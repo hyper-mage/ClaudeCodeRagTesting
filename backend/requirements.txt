@@ -1,0 +1,11 @@
+fastapi==0.115.12
+uvicorn==0.34.2
+openai==1.74.0
+langsmith==0.3.42
+supabase==2.13.0
+python-dotenv==1.1.0
+pydantic==2.11.1
+pydantic-settings==2.9.1
+sse-starlette==2.2.1
+PyJWT==2.10.1
+cryptography==46.0.5
