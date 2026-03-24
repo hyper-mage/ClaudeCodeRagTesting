@@ -6,7 +6,7 @@ export default function DocumentsPage() {
   const { documents, uploadDocument, deleteDocument } = useDocuments()
 
   const handleUpload = async (file: File) => {
-    await uploadDocument(file)
+    return await uploadDocument(file)
   }
 
   return (

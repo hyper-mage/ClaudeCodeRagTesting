@@ -54,6 +54,9 @@ export function useDocuments() {
     }
 
     const doc = await res.json()
+    if (doc.duplicate) {
+      return doc  // Don't add to list — it already exists
+    }
     setDocuments(prev => [doc, ...prev])
     return doc
   }, [session])

@@ -1,8 +1,12 @@
 import uuid
+import logging
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from auth import get_user_id
 from database import get_supabase
-from services.ingestion_service import process_document
+from services.ingestion_service import process_document, process_document_incremental
+from services.record_manager import hash_content, check_duplicate, find_previous_version
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/documents", tags=["documents"])
 
@@ -32,7 +36,20 @@ async def upload_document(
 
     # Read file content
     content = await file.read()
+    content_hash = hash_content(content)
     file_size = len(content)
+    logger.info(f"Upload '{filename}': content_hash={content_hash[:12]}..., size={file_size}")
+
+    # Path A: Exact duplicate
+    existing = check_duplicate(user_id, content_hash)
+    if existing:
+        logger.info(f"Duplicate detected for '{filename}': existing doc {existing['id']}")
+        return {**existing, "duplicate": True, "message": "This file has already been uploaded"}
+
+    # Path B: Check for same filename (incremental update candidate)
+    previous = find_previous_version(user_id, filename)
+    if previous:
+        logger.info(f"Previous version found for '{filename}': doc {previous['id']}, has_hash={bool(previous.get('content_hash'))}")
 
     # Upload to Supabase Storage
     storage_path = f"{user_id}/{doc_id}/{filename}"
@@ -51,13 +68,19 @@ async def upload_document(
         "file_size": file_size,
         "mime_type": mime_type,
         "status": "pending",
+        "content_hash": content_hash,
     }).execute()
 
     # Process document (synchronous for now)
     try:
-        process_document(doc_id, user_id)
-    except Exception:
-        pass  # Status already set to 'failed' inside process_document
+        if previous and previous.get("content_hash"):
+            logger.info(f"Incremental processing '{filename}' (old doc: {previous['id']})")
+            process_document_incremental(doc_id, user_id, previous["id"])
+        else:
+            logger.info(f"Full processing '{filename}'")
+            process_document(doc_id, user_id)
+    except Exception as e:
+        logger.error(f"Processing failed for '{filename}': {e}")
 
     # Return updated document
     result = db.table("documents").select("*").eq("id", doc_id).single().execute()

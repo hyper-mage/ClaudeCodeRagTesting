@@ -1,6 +1,7 @@
 from config import get_settings
 from database import get_supabase
 from services.embedding_service import get_embeddings
+from services.record_manager import hash_chunk, get_existing_chunk_hashes, diff_chunks
 import uuid
 
 
@@ -96,6 +97,7 @@ def process_document(doc_id: str, user_id: str) -> None:
                 "content": chunk_text_content,
                 "chunk_index": i,
                 "embedding": embedding,
+                "content_hash": hash_chunk(chunk_text_content),
                 "metadata": {"filename": doc.data["filename"], "chunk_index": i},
             })
 
@@ -115,4 +117,99 @@ def process_document(doc_id: str, user_id: str) -> None:
             "status": "failed",
             "error_message": str(e),
         }).eq("id", doc_id).execute()
+        raise
+
+
+def process_document_incremental(new_doc_id: str, user_id: str, old_doc_id: str) -> None:
+    """Incremental processing: diff chunks, embed only new ones, reuse unchanged."""
+    db = get_supabase()
+    settings = get_settings()
+
+    try:
+        # Update status to processing
+        db.table("documents").update({"status": "processing"}).eq("id", new_doc_id).execute()
+
+        # Get new document record
+        doc = db.table("documents").select("*").eq("id", new_doc_id).single().execute()
+        storage_path = doc.data["storage_path"]
+
+        # Download + chunk new file
+        file_bytes = db.storage.from_("documents").download(storage_path)
+        text = file_bytes.decode("utf-8")
+
+        if not text.strip():
+            raise ValueError("Document is empty")
+
+        chunks = chunk_text(text, settings.chunk_size, settings.chunk_overlap)
+        if not chunks:
+            raise ValueError("No chunks generated from document")
+
+        # Hash each new chunk
+        new_chunk_hashes = [hash_chunk(c) for c in chunks]
+
+        # Get old chunk hashes
+        old_hashes = get_existing_chunk_hashes(old_doc_id)
+
+        # Diff
+        new_indices, stale_ids = diff_chunks(old_hashes, new_chunk_hashes)
+
+        # Delete stale chunks from old document
+        if stale_ids:
+            for stale_id in stale_ids:
+                db.table("document_chunks").delete().eq("id", stale_id).execute()
+
+        # Re-parent surviving chunks (update document_id + chunk_index to new doc)
+        surviving_hashes = {h: cid for h, cid in old_hashes.items() if h in set(new_chunk_hashes)}
+        for i, ch in enumerate(new_chunk_hashes):
+            if ch in surviving_hashes:
+                db.table("document_chunks").update({
+                    "document_id": new_doc_id,
+                    "chunk_index": i,
+                }).eq("id", surviving_hashes[ch]).execute()
+
+        # Embed + insert only new chunks
+        if new_indices:
+            new_texts = [chunks[i] for i in new_indices]
+            batch_size = 100
+            all_embeddings = []
+            for i in range(0, len(new_texts), batch_size):
+                batch = new_texts[i:i + batch_size]
+                embeddings = get_embeddings(batch)
+                all_embeddings.extend(embeddings)
+
+            chunk_rows = []
+            for idx_in_new, embed_idx in enumerate(new_indices):
+                chunk_rows.append({
+                    "document_id": new_doc_id,
+                    "user_id": user_id,
+                    "content": chunks[embed_idx],
+                    "chunk_index": embed_idx,
+                    "embedding": all_embeddings[idx_in_new],
+                    "content_hash": new_chunk_hashes[embed_idx],
+                    "metadata": {"filename": doc.data["filename"], "chunk_index": embed_idx},
+                })
+
+            for i in range(0, len(chunk_rows), 100):
+                batch = chunk_rows[i:i + 100]
+                db.table("document_chunks").insert(batch).execute()
+
+        # Delete old document record + storage file
+        old_doc = db.table("documents").select("storage_path").eq("id", old_doc_id).single().execute()
+        try:
+            db.storage.from_("documents").remove([old_doc.data["storage_path"]])
+        except Exception:
+            pass  # Storage file may already be gone
+        db.table("documents").delete().eq("id", old_doc_id).execute()
+
+        # Update new document status to completed
+        db.table("documents").update({
+            "status": "completed",
+            "chunk_count": len(chunks),
+        }).eq("id", new_doc_id).execute()
+
+    except Exception as e:
+        db.table("documents").update({
+            "status": "failed",
+            "error_message": str(e),
+        }).eq("id", new_doc_id).execute()
         raise

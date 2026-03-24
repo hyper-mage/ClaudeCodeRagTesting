@@ -37,3 +37,10 @@ Track your progress through the masterclass. Update this file as you complete mo
   - [x] Vector dimensions fixed (2048 for Nemotron embed, no index — pgvector 2000 dim limit)
   - [x] Embedding service switched to raw HTTP (OpenAI SDK parsing issue with OpenRouter)
   - [x] E2E tests: 22/22 passed (auth, threads, chat, streaming, history, documents, upload, chunking, RAG retrieval, cleanup)
+
+### Module 3: Record Manager
+- [x] Task 1: Database Migration (content_hash columns + unique index)
+- [x] Task 2: Record Manager Service (hashing + diff logic)
+- [x] Task 3: Upload Router + Ingestion Service Changes
+- [x] Task 4: Frontend Duplicate Feedback
+- [x] Task 5: End-to-End Verification
