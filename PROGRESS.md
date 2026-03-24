@@ -17,3 +17,23 @@ Track your progress through the masterclass. Update this file as you complete mo
 - [x] Task 4: Frontend — Auth UI & App Shell
 - [x] Task 5: OpenAI Responses API + SSE Streaming
 - [x] Task 6: LangSmith Observability
+
+### Module 2: BYO Retrieval + Memory
+- [x] Task 1: Configuration for Multi-Provider Support
+- [x] Task 2: LLM Service Rewrite (Chat Completions)
+- [x] Task 3: Chat Router for Stateless Completions
+- [x] Task 4a: Drop OpenAI Columns Migration
+- [x] Task 4b: Ingestion Schema (pgvector + documents + chunks)
+- [x] Task 5: Supabase Storage Bucket
+- [x] Task 6: Embedding Service
+- [x] Task 7: Ingestion Backend (Upload + Processing Pipeline)
+- [x] Task 8: Retrieval Service + Tool Calling in Chat
+- [x] Task 9: Icon Sidebar Navigation
+- [x] Task 10: Documents Page + File Upload + Realtime Status
+- [x] Task 11: End-to-End Verification
+  - [x] SQL migrations run (003–010)
+  - [x] Realtime enabled on documents table
+  - [x] .env configured (OpenRouter + Nemotron models)
+  - [x] Vector dimensions fixed (2048 for Nemotron embed, no index — pgvector 2000 dim limit)
+  - [x] Embedding service switched to raw HTTP (OpenAI SDK parsing issue with OpenRouter)
+  - [x] E2E tests: 22/22 passed (auth, threads, chat, streaming, history, documents, upload, chunking, RAG retrieval, cleanup)

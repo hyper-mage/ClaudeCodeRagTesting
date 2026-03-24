@@ -53,7 +53,7 @@ export default function ChatPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-950 text-white flex">
+    <div className="flex-1 bg-gray-950 text-white flex overflow-hidden">
       <ThreadSidebar
         threads={threads}
         activeThreadId={activeThreadId}

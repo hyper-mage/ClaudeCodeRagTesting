@@ -4,7 +4,7 @@ from sse_starlette.sse import EventSourceResponse
 from auth import get_user_id
 from database import get_supabase
 from models.schemas import MessageCreate
-from services.openai_service import get_openai_client, create_thread, add_message_to_thread, stream_run
+from services.llm_service import stream_chat_completion
 
 try:
     from langsmith import traceable
@@ -15,6 +15,22 @@ except ImportError:
         return lambda f: f
 
 router = APIRouter(prefix="/api/threads", tags=["chat"])
+
+
+RETRIEVAL_TOOL = {
+    "type": "function",
+    "function": {
+        "name": "search_documents",
+        "description": "Search the user's uploaded documents for relevant information",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "query": {"type": "string", "description": "Search query"}
+            },
+            "required": ["query"],
+        },
+    },
+}
 
 
 @router.post("/{thread_id}/messages")
@@ -39,37 +55,82 @@ async def send_message(
         raise HTTPException(status_code=404, detail="Thread not found")
 
     # Store user message
-    user_msg = (
+    db.table("messages").insert({
+        "thread_id": thread_id,
+        "user_id": user_id,
+        "role": "user",
+        "content": body.content,
+    }).execute()
+
+    # Load all messages for this thread
+    history = (
         db.table("messages")
-        .insert({
-            "thread_id": thread_id,
-            "user_id": user_id,
-            "role": "user",
-            "content": body.content,
-        })
+        .select("role, content")
+        .eq("thread_id", thread_id)
+        .eq("user_id", user_id)
+        .order("created_at")
         .execute()
     )
-
-    client = get_openai_client()
-
-    # Create OpenAI thread if needed
-    openai_thread_id = thread.data.get("openai_thread_id")
-    if not openai_thread_id:
-        openai_thread_id = create_thread(client)
-        db.table("threads").update({"openai_thread_id": openai_thread_id}).eq("id", thread_id).execute()
-
-    # Add message to OpenAI thread
-    add_message_to_thread(client, openai_thread_id, body.content)
+    messages = [{"role": m["role"], "content": m["content"]} for m in history.data]
 
     async def event_generator():
         full_content = ""
         try:
-            for delta in stream_run(client, openai_thread_id):
-                full_content += delta
-                yield {
-                    "event": "content_delta",
-                    "data": json.dumps({"text": delta}),
-                }
+            # Check if user has any documents for retrieval
+            doc_check = (
+                db.table("documents")
+                .select("id")
+                .eq("user_id", user_id)
+                .eq("status", "completed")
+                .limit(1)
+                .execute()
+            )
+            tools = [RETRIEVAL_TOOL] if doc_check.data else None
+
+            current_messages = list(messages)
+
+            while True:
+                tool_call_happened = False
+
+                for event in stream_chat_completion(current_messages, tools=tools):
+                    if event["type"] == "text_delta":
+                        full_content += event["text"]
+                        yield {
+                            "event": "content_delta",
+                            "data": json.dumps({"text": event["text"]}),
+                        }
+                    elif event["type"] == "tool_call":
+                        tool_call_happened = True
+                        # Execute tool calls
+                        from services.retrieval_service import search_documents
+
+                        # Add assistant message with tool calls
+                        current_messages.append({
+                            "role": "assistant",
+                            "tool_calls": event["tool_calls"],
+                        })
+
+                        for tc in event["tool_calls"]:
+                            fn_name = tc["function"]["name"]
+                            fn_args = json.loads(tc["function"]["arguments"])
+
+                            if fn_name == "search_documents":
+                                results = search_documents(
+                                    user_id=user_id,
+                                    query=fn_args["query"],
+                                )
+                                tool_result = json.dumps(results)
+                            else:
+                                tool_result = json.dumps({"error": f"Unknown tool: {fn_name}"})
+
+                            current_messages.append({
+                                "role": "tool",
+                                "tool_call_id": tc["id"],
+                                "content": tool_result,
+                            })
+
+                if not tool_call_happened:
+                    break
 
             # Store assistant message
             assistant_msg = (

@@ -16,6 +16,22 @@ class Settings(BaseSettings):
     langchain_tracing_v2: str = "true"
     langchain_project: str = "rag-masterclass"
 
+    # Chat LLM (OpenRouter default, works with any OpenAI-compatible API)
+    llm_base_url: str = "https://openrouter.ai/api/v1"
+    llm_api_key: str = ""
+    llm_model: str = ""
+    system_prompt: str = "You are a helpful assistant. Answer questions clearly and concisely."
+
+    # Embeddings (separate provider — not all chat providers support embeddings)
+    embedding_base_url: str = "https://api.openai.com/v1"
+    embedding_api_key: str = ""
+    embedding_model: str = "text-embedding-3-small"
+    embedding_dimensions: int = 1536
+
+    # Chunking
+    chunk_size: int = 1000
+    chunk_overlap: int = 200
+
     # Frontend vars (read from VITE_ prefix env vars)
     vite_supabase_url: str = ""
     vite_supabase_anon_key: str = ""
@@ -23,6 +39,14 @@ class Settings(BaseSettings):
     @property
     def supabase_url_resolved(self) -> str:
         return self.supabase_url or self.vite_supabase_url
+
+    @property
+    def resolved_llm_api_key(self) -> str:
+        return self.llm_api_key or self.openai_api_key
+
+    @property
+    def resolved_embedding_api_key(self) -> str:
+        return self.embedding_api_key or self.openai_api_key
 
 
 @lru_cache

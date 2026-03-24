@@ -1,5 +1,3 @@
-import { useAuth } from '../contexts/AuthContext'
-
 interface Thread {
   id: string
   title: string | null
@@ -16,8 +14,6 @@ interface Props {
 }
 
 export default function ThreadSidebar({ threads, activeThreadId, onSelectThread, onNewThread, onDeleteThread }: Props) {
-  const { signOut } = useAuth()
-
   return (
     <div className="w-64 bg-gray-900 border-r border-gray-800 flex flex-col h-full">
       <div className="p-3">
@@ -46,14 +42,6 @@ export default function ThreadSidebar({ threads, activeThreadId, onSelectThread,
             </button>
           </div>
         ))}
-      </div>
-      <div className="p-3 border-t border-gray-800">
-        <button
-          onClick={signOut}
-          className="w-full py-2 px-3 text-sm text-gray-400 hover:text-white hover:bg-gray-800 rounded"
-        >
-          Sign Out
-        </button>
       </div>
     </div>
   )
