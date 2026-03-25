@@ -38,7 +38,15 @@ export default function DocumentList({ documents, onDelete }: Props) {
               {doc.chunk_count != null && doc.status === 'completed' && (
                 <span className="text-gray-500 text-xs">{doc.chunk_count} chunks</span>
               )}
+              {doc.status === 'completed' && doc.metadata?.document_type && (
+                <span className="bg-purple-600 text-purple-100 px-1.5 py-0.5 rounded text-xs">
+                  {doc.metadata.document_type.replace(/_/g, ' ')}
+                </span>
+              )}
             </div>
+            {doc.status === 'completed' && doc.metadata?.topic && (
+              <p className="text-gray-500 text-xs mt-0.5 truncate">{doc.metadata.topic}</p>
+            )}
             {doc.error_message && (
               <p className="text-red-400 text-xs mt-1 truncate">{doc.error_message}</p>
             )}

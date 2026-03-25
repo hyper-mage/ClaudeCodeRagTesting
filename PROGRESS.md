@@ -44,3 +44,12 @@ Track your progress through the masterclass. Update this file as you complete mo
 - [x] Task 3: Upload Router + Ingestion Service Changes
 - [x] Task 4: Frontend Duplicate Feedback
 - [x] Task 5: End-to-End Verification
+
+### Module 4: Metadata Extraction
+- [x] Task 1: Pydantic DocumentMetadata Model
+- [x] Task 2: Metadata Extraction Service (LLM-powered structured extraction)
+- [x] Task 3: Database Migration (metadata column, GIN index, RPC update)
+- [x] Task 4: Integrate Extraction into Ingestion Pipeline
+- [x] Task 5: Retrieval Service Metadata Filtering
+- [x] Task 6: Enhanced Tool Definition (document_type + topic filters)
+- [x] Task 7: Frontend Display (metadata badges) + E2E Verification

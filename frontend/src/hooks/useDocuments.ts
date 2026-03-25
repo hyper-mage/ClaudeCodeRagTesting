@@ -2,6 +2,14 @@ import { useState, useCallback, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 
+export interface DocumentMetadata {
+  document_type: string
+  topic: string
+  keywords: string[]
+  summary: string
+  language: string
+}
+
 export interface Document {
   id: string
   filename: string
@@ -10,6 +18,7 @@ export interface Document {
   status: 'pending' | 'processing' | 'completed' | 'failed'
   error_message: string | null
   chunk_count: number | null
+  metadata: DocumentMetadata | null
   created_at: string
   updated_at: string
 }

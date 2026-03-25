@@ -1,5 +1,21 @@
 from pydantic import BaseModel
 from datetime import datetime
+from typing import Literal
+
+
+class DocumentMetadata(BaseModel):
+    document_type: Literal[
+        "technical_documentation",
+        "meeting_notes",
+        "research_paper",
+        "tutorial",
+        "email",
+        "general",
+    ] = "general"
+    topic: str = ""
+    keywords: list[str] = []
+    summary: str = ""
+    language: str = "en"
 
 
 class ThreadCreate(BaseModel):
@@ -38,5 +54,6 @@ class DocumentResponse(BaseModel):
     error_message: str | None
     chunk_count: int | None
     content_hash: str | None = None
+    metadata: dict | None = None
     created_at: datetime
     updated_at: datetime

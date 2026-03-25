@@ -1,7 +1,10 @@
 import json
+import logging
 from fastapi import APIRouter, Depends, HTTPException
 from sse_starlette.sse import EventSourceResponse
 from auth import get_user_id
+
+logger = logging.getLogger(__name__)
 from database import get_supabase
 from models.schemas import MessageCreate
 from services.llm_service import stream_chat_completion
@@ -21,11 +24,30 @@ RETRIEVAL_TOOL = {
     "type": "function",
     "function": {
         "name": "search_documents",
-        "description": "Search the user's uploaded documents for relevant information",
+        "description": (
+            "Search the user's uploaded documents for relevant information. "
+            "Optionally filter by document_type or topic to narrow results."
+        ),
         "parameters": {
             "type": "object",
             "properties": {
-                "query": {"type": "string", "description": "Search query"}
+                "query": {"type": "string", "description": "Search query"},
+                "document_type": {
+                    "type": "string",
+                    "enum": [
+                        "technical_documentation",
+                        "meeting_notes",
+                        "research_paper",
+                        "tutorial",
+                        "email",
+                        "general",
+                    ],
+                    "description": "Filter by document type, e.g. 'tutorial' or 'meeting_notes'",
+                },
+                "topic": {
+                    "type": "string",
+                    "description": "Filter by document topic",
+                },
             },
             "required": ["query"],
         },
@@ -115,11 +137,22 @@ async def send_message(
                             fn_args = json.loads(tc["function"]["arguments"])
 
                             if fn_name == "search_documents":
-                                results = search_documents(
-                                    user_id=user_id,
-                                    query=fn_args["query"],
-                                )
-                                tool_result = json.dumps(results)
+                                # Build metadata filter from optional params
+                                metadata_filter = {}
+                                if "document_type" in fn_args:
+                                    metadata_filter["document_type"] = fn_args["document_type"]
+                                if "topic" in fn_args:
+                                    metadata_filter["topic"] = fn_args["topic"]
+                                try:
+                                    results = search_documents(
+                                        user_id=user_id,
+                                        query=fn_args["query"],
+                                        metadata_filter=metadata_filter or None,
+                                    )
+                                    tool_result = json.dumps(results)
+                                except Exception as e:
+                                    logger.error(f"search_documents failed: {e}", exc_info=True)
+                                    tool_result = json.dumps({"error": str(e)})
                             else:
                                 tool_result = json.dumps({"error": f"Unknown tool: {fn_name}"})
 

@@ -1,6 +1,7 @@
 from config import get_settings
 from database import get_supabase
 from services.embedding_service import get_embeddings
+from services.metadata_service import extract_metadata_safe
 from services.record_manager import hash_chunk, get_existing_chunk_hashes, diff_chunks
 import uuid
 
@@ -75,6 +76,13 @@ def process_document(doc_id: str, user_id: str) -> None:
         if not text.strip():
             raise ValueError("Document is empty")
 
+        # Extract metadata via LLM
+        metadata = extract_metadata_safe(text)
+        metadata_dict = metadata.model_dump()
+
+        # Store metadata on document record
+        db.table("documents").update({"metadata": metadata_dict}).eq("id", doc_id).execute()
+
         # Chunk the text
         chunks = chunk_text(text, settings.chunk_size, settings.chunk_overlap)
         if not chunks:
@@ -98,7 +106,7 @@ def process_document(doc_id: str, user_id: str) -> None:
                 "chunk_index": i,
                 "embedding": embedding,
                 "content_hash": hash_chunk(chunk_text_content),
-                "metadata": {"filename": doc.data["filename"], "chunk_index": i},
+                "metadata": {"filename": doc.data["filename"], "chunk_index": i, **metadata_dict},
             })
 
         # Insert in batches
@@ -139,6 +147,13 @@ def process_document_incremental(new_doc_id: str, user_id: str, old_doc_id: str)
 
         if not text.strip():
             raise ValueError("Document is empty")
+
+        # Extract metadata via LLM
+        metadata = extract_metadata_safe(text)
+        metadata_dict = metadata.model_dump()
+
+        # Store metadata on document record
+        db.table("documents").update({"metadata": metadata_dict}).eq("id", new_doc_id).execute()
 
         chunks = chunk_text(text, settings.chunk_size, settings.chunk_overlap)
         if not chunks:
@@ -186,7 +201,7 @@ def process_document_incremental(new_doc_id: str, user_id: str, old_doc_id: str)
                     "chunk_index": embed_idx,
                     "embedding": all_embeddings[idx_in_new],
                     "content_hash": new_chunk_hashes[embed_idx],
-                    "metadata": {"filename": doc.data["filename"], "chunk_index": embed_idx},
+                    "metadata": {"filename": doc.data["filename"], "chunk_index": embed_idx, **metadata_dict},
                 })
 
             for i in range(0, len(chunk_rows), 100):
