@@ -23,6 +23,10 @@ async def upload_document(
     mime_map = {
         ".txt": "text/plain",
         ".md": "text/markdown",
+        ".pdf": "application/pdf",
+        ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        ".html": "text/html",
+        ".htm": "text/html",
     }
     filename = file.filename or "unnamed"
     ext = "." + filename.rsplit(".", 1)[-1].lower() if "." in filename else ""
@@ -31,7 +35,7 @@ async def upload_document(
     if not mime_type:
         raise HTTPException(
             status_code=400,
-            detail=f"Unsupported file type: {ext}. Supported: .txt, .md"
+            detail=f"Unsupported file type: {ext}. Supported: .txt, .md, .pdf, .docx, .html"
         )
 
     # Read file content

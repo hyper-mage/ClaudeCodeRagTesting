@@ -38,13 +38,15 @@ Technically-minded people who want to build production RAG systems using AI codi
 ### Out of Scope
 - ❌ Knowledge graphs / GraphRAG
 - ❌ Code execution / sandboxing
-- ❌ Image/audio/video processing
 - ❌ Fine-tuning
 - ❌ Multi-tenant admin features
 - ❌ Billing/payments
 - ❌ Data connectors (Google Drive, SFTP, APIs, webhooks)
 - ❌ Scheduled/automated ingestion
 - ❌ Admin UI (config via env vars)
+
+### Nice to Have (Post-Modules)
+- 🟡 Image understanding in PDFs — use docling's VLM support (`docling[vlm]`) to extract image descriptions, embed them alongside text chunks for retrieval
 
 ## Stack
 

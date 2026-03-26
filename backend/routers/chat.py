@@ -6,6 +6,7 @@ from auth import get_user_id
 
 logger = logging.getLogger(__name__)
 from database import get_supabase
+from config import get_settings
 from models.schemas import MessageCreate
 from services.llm_service import stream_chat_completion
 
@@ -149,7 +150,12 @@ async def send_message(
                                         query=fn_args["query"],
                                         metadata_filter=metadata_filter or None,
                                     )
-                                    tool_result = json.dumps(results)
+                                    settings = get_settings()
+                                    tool_result = json.dumps({
+                                        "search_mode": settings.search_mode,
+                                        "reranked": settings.rerank_enabled,
+                                        "results": results,
+                                    })
                                 except Exception as e:
                                     logger.error(f"search_documents failed: {e}", exc_info=True)
                                     tool_result = json.dumps({"error": str(e)})

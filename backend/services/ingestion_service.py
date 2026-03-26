@@ -2,6 +2,7 @@ from config import get_settings
 from database import get_supabase
 from services.embedding_service import get_embeddings
 from services.metadata_service import extract_metadata_safe
+from services.parsing_service import extract_text
 from services.record_manager import hash_chunk, get_existing_chunk_hashes, diff_chunks
 import uuid
 
@@ -64,14 +65,9 @@ def process_document(doc_id: str, user_id: str) -> None:
         storage_path = doc.data["storage_path"]
         mime_type = doc.data["mime_type"]
 
-        # Validate file type
-        supported_types = ["text/plain", "text/markdown"]
-        if mime_type not in supported_types:
-            raise ValueError(f"Unsupported file type: {mime_type}. Supported: .txt, .md")
-
-        # Download file from storage
+        # Download file from storage and extract text
         file_bytes = db.storage.from_("documents").download(storage_path)
-        text = file_bytes.decode("utf-8")
+        text = extract_text(file_bytes, mime_type, doc.data["filename"])
 
         if not text.strip():
             raise ValueError("Document is empty")
@@ -141,9 +137,9 @@ def process_document_incremental(new_doc_id: str, user_id: str, old_doc_id: str)
         doc = db.table("documents").select("*").eq("id", new_doc_id).single().execute()
         storage_path = doc.data["storage_path"]
 
-        # Download + chunk new file
+        # Download + extract text from new file
         file_bytes = db.storage.from_("documents").download(storage_path)
-        text = file_bytes.decode("utf-8")
+        text = extract_text(file_bytes, doc.data["mime_type"], doc.data["filename"])
 
         if not text.strip():
             raise ValueError("Document is empty")

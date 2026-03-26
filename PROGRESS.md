@@ -53,3 +53,26 @@ Track your progress through the masterclass. Update this file as you complete mo
 - [x] Task 5: Retrieval Service Metadata Filtering
 - [x] Task 6: Enhanced Tool Definition (document_type + topic filters)
 - [x] Task 7: Frontend Display (metadata badges) + E2E Verification
+
+### Module 5: Multi-Format Document Support
+- [x] Task 1: Install Docling Dependency
+- [x] Task 2: Parsing Service (docling wrapper with extract_text)
+- [x] Task 3: Backend MIME Map + Ingestion Integration
+- [x] Task 4: Frontend File Upload Updates
+- [ ] Task 5: End-to-End Testing (PDF, DOCX, HTML, MD, TXT) — blocked by OpenRouter rate limit, retry when credits reset
+
+### Module 6: Hybrid Search & Reranking
+- [x] Task 1: Configuration (search_mode, RRF params, rerank settings)
+- [x] Task 2: Database Migration (tsvector column, GIN index, trigger)
+- [x] Task 3: Keyword Search RPC Function
+- [x] Task 4: Rerank Service (LLM + API providers)
+- [x] Task 5: Hybrid Retrieval with RRF Fusion
+- [x] Task 6: Chat Router Wiring (search mode context in tool results)
+- [x] Task 7: End-to-End Verification
+  - [x] Config loads with new settings (hybrid mode, RRF k=60, rerank disabled)
+  - [x] All services import correctly (retrieval, rerank)
+  - [x] RRF fusion logic verified (deduplication, score boosting, correct ordering)
+  - [x] Rerank no-ops correctly when disabled
+  - [x] Chat router imports with new config dependency
+  - [x] Run migrations 013-014 in Supabase SQL Editor
+  - [ ] E2E: upload doc, test hybrid search vs vector-only, verify LangSmith traces — blocked by OpenRouter rate limit, retry when credits reset

@@ -32,6 +32,20 @@ class Settings(BaseSettings):
     chunk_size: int = 1000
     chunk_overlap: int = 200
 
+    # Search
+    search_mode: str = "hybrid"  # "vector_only", "keyword_only", "hybrid"
+    search_rrf_k: int = 60  # RRF constant (standard default)
+    search_vector_weight: float = 1.0  # weight for vector results in RRF
+    search_keyword_weight: float = 1.0  # weight for keyword results in RRF
+
+    # Reranking (optional — disabled by default)
+    rerank_enabled: bool = False
+    rerank_provider: str = "llm"  # "llm" or "api"
+    rerank_base_url: str = ""  # for api provider (Jina, Cohere, etc.)
+    rerank_api_key: str = ""
+    rerank_model: str = ""
+    rerank_top_k: int = 5  # results to keep after reranking
+
     # Frontend vars (read from VITE_ prefix env vars)
     vite_supabase_url: str = ""
     vite_supabase_anon_key: str = ""
