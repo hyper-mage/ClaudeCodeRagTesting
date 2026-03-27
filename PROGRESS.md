@@ -59,7 +59,7 @@ Track your progress through the masterclass. Update this file as you complete mo
 - [x] Task 2: Parsing Service (docling wrapper with extract_text)
 - [x] Task 3: Backend MIME Map + Ingestion Integration
 - [x] Task 4: Frontend File Upload Updates
-- [ ] Task 5: End-to-End Testing (PDF, DOCX, HTML, MD, TXT) — blocked by OpenRouter rate limit, retry when credits reset
+- [x] Task 5: End-to-End Testing (PDF, DOCX, HTML, MD, TXT)
 
 ### Module 6: Hybrid Search & Reranking
 - [x] Task 1: Configuration (search_mode, RRF params, rerank settings)
@@ -75,4 +75,4 @@ Track your progress through the masterclass. Update this file as you complete mo
   - [x] Rerank no-ops correctly when disabled
   - [x] Chat router imports with new config dependency
   - [x] Run migrations 013-014 in Supabase SQL Editor
-  - [ ] E2E: upload doc, test hybrid search vs vector-only, verify LangSmith traces — blocked by OpenRouter rate limit, retry when credits reset
+  - [x] E2E: upload doc, test hybrid search vs vector-only, verify LangSmith traces
