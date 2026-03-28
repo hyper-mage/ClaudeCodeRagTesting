@@ -1,10 +1,16 @@
 import MessageBubble from './MessageBubble'
 import ChatInput from './ChatInput'
 
+interface ToolEvent {
+  tool: string
+  args_preview: string
+}
+
 interface Message {
   id: string
   role: 'user' | 'assistant'
   content: string
+  toolsUsed?: ToolEvent[]
 }
 
 interface Props {
@@ -23,7 +29,7 @@ export default function ChatContainer({ messages, onSend, isStreaming }: Props) 
           </div>
         )}
         {messages.map(msg => (
-          <MessageBubble key={msg.id} role={msg.role} content={msg.content} />
+          <MessageBubble key={msg.id} role={msg.role} content={msg.content} toolsUsed={msg.toolsUsed} />
         ))}
       </div>
       <ChatInput onSend={onSend} disabled={isStreaming} />

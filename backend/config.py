@@ -20,7 +20,11 @@ class Settings(BaseSettings):
     llm_base_url: str = "https://openrouter.ai/api/v1"
     llm_api_key: str = ""
     llm_model: str = ""
-    system_prompt: str = "You are a helpful assistant. Answer questions clearly and concisely."
+    system_prompt: str = (
+        "You are a helpful assistant with access to tools. Answer questions clearly and concisely. "
+        "When using web search results, always cite your sources with URLs. "
+        "When showing database query results, format them as markdown tables when appropriate."
+    )
 
     # Embeddings (separate provider — not all chat providers support embeddings)
     embedding_base_url: str = "https://api.openai.com/v1"
@@ -46,6 +50,14 @@ class Settings(BaseSettings):
     rerank_model: str = ""
     rerank_top_k: int = 5  # results to keep after reranking
 
+    # Web Search (optional — tool only available when API key is set)
+    web_search_provider: str = "tavily"
+    web_search_api_key: str = ""
+    web_search_max_results: int = 5
+
+    # Text-to-SQL
+    sql_max_rows: int = 50  # max rows returned from user queries
+
     # Frontend vars (read from VITE_ prefix env vars)
     vite_supabase_url: str = ""
     vite_supabase_anon_key: str = ""
@@ -61,6 +73,10 @@ class Settings(BaseSettings):
     @property
     def resolved_embedding_api_key(self) -> str:
         return self.embedding_api_key or self.openai_api_key
+
+    @property
+    def web_search_enabled(self) -> bool:
+        return bool(self.web_search_api_key)
 
 
 @lru_cache

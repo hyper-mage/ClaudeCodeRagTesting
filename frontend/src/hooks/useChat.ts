@@ -1,10 +1,16 @@
 import { useState, useCallback } from 'react'
 import { supabase } from '../lib/supabase'
 
+export interface ToolEvent {
+  tool: string
+  args_preview: string
+}
+
 export interface Message {
   id: string
   role: 'user' | 'assistant'
   content: string
+  toolsUsed?: ToolEvent[]
 }
 
 export function useChat(threadId: string | null) {
@@ -75,7 +81,16 @@ export function useChat(threadId: string | null) {
             // Find the event type from the previous line
             try {
               const parsed = JSON.parse(eventData)
-              if (parsed.text !== undefined) {
+              if (parsed.tool_event === true) {
+                // tool usage event — add to assistant message's toolsUsed
+                setMessages(prev =>
+                  prev.map(m =>
+                    m.id === assistantId
+                      ? { ...m, toolsUsed: [...(m.toolsUsed || []), { tool: parsed.tool, args_preview: parsed.args_preview }] }
+                      : m
+                  )
+                )
+              } else if (parsed.text !== undefined) {
                 // content_delta
                 setMessages(prev =>
                   prev.map(m =>

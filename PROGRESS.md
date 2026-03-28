@@ -76,3 +76,14 @@ Track your progress through the masterclass. Update this file as you complete mo
   - [x] Chat router imports with new config dependency
   - [x] Run migrations 013-014 in Supabase SQL Editor
   - [x] E2E: upload doc, test hybrid search vs vector-only, verify LangSmith traces
+
+### Module 7: Text-to-SQL + Web Search
+- [x] Task 1: Web Search & SQL Config (config.py settings + system prompt)
+- [x] Task 2: Safe SQL Execution RPC (migration 015)
+- [x] Task 3: SQL Execution Service (sql_service.py)
+- [x] Task 4: Web Search Service (web_search_service.py — Tavily)
+- [x] Task 5: Multi-Tool Chat Router (tool definitions + execute_tool dispatch)
+- [x] Task 6: SSE Tool Events (tool_event streaming)
+- [x] Task 7: Frontend Tool Indicators (badges in MessageBubble)
+- [x] Task 8: Markdown Rendering + Attribution (react-markdown + typography plugin)
+- [ ] Task 9: End-to-End Verification
