@@ -86,4 +86,4 @@ Track your progress through the masterclass. Update this file as you complete mo
 - [x] Task 6: SSE Tool Events (tool_event streaming)
 - [x] Task 7: Frontend Tool Indicators (badges in MessageBubble)
 - [x] Task 8: Markdown Rendering + Attribution (react-markdown + typography plugin)
-- [ ] Task 9: End-to-End Verification
+- [x] Task 9: End-to-End Verification

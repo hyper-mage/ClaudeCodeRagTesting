@@ -21,9 +21,9 @@ export default function MessageBubble({ role, content, toolsUsed }: Props) {
   return (
     <div className={`flex ${role === 'user' ? 'justify-end' : 'justify-start'} mb-4`}>
       <div
-        className={`max-w-[70%] px-4 py-2 rounded-lg whitespace-pre-wrap ${
+        className={`max-w-[70%] px-4 py-2 rounded-lg ${
           role === 'user'
-            ? 'bg-blue-600 text-white'
+            ? 'bg-blue-600 text-white whitespace-pre-wrap'
             : 'bg-gray-800 text-gray-100'
         }`}
       >
@@ -40,8 +40,8 @@ export default function MessageBubble({ role, content, toolsUsed }: Props) {
           </div>
         )}
         {role === 'assistant' ? (
+          <div className="prose prose-invert prose-sm max-w-none [&>*:first-child]:mt-0 [&>*:last-child]:mb-0">
           <ReactMarkdown
-            className="prose prose-invert prose-sm max-w-none"
             components={{
               a: ({ href, children }) => (
                 <a href={href} target="_blank" rel="noopener noreferrer" className="text-blue-400 underline">
@@ -61,8 +61,9 @@ export default function MessageBubble({ role, content, toolsUsed }: Props) {
               ),
             }}
           >
-            {content}
+            {content || ''}
           </ReactMarkdown>
+          </div>
         ) : (
           content
         )}
