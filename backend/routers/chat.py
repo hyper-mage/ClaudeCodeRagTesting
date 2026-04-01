@@ -106,6 +106,33 @@ WEB_SEARCH_TOOL = {
     },
 }
 
+ANALYZE_DOCUMENT_TOOL = {
+    "type": "function",
+    "function": {
+        "name": "analyze_document",
+        "description": (
+            "Analyze an entire uploaded document in depth. Use this when the user asks "
+            "about a specific document by name - for example, to summarize it, extract "
+            "key points, compare sections, or answer detailed questions that require "
+            "reading the whole document rather than searching for specific passages."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "document_name": {
+                    "type": "string",
+                    "description": "The filename of the document to analyze (e.g. 'report.pdf')",
+                },
+                "query": {
+                    "type": "string",
+                    "description": "What to analyze or answer about the document",
+                },
+            },
+            "required": ["document_name", "query"],
+        },
+    },
+}
+
 
 def execute_tool(fn_name: str, fn_args: dict, user_id: str) -> str:
     """Dispatch a tool call to the appropriate service and return JSON result."""
@@ -141,6 +168,15 @@ def execute_tool(fn_name: str, fn_args: dict, user_id: str) -> str:
     elif fn_name == "web_search":
         result = search_web(query=fn_args["query"])
         return json.dumps({"tool": "web_search", **result})
+
+    elif fn_name == "analyze_document":
+        from services.subagent_service import run_document_analysis
+        result = run_document_analysis(
+            user_id=user_id,
+            document_name=fn_args["document_name"],
+            analysis_query=fn_args["query"],
+        )
+        return json.dumps({"tool": "analyze_document", **result})
 
     else:
         return json.dumps({"error": f"Unknown tool: {fn_name}"})
@@ -202,6 +238,7 @@ async def send_message(
             tools = []
             if doc_check.data:
                 tools.append(RETRIEVAL_TOOL)
+                tools.append(ANALYZE_DOCUMENT_TOOL)
             tools.append(SQL_TOOL)
             if settings.web_search_enabled:
                 tools.append(WEB_SEARCH_TOOL)
@@ -232,6 +269,19 @@ async def send_message(
                             fn_name = tc["function"]["name"]
                             fn_args = json.loads(tc["function"]["arguments"])
 
+                            # Emit sub-agent start event (spinner in frontend)
+                            if fn_name == "analyze_document":
+                                yield {
+                                    "event": "tool_event",
+                                    "data": json.dumps({
+                                        "tool_event": True,
+                                        "tool": "analyze_document",
+                                        "subagent": True,
+                                        "status": "running",
+                                        "args_preview": fn_args.get("document_name", ""),
+                                    }),
+                                }
+
                             tool_result = execute_tool(fn_name, fn_args, user_id)
 
                             current_messages.append({
@@ -242,13 +292,17 @@ async def send_message(
 
                             # Emit tool event to frontend for attribution
                             args_preview = fn_args.get("query", fn_args.get("sql", ""))[:100]
+                            tool_event_data = {
+                                "tool_event": True,
+                                "tool": fn_name,
+                                "args_preview": args_preview,
+                            }
+                            if fn_name == "analyze_document":
+                                tool_event_data["subagent"] = True
+                                tool_event_data["status"] = "complete"
                             yield {
                                 "event": "tool_event",
-                                "data": json.dumps({
-                                    "tool_event": True,
-                                    "tool": fn_name,
-                                    "args_preview": args_preview,
-                                }),
+                                "data": json.dumps(tool_event_data),
                             }
 
                 if not tool_call_happened:

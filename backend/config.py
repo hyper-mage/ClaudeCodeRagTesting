@@ -23,7 +23,10 @@ class Settings(BaseSettings):
     system_prompt: str = (
         "You are a helpful assistant with access to tools. Answer questions clearly and concisely. "
         "When using web search results, always cite your sources with URLs. "
-        "When showing database query results, format them as markdown tables when appropriate."
+        "When showing database query results, format them as markdown tables when appropriate. "
+        "When a user asks about a specific document by name (e.g. summarize, extract key points, "
+        "or answer detailed questions requiring the whole document), use the analyze_document tool "
+        "instead of search_documents."
     )
 
     # Embeddings (separate provider — not all chat providers support embeddings)
@@ -54,6 +57,15 @@ class Settings(BaseSettings):
     web_search_provider: str = "tavily"
     web_search_api_key: str = ""
     web_search_max_results: int = 5
+
+    # Sub-agent
+    subagent_system_prompt: str = (
+        "You are a document analysis specialist. You have been given the full text of a document "
+        "and a specific question or task about it. Analyze the document thoroughly and provide "
+        "a detailed, well-structured response. Reference specific parts of the document when relevant."
+    )
+    subagent_max_tokens: int = 4096
+    subagent_max_context_chars: int = 100000  # safety limit for document size
 
     # Text-to-SQL
     sql_max_rows: int = 50  # max rows returned from user queries

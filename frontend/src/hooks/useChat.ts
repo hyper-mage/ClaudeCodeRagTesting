@@ -4,6 +4,8 @@ import { supabase } from '../lib/supabase'
 export interface ToolEvent {
   tool: string
   args_preview: string
+  subagent?: boolean
+  status?: 'running' | 'complete'
 }
 
 export interface Message {
@@ -84,11 +86,32 @@ export function useChat(threadId: string | null) {
               if (parsed.tool_event === true) {
                 // tool usage event — add to assistant message's toolsUsed
                 setMessages(prev =>
-                  prev.map(m =>
-                    m.id === assistantId
-                      ? { ...m, toolsUsed: [...(m.toolsUsed || []), { tool: parsed.tool, args_preview: parsed.args_preview }] }
-                      : m
-                  )
+                  prev.map(m => {
+                    if (m.id !== assistantId) return m
+
+                    // Sub-agent complete: update existing running entry
+                    if (parsed.subagent && parsed.status === 'complete') {
+                      const updated = (m.toolsUsed || []).map(t =>
+                        t.tool === parsed.tool && t.subagent
+                          ? { ...t, status: 'complete' as const }
+                          : t
+                      )
+                      return { ...m, toolsUsed: updated }
+                    }
+
+                    // New tool event (including sub-agent start)
+                    return {
+                      ...m,
+                      toolsUsed: [
+                        ...(m.toolsUsed || []),
+                        {
+                          tool: parsed.tool,
+                          args_preview: parsed.args_preview,
+                          ...(parsed.subagent ? { subagent: true, status: parsed.status } : {}),
+                        },
+                      ],
+                    }
+                  })
                 )
               } else if (parsed.text !== undefined) {
                 // content_delta

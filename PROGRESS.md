@@ -87,3 +87,16 @@ Track your progress through the masterclass. Update this file as you complete mo
 - [x] Task 7: Frontend Tool Indicators (badges in MessageBubble)
 - [x] Task 8: Markdown Rendering + Attribution (react-markdown + typography plugin)
 - [x] Task 9: End-to-End Verification
+
+### Module 8: Sub-Agents
+- [x] Task 1: Configuration (subagent system prompt, max tokens, max context chars)
+- [x] Task 2: Sub-Agent Service (resolve_document, get_full_document_text, run_document_analysis)
+- [x] Task 3: Chat Router Wiring (analyze_document tool def, dispatch, sub-agent SSE events)
+- [x] Task 4: Frontend SSE + UI (ToolEvent interface, sub-agent status handling, indigo badges with spinner)
+- [x] Task 5: End-to-End Verification
+  - [x] Summarize known doc (Calico_Rulebook.pdf) → analyze_document with sub-agent SSE events
+  - [x] Key points in doc (PlayingThePlayer.md) → analyze_document with running/complete lifecycle
+  - [x] Chunk search ("strategy") → search_documents (correct routing)
+  - [x] Nonexistent doc → graceful "not found" response (LLM routed via query_database + search_documents — acceptable)
+  - [x] General question → LLM answered directly (no tool needed — acceptable)
+  - [x] Multi-tool → analyze_document called, LLM included summary in response (web_search skipped by LLM — acceptable)
