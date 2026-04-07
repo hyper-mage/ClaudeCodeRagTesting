@@ -30,12 +30,11 @@ Decimal phases appear between their surrounding integers in numeric order.
   2. Default KB content is readable by all authenticated users without granting access to other users' private documents
   3. A user's uploaded documents are invisible to every other user
   4. RLS policies correctly enforce mixed visibility: shared reads for default content, owner-only for private content
-**Plans**: TBD
+**Plans**: 2 plans
 
 Plans:
-- [ ] 01-01: TBD
-- [ ] 01-02: TBD
-- [ ] 01-03: TBD
+- [ ] 01-01-PLAN.md -- ltree extension, system user, and folders table with RLS
+- [ ] 01-02-PLAN.md -- Visibility columns, RLS policy replacement, and search RPC updates
 
 ### Phase 2: Default KB and Ingestion Extensions
 **Goal**: Users have immediate value from 10 pre-seeded board games, and can upload images and spreadsheets alongside existing formats
@@ -129,7 +128,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Data Foundation and Schema | 0/3 | Not started | - |
+| 1. Data Foundation and Schema | 0/2 | Not started | - |
 | 2. Default KB and Ingestion Extensions | 0/3 | Not started | - |
 | 3. KB Navigation Tools | 0/3 | Not started | - |
 | 4. File Manager UI | 0/4 | Not started | - |
