@@ -93,13 +93,51 @@
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| — | — | (Populated during roadmap creation) |
+| DATA-01 | Phase 1 | Pending |
+| DATA-02 | Phase 4 | Pending |
+| DATA-03 | Phase 1 | Pending |
+| DATA-04 | Phase 2 | Pending |
+| DATA-05 | Phase 1 | Pending |
+| DATA-06 | Phase 1 | Pending |
+| DATA-07 | Phase 1 | Pending |
+| DATA-08 | Phase 2 | Pending |
+| DATA-09 | Phase 2 | Pending |
+| DATA-10 | Phase 2 | Pending |
+| TOOL-01 | Phase 3 | Pending |
+| TOOL-02 | Phase 3 | Pending |
+| TOOL-03 | Phase 3 | Pending |
+| TOOL-04 | Phase 3 | Pending |
+| TOOL-05 | Phase 3 | Pending |
+| TOOL-06 | Phase 3 | Pending |
+| TOOL-07 | Phase 3 | Pending |
+| TOOL-08 | Phase 3 | Pending |
+| AGNT-01 | Phase 6 | Pending |
+| AGNT-02 | Phase 6 | Pending |
+| AGNT-03 | Phase 6 | Pending |
+| AGNT-04 | Phase 6 | Pending |
+| AGNT-05 | Phase 6 | Pending |
+| EXPL-01 | Phase 5 | Pending |
+| EXPL-02 | Phase 5 | Pending |
+| EXPL-03 | Phase 5 | Pending |
+| EXPL-04 | Phase 5 | Pending |
+| EXPL-05 | Phase 5 | Pending |
+| EXPL-06 | Phase 5 | Pending |
+| FMGR-01 | Phase 4 | Pending |
+| FMGR-02 | Phase 4 | Pending |
+| FMGR-03 | Phase 4 | Pending |
+| FMGR-04 | Phase 4 | Pending |
+| FMGR-05 | Phase 4 | Pending |
+| FMGR-06 | Phase 4 | Pending |
+| FMGR-07 | Phase 4 | Pending |
+| FMGR-08 | Phase 4 | Pending |
+| FMGR-09 | Phase 4 | Pending |
+| FMGR-10 | Phase 4 | Pending |
 
 **Coverage:**
-- v1 requirements: 34 total
-- Mapped to phases: 0
-- Unmapped: 34
+- v1 requirements: 39 total
+- Mapped to phases: 39
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-04-07*
-*Last updated: 2026-04-07 after initial definition*
+*Last updated: 2026-04-07 after roadmap creation*
