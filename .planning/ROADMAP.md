@@ -48,7 +48,7 @@ Plans:
 **Plans**: 3 plans
 
 Plans:
-- [ ] 02-01-PLAN.md -- Extend parsing pipeline for IMAGE/XLSX + folder_id/visibility propagation + frontend file types
+- [x] 02-01-PLAN.md -- Extend parsing pipeline for IMAGE/XLSX + folder_id/visibility propagation + frontend file types
 - [ ] 02-02-PLAN.md -- Create 10 board game markdown content files for default KB
 - [ ] 02-03-PLAN.md -- Seed script to ingest default KB into Supabase with per-game subfolders
 
