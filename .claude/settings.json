@@ -1,35 +1,75 @@
 {
-    "permissions": {
-      "allow": [
-        "WebFetch(domain:*)",
-        "Bash(npm run:*)",
-        "Bash(npm test:*)",
-        "Bash(npm install:*)",
-        "Bash(npm run dev:*)",
-        "Bash(npm run build:*)",
-        "Bash(npm run lint:*)",
-        "Bash(npx:*)",
-        "Bash(pnpm:*)",
-        "Bash(yarn:*)",
-        "Bash(bun:*)",
-        "Bash(python3:*)",
-        "Bash(python:*)",
-        "Bash(git diff:*)",
-        "Bash(git status:*)",
-        "Bash(git log:*)",
-        "Bash(git add:*)",
-        "Bash(git commit:*)"
-      ],
-      "deny": [
-        "Bash(sudo:*)",
-        "Bash(docker:*)",
-        "Bash(rm -rf:*)",
-        "Read(./.env)",
-        "Read(~/.ssh/**)"
-      ],
-      "ask": [
-        "Bash(git push:*)"
-      ],
-      "defaultMode": "acceptEdits"
-    }
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:*)",
+      "Bash(npm run:*)",
+      "Bash(npm test:*)",
+      "Bash(npm install:*)",
+      "Bash(npm run dev:*)",
+      "Bash(npm run build:*)",
+      "Bash(npm run lint:*)",
+      "Bash(npx:*)",
+      "Bash(pnpm:*)",
+      "Bash(yarn:*)",
+      "Bash(bun:*)",
+      "Bash(python3:*)",
+      "Bash(python:*)",
+      "Bash(git diff:*)",
+      "Bash(git status:*)",
+      "Bash(git log:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)"
+    ],
+    "deny": [
+      "Bash(sudo:*)",
+      "Bash(docker:*)",
+      "Bash(rm -rf:*)",
+      "Read(./.env)",
+      "Read(~/.ssh/**)"
+    ],
+    "ask": [
+      "Bash(git push:*)"
+    ],
+    "defaultMode": "acceptEdits"
+  },
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node .claude/hooks/gsd-check-update.js"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Bash|Edit|Write|MultiEdit|Agent|Task",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node .claude/hooks/gsd-context-monitor.js",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node .claude/hooks/gsd-prompt-guard.js",
+            "timeout": 5
+          }
+        ]
+      }
+    ]
+  },
+  "statusLine": {
+    "type": "command",
+    "command": "node .claude/hooks/gsd-statusline.js"
   }
+}
