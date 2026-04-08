@@ -11,9 +11,9 @@
 - [ ] **DATA-02**: User can see a hierarchical folder structure in the ingestion interface
 - [x] **DATA-03**: System stores folder hierarchy in Supabase with materialized paths for efficient tree queries
 - [ ] **DATA-04**: Default board game KB ships with 10 pre-seeded popular games organized in folders
-- [ ] **DATA-05**: All authenticated users can read the default KB content (shared visibility)
-- [ ] **DATA-06**: User's uploaded documents remain private (only visible to that user)
-- [ ] **DATA-07**: RLS policies enforce mixed visibility (default KB readable by all, private docs per-user)
+- [x] **DATA-05**: All authenticated users can read the default KB content (shared visibility)
+- [x] **DATA-06**: User's uploaded documents remain private (only visible to that user)
+- [x] **DATA-07**: RLS policies enforce mixed visibility (default KB readable by all, private docs per-user)
 - [ ] **DATA-08**: User can upload images (JPG, PNG) which are processed with OCR to extract text
 - [ ] **DATA-09**: User can upload XLSX files which are parsed into searchable markdown content
 - [ ] **DATA-10**: Uploaded files are placed into the user's selected folder in Supabase Storage
@@ -97,9 +97,9 @@
 | DATA-02 | Phase 4 | Pending |
 | DATA-03 | Phase 1 | Complete |
 | DATA-04 | Phase 2 | Pending |
-| DATA-05 | Phase 1 | Pending |
-| DATA-06 | Phase 1 | Pending |
-| DATA-07 | Phase 1 | Pending |
+| DATA-05 | Phase 1 | Complete |
+| DATA-06 | Phase 1 | Complete |
+| DATA-07 | Phase 1 | Complete |
 | DATA-08 | Phase 2 | Pending |
 | DATA-09 | Phase 2 | Pending |
 | DATA-10 | Phase 2 | Pending |

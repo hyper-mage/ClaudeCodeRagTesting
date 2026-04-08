@@ -34,7 +34,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 
 Plans:
 - [x] 01-01-PLAN.md -- ltree extension, system user, and folders table with RLS
-- [ ] 01-02-PLAN.md -- Visibility columns, RLS policy replacement, and search RPC updates
+- [x] 01-02-PLAN.md -- Visibility columns, RLS policy replacement, and search RPC updates
 
 ### Phase 2: Default KB and Ingestion Extensions
 **Goal**: Users have immediate value from 10 pre-seeded board games, and can upload images and spreadsheets alongside existing formats

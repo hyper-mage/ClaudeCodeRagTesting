@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed 01-01-PLAN.md
-last_updated: "2026-04-08T00:11:00.651Z"
+stopped_at: Completed 01-02-PLAN.md
+last_updated: "2026-04-08T00:13:43.683Z"
 last_activity: 2026-04-08
 progress:
   total_phases: 6
-  completed_phases: 0
+  completed_phases: 1
   total_plans: 2
-  completed_plans: 1
+  completed_plans: 2
   percent: 0
 ---
 
@@ -26,7 +26,7 @@ See: .planning/PROJECT.md (updated 2026-04-07)
 ## Current Position
 
 Phase: 1 of 6 (Data Foundation and Schema)
-Plan: 1 of 3 in current phase
+Plan: 2 of 3 in current phase
 Status: Ready to execute
 Last activity: 2026-04-08
 
@@ -53,6 +53,7 @@ Progress: [░░░░░░░░░░] 0%
 
 *Updated after each plan completion*
 | Phase 01 P01 | 1min | 2 tasks | 3 files |
+| Phase 01 P02 | 1min | 3 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -66,6 +67,8 @@ Recent decisions affecting current work:
 - [Roadmap]: File Manager UI (Phase 4) can potentially parallelize with Phase 3 (both depend on Phase 1+2)
 - [Phase 01]: Used deterministic UUIDs for system user and Board Games folder to enable cross-migration references
 - [Phase 01]: RLS UPDATE/DELETE policies restricted to private folders only -- public KB immutable via RLS
+- [Phase 01]: INSERT policies have no visibility restriction so backend service role can insert public docs
+- [Phase 01]: execute_readonly_query needs no changes -- updated RLS policies automatically enforce visibility
 
 ### Pending Todos
 
@@ -79,6 +82,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-08T00:11:00.644Z
-Stopped at: Completed 01-01-PLAN.md
+Last session: 2026-04-08T00:13:43.677Z
+Stopped at: Completed 01-02-PLAN.md
 Resume file: None
