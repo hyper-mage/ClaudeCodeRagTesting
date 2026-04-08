@@ -12,14 +12,14 @@ export default function FileUpload({ onUpload }: Props) {
   const [info, setInfo] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
-  const ACCEPTED_TYPES = ['.txt', '.md', '.pdf', '.docx', '.html', '.htm']
+  const ACCEPTED_TYPES = ['.txt', '.md', '.pdf', '.docx', '.html', '.htm', '.jpg', '.jpeg', '.png', '.xlsx']
 
   const handleFile = async (file: File) => {
     setError(null)
     setInfo(null)
     const ext = '.' + file.name.split('.').pop()?.toLowerCase()
     if (!ACCEPTED_TYPES.includes(ext)) {
-      setError(`Unsupported file type: ${ext}. Supported: .txt, .md, .pdf, .docx, .html`)
+      setError(`Unsupported file type: ${ext}. Supported: .txt, .md, .pdf, .docx, .html, .jpg, .png, .xlsx`)
       return
     }
     setIsUploading(true)
@@ -77,7 +77,7 @@ export default function FileUpload({ onUpload }: Props) {
           <>
             <p className="text-gray-300 mb-1">Drag and drop a file here</p>
             <p className="text-gray-500 text-sm">or click to browse</p>
-            <p className="text-gray-600 text-xs mt-2">Supports: .txt, .md, .pdf, .docx, .html</p>
+            <p className="text-gray-600 text-xs mt-2">Supports: .txt, .md, .pdf, .docx, .html, .jpg, .png, .xlsx</p>
           </>
         )}
       </div>
@@ -90,7 +90,7 @@ export default function FileUpload({ onUpload }: Props) {
       <input
         ref={fileInputRef}
         type="file"
-        accept=".txt,.md,.pdf,.docx,.html,.htm"
+        accept=".txt,.md,.pdf,.docx,.html,.htm,.jpg,.jpeg,.png,.xlsx"
         onChange={handleChange}
         className="hidden"
       />
