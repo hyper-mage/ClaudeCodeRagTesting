@@ -45,12 +45,12 @@ Plans:
   2. User can upload a JPG/PNG image of a rule card and the system extracts searchable text via OCR
   3. User can upload an XLSX file and the system parses it into searchable markdown content
   4. Uploaded files land in the user's selected folder in Supabase Storage with correct folder association
-**Plans**: TBD
+**Plans**: 3 plans
 
 Plans:
-- [ ] 02-01: TBD
-- [ ] 02-02: TBD
-- [ ] 02-03: TBD
+- [ ] 02-01-PLAN.md -- Extend parsing pipeline for IMAGE/XLSX + folder_id/visibility propagation + frontend file types
+- [ ] 02-02-PLAN.md -- Create 10 board game markdown content files for default KB
+- [ ] 02-03-PLAN.md -- Seed script to ingest default KB into Supabase with per-game subfolders
 
 ### Phase 3: KB Navigation Tools
 **Goal**: The agent can navigate and search the knowledge base using specialized tools that query Supabase, with transparent display in the chat UI
@@ -128,8 +128,8 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Data Foundation and Schema | 0/2 | Not started | - |
-| 2. Default KB and Ingestion Extensions | 0/3 | Not started | - |
+| 1. Data Foundation and Schema | 2/2 | Complete | - |
+| 2. Default KB and Ingestion Extensions | 0/3 | Planning | - |
 | 3. KB Navigation Tools | 0/3 | Not started | - |
 | 4. File Manager UI | 0/4 | Not started | - |
 | 5. Explorer Sub-Agent | 0/3 | Not started | - |
