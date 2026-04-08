@@ -10,7 +10,7 @@
 - [x] **DATA-01**: User can create folders and subfolders to organize their documents
 - [ ] **DATA-02**: User can see a hierarchical folder structure in the ingestion interface
 - [x] **DATA-03**: System stores folder hierarchy in Supabase with materialized paths for efficient tree queries
-- [ ] **DATA-04**: Default board game KB ships with 10 pre-seeded popular games organized in folders
+- [x] **DATA-04**: Default board game KB ships with 10 pre-seeded popular games organized in folders
 - [x] **DATA-05**: All authenticated users can read the default KB content (shared visibility)
 - [x] **DATA-06**: User's uploaded documents remain private (only visible to that user)
 - [x] **DATA-07**: RLS policies enforce mixed visibility (default KB readable by all, private docs per-user)
@@ -96,7 +96,7 @@
 | DATA-01 | Phase 1 | Complete |
 | DATA-02 | Phase 4 | Pending |
 | DATA-03 | Phase 1 | Complete |
-| DATA-04 | Phase 2 | Pending |
+| DATA-04 | Phase 2 | Complete |
 | DATA-05 | Phase 1 | Complete |
 | DATA-06 | Phase 1 | Complete |
 | DATA-07 | Phase 1 | Complete |
