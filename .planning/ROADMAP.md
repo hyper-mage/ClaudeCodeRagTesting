@@ -33,7 +33,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 **Plans**: 2 plans
 
 Plans:
-- [ ] 01-01-PLAN.md -- ltree extension, system user, and folders table with RLS
+- [x] 01-01-PLAN.md -- ltree extension, system user, and folders table with RLS
 - [ ] 01-02-PLAN.md -- Visibility columns, RLS policy replacement, and search RPC updates
 
 ### Phase 2: Default KB and Ingestion Extensions

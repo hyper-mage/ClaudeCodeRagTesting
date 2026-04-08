@@ -7,9 +7,9 @@
 
 ### Data Foundation
 
-- [ ] **DATA-01**: User can create folders and subfolders to organize their documents
+- [x] **DATA-01**: User can create folders and subfolders to organize their documents
 - [ ] **DATA-02**: User can see a hierarchical folder structure in the ingestion interface
-- [ ] **DATA-03**: System stores folder hierarchy in Supabase with materialized paths for efficient tree queries
+- [x] **DATA-03**: System stores folder hierarchy in Supabase with materialized paths for efficient tree queries
 - [ ] **DATA-04**: Default board game KB ships with 10 pre-seeded popular games organized in folders
 - [ ] **DATA-05**: All authenticated users can read the default KB content (shared visibility)
 - [ ] **DATA-06**: User's uploaded documents remain private (only visible to that user)
@@ -93,9 +93,9 @@
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| DATA-01 | Phase 1 | Pending |
+| DATA-01 | Phase 1 | Complete |
 | DATA-02 | Phase 4 | Pending |
-| DATA-03 | Phase 1 | Pending |
+| DATA-03 | Phase 1 | Complete |
 | DATA-04 | Phase 2 | Pending |
 | DATA-05 | Phase 1 | Pending |
 | DATA-06 | Phase 1 | Pending |
