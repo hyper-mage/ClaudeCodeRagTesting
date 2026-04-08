@@ -15,7 +15,9 @@ _converter = None
 def _get_converter():
     global _converter
     if _converter is None:
-        from docling.document_converter import DocumentConverter, PdfFormatOption
+        from docling.document_converter import (
+            DocumentConverter, PdfFormatOption, ImageFormatOption, ExcelFormatOption
+        )
         from docling.datamodel.pipeline_options import PdfPipelineOptions
         from docling.datamodel.base_models import InputFormat
 
@@ -24,8 +26,14 @@ def _get_converter():
             pdf_options.artifacts_path = _MODELS_DIR
 
         _converter = DocumentConverter(
+            allowed_formats=[
+                InputFormat.PDF, InputFormat.DOCX, InputFormat.HTML,
+                InputFormat.MD, InputFormat.IMAGE, InputFormat.XLSX,
+            ],
             format_options={
                 InputFormat.PDF: PdfFormatOption(pipeline_options=pdf_options),
+                InputFormat.IMAGE: ImageFormatOption(),
+                InputFormat.XLSX: ExcelFormatOption(),
             }
         )
     return _converter
@@ -35,6 +43,9 @@ def _get_converter():
 _FILE_BASED = {
     "application/pdf": ".pdf",
     "application/vnd.openxmlformats-officedocument.wordprocessingml.document": ".docx",
+    "image/jpeg": ".jpg",
+    "image/png": ".png",
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": ".xlsx",
 }
 
 # MIME types that can be converted from a string

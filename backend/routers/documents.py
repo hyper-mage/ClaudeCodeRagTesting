@@ -1,6 +1,6 @@
 import uuid
 import logging
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
 from auth import get_user_id
 from database import get_supabase
 from services.ingestion_service import process_document, process_document_incremental
@@ -10,24 +10,30 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/documents", tags=["documents"])
 
+mime_map = {
+    ".txt": "text/plain",
+    ".md": "text/markdown",
+    ".pdf": "application/pdf",
+    ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    ".html": "text/html",
+    ".htm": "text/html",
+    ".jpg": "image/jpeg",
+    ".jpeg": "image/jpeg",
+    ".png": "image/png",
+    ".xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+}
+
 
 @router.post("/upload")
 async def upload_document(
     file: UploadFile = File(...),
+    folder_id: str | None = Form(None),
     user_id: str = Depends(get_user_id),
 ):
     db = get_supabase()
     doc_id = str(uuid.uuid4())
 
     # Determine mime type
-    mime_map = {
-        ".txt": "text/plain",
-        ".md": "text/markdown",
-        ".pdf": "application/pdf",
-        ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-        ".html": "text/html",
-        ".htm": "text/html",
-    }
     filename = file.filename or "unnamed"
     ext = "." + filename.rsplit(".", 1)[-1].lower() if "." in filename else ""
     mime_type = mime_map.get(ext)
@@ -35,7 +41,7 @@ async def upload_document(
     if not mime_type:
         raise HTTPException(
             status_code=400,
-            detail=f"Unsupported file type: {ext}. Supported: .txt, .md, .pdf, .docx, .html"
+            detail=f"Unsupported file type: {ext}. Supported: .txt, .md, .pdf, .docx, .html, .jpg, .png, .xlsx"
         )
 
     # Read file content
@@ -73,6 +79,8 @@ async def upload_document(
         "mime_type": mime_type,
         "status": "pending",
         "content_hash": content_hash,
+        "folder_id": folder_id,
+        "visibility": "private",
     }).execute()
 
     # Process document (synchronous for now)
