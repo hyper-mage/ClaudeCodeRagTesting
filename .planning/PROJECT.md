@@ -30,15 +30,16 @@ The agent can intelligently search and reason across a structured board game kno
 - ✓ Markdown rendering with attribution in chat — Module 7
 - ✓ RLS on all tables (users only see their own data) — Module 2
 - ✓ LangSmith observability — Module 1
+- ✓ Default board game knowledge base (10 popular games, pre-seeded) — Validated in Phase 2
+- ✓ Image ingestion with OCR (game board photos, rule cards) — Validated in Phase 2
+- ✓ XLSX ingestion support (score sheets, game trackers) — Validated in Phase 2
+- ✓ Mixed-visibility RLS (public default KB + private user docs) — Validated in Phase 1
 
 ### Active
 
-- [ ] Default board game knowledge base (10 popular games, pre-seeded on deploy)
 - [ ] Context-aware source selection (agent decides default KB vs private docs vs both)
 - [ ] File manager-style folder/subfolder UI for organizing documents
 - [ ] Hierarchical folder structure in Supabase storage and DB
-- [ ] Image ingestion with OCR (game board photos, rule cards)
-- [ ] XLSX ingestion support (score sheets, game trackers)
 - [ ] KB navigation tools: ls (list files in folder)
 - [ ] KB navigation tools: tree (hierarchical structure view)
 - [ ] KB navigation tools: grep (regex content search across chunks)
@@ -115,4 +116,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-04-07 after initialization*
+*Last updated: 2026-04-08 after Phase 2 completion*
