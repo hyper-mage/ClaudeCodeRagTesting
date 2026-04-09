@@ -62,12 +62,12 @@ Plans:
   3. User can ask the agent to find specific content and see grep/glob results with matched files
   4. User can ask the agent to read a document and see the content (full or line-range)
   5. Every tool call is displayed transparently in the chat UI with tool name, arguments, and collapsible output
-**Plans**: TBD
+**Plans**: 3 plans
 
 Plans:
-- [ ] 03-01: TBD
-- [ ] 03-02: TBD
-- [ ] 03-03: TBD
+- [ ] 03-01-PLAN.md -- KB tools service (kb_ls, kb_tree, kb_read, kb_grep, kb_glob) + Supabase RPC migrations
+- [ ] 03-02-PLAN.md -- Frontend ToolCallCard component + SSE parsing for tool_start/tool_result events
+- [ ] 03-03-PLAN.md -- Wire tools into chat loop (definitions, dispatch, SSE events, system prompt guide) + verification
 
 ### Phase 4: File Manager UI
 **Goal**: Users can visually organize their documents and the default KB in a file manager-style interface with full folder operations
@@ -129,8 +129,8 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Data Foundation and Schema | 2/2 | Complete | - |
-| 2. Default KB and Ingestion Extensions | 0/3 | Planning | - |
-| 3. KB Navigation Tools | 0/3 | Not started | - |
+| 2. Default KB and Ingestion Extensions | 3/3 | Complete | - |
+| 3. KB Navigation Tools | 0/3 | Planning | - |
 | 4. File Manager UI | 0/4 | Not started | - |
 | 5. Explorer Sub-Agent | 0/3 | Not started | - |
 | 6. Agent Intelligence and Polish | 0/3 | Not started | - |
