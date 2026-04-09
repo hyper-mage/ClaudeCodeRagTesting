@@ -3,6 +3,15 @@ import logging
 import tempfile
 from pathlib import Path
 
+# Windows symlink workaround: force HuggingFace Hub to use file copies
+# instead of symlinks (avoids WinError 1314 without Developer Mode)
+if os.name == "nt":
+    os.environ["HF_HUB_DISABLE_SYMLINKS_WARNING"] = "1"
+    import huggingface_hub.file_download as _hf_fd
+    _hf_fd._are_symlinks_supported_in_dir.update(
+        {str(Path.home() / ".cache" / "huggingface" / "hub"): False}
+    )
+
 logger = logging.getLogger(__name__)
 
 # Local models directory (avoids Windows symlink issues with HF cache)
