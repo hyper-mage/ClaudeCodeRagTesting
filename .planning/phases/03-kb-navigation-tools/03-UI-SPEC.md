@@ -1,7 +1,7 @@
 ---
 phase: 3
 slug: kb-navigation-tools
-status: draft
+status: approved
 shadcn_initialized: false
 preset: none
 created: 2026-04-09
@@ -148,13 +148,13 @@ All other components (ChatInput, DocumentList, FileUpload, IconSidebar, ThreadSi
 - Flex row, items-center, justify-between
 - Left side: icon (16x16) + 4px gap + tool name (semibold, 12px) + 8px gap + arguments (mono, 12px, gray-400, truncated with ellipsis at 200px max-width)
 - Right side: spinner (when status=running, 14x14 border spinner) OR check icon (when status=complete, 14x14 lucide Check, gray-500) + chevron (ChevronDown/ChevronUp, 14x14, gray-500)
-- Padding: 8px horizontal, 6px vertical
+- Padding: 8px all
 - Cursor: pointer (entire header is clickable to toggle)
 
 ### Output Area (Expanded)
 
 - Border-top: 1px solid gray-700
-- Padding: 16px horizontal, 12px vertical
+- Padding: 16px horizontal, 8px vertical
 - Font: monospace, 12px, gray-300
 - Max-height: 300px with overflow-y: auto
 - White-space: pre-wrap (preserve formatting of ls/tree/grep output)
@@ -262,11 +262,11 @@ No third-party registries. No shadcn components used in Phase 3.
 
 ## Checker Sign-Off
 
-- [ ] Dimension 1 Copywriting: PASS
-- [ ] Dimension 2 Visuals: PASS
-- [ ] Dimension 3 Color: PASS
-- [ ] Dimension 4 Typography: PASS
-- [ ] Dimension 5 Spacing: PASS
-- [ ] Dimension 6 Registry Safety: PASS
+- [x] Dimension 1 Copywriting: PASS
+- [x] Dimension 2 Visuals: PASS
+- [x] Dimension 3 Color: PASS
+- [x] Dimension 4 Typography: PASS
+- [x] Dimension 5 Spacing: PASS
+- [x] Dimension 6 Registry Safety: PASS
 
-**Approval:** pending
+**Approval:** approved (2026-04-09)
