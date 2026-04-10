@@ -1,9 +1,11 @@
 ---
-status: diagnosed
+status: complete
 phase: 03-kb-navigation-tools
-source: [03-01-SUMMARY.md, 03-02-SUMMARY.md, 03-03-SUMMARY.md]
-started: 2026-04-09T12:00:00Z
-updated: 2026-04-09T12:20:00Z
+source: [03-01-SUMMARY.md, 03-02-SUMMARY.md, 03-03-SUMMARY.md, 03-04-SUMMARY.md]
+started: 2026-04-10T15:00:00Z
+updated: 2026-04-10T15:30:00Z
+round: 2
+prior_round: "Round 1: 8/9 passed, 1 major issue (tool stall + lost cards on navigation). Fixed by plan 03-04."
 ---
 
 ## Current Test
@@ -13,47 +15,28 @@ updated: 2026-04-09T12:20:00Z
 ## Tests
 
 ### 1. Cold Start Smoke Test
-expected: Kill any running backend/frontend servers. Start them fresh. Backend boots without errors (migrations 022-024 applied), frontend loads, and sending a chat message returns a response without crashes.
+expected: Kill any running backend/frontend servers. Start them fresh. Backend boots without errors, frontend loads, and sending a chat message returns a response without crashes.
 result: pass
 
-### 2. KB List Tool (kb_ls)
-expected: Ask the agent something like "list the folders in the board games knowledge base." Agent calls kb_ls tool, a tool card appears showing the tool running, then completes with a list of game folders. Agent summarizes the results in its response.
-result: pass
-
-### 3. KB Tree Tool (kb_tree)
-expected: Ask the agent to "show me the folder structure of the knowledge base." Agent calls kb_tree, tool card shows hierarchical tree output with box-drawing characters. Response includes the tree structure.
-result: pass
-
-### 4. KB Read Tool (kb_read)
-expected: Ask the agent to "read the rules for [a specific game]." Agent calls kb_read with a path, tool card shows document content (truncated at ~200 lines if long). Agent summarizes the content in its response.
-result: pass
-
-### 5. KB Grep Tool (kb_grep)
-expected: Ask the agent to "search the knowledge base for 'worker placement'." Agent calls kb_grep, tool card shows matching lines with file paths and context. Agent synthesizes results in response.
+### 2. KB Grep Retest (Previously Failed)
+expected: Ask the agent to "search the knowledge base for 'worker placement'." Agent calls kb_grep, tool card shows matching lines with file paths and context. Agent synthesizes results in response. The agent should NOT stall indefinitely — if a tool takes too long, it should timeout gracefully.
 result: issue
-reported: "it made several tool calls showing completed but got stuck reading a doc in the documents (from what i've uploaded) I switched to the documents tab to check something and came back and all the tool calls were gone with no answer, yet. The console shows Cookie __cf_bm has been rejected for invalid domain."
-severity: major
+reported: "Tool stalls on 'read document' tool. Backend error: invalid input syntax for type uuid: 'None' in kb_tools_service.py _resolve_folder_by_path. The user_id is being passed as string 'None' instead of a valid UUID. Tool card expand won't show loading tool content. UPDATE: after navigating away and back, the stalled tool is gone and replaced with '[Response interrupted]' — the 03-04 finally-block cleanup works, but the underlying _resolve_folder_by_path bug remains."
+severity: blocker
 
-### 6. KB Glob Tool (kb_glob)
-expected: Ask the agent to "find all files matching *.md in the knowledge base" or similar glob pattern. Agent calls kb_glob, tool card shows matching file paths. Agent lists results.
+### 3. Tool Cards Survive Navigation
+expected: Start a chat that triggers multiple tool calls. While the agent is mid-stream (tools still running), navigate to the Documents tab. Wait a few seconds, then navigate back to the chat. The completed tool cards should still be visible — loaded from the database, not lost.
 result: pass
 
-### 7. Tool Call Cards Display
-expected: When the agent uses any tool, it appears as a collapsible card (not a pill badge). Card shows tool icon, tool name, status indicator (spinning while running, checkmark when done). Clicking the card expands to show the tool's output.
+### 4. Simple Message Still Works
+expected: Send a simple message that doesn't trigger any tools (e.g., "hello" or "what can you help me with?"). The agent should respond normally with text, no tool cards. No errors in console.
 result: pass
-
-### 8. Tool Card Persistence
-expected: After a chat with tool calls, switch to a different thread and back (or reload the page). The tool call cards should still appear on the messages that had them, loaded from the database.
-result: pass
-
-### 9. Hide/Show Tool Cards Toggle
-expected: There is a toggle or button to hide/show tool cards on messages. Clicking it collapses all tool cards on that message, clicking again reveals them.
-result: pass
+notes: "Passed on new chat and previously successful thread. On the failed thread from test 2, 'hello' triggered ~10 tool calls retrying 'worker placement' search — expected since LLM sees incomplete conversation history. Should resolve once test 2 bug is fixed."
 
 ## Summary
 
-total: 9
-passed: 8
+total: 4
+passed: 3
 issues: 1
 pending: 0
 skipped: 0
@@ -61,23 +44,17 @@ blocked: 0
 
 ## Gaps
 
-- truth: "Agent calls kb_grep, tool card shows matching lines with file paths and context. Agent synthesizes results in response."
+- truth: "Agent calls kb_grep/kb_read, tool card shows results. Agent synthesizes results in response without stalling."
   status: failed
-  reason: "User reported: it made several tool calls showing completed but got stuck reading a doc in the documents (from what i've uploaded) I switched to the documents tab to check something and came back and all the tool calls were gone with no answer, yet."
-  severity: major
-  test: 5
-  root_cause: "Two issues: (1) Tool loop stalls because analyze_document subagent makes blocking non-streaming LLM call with no timeout (subagent_service.py line 88), and stream_chat_completion has no timeout either (llm_service.py line 68). (2) Tool events only persist to DB after entire tool loop completes (chat.py lines 532-545); useChat.ts has no AbortController or unmount cleanup, so navigating away loses all in-flight tool state permanently."
+  reason: "User reported: kb_read crashes with 'invalid input syntax for type uuid: None' in _resolve_folder_by_path when LLM passes a path to a user-uploaded document. The error is uncaught in execute_tool, killing the entire SSE stream."
+  severity: blocker
+  test: 2
+  root_cause: "Two issues: (1) _resolve_folder_by_path (kb_tools_service.py:96) passes current_folder_id=None to .eq('folder_id', None) when path resolves a file directly under 'My Documents' root — Python None becomes string 'None' in the Supabase query, invalid UUID. (2) KB tool calls in execute_tool (chat.py:347-383) have no try/except — unlike search_documents which catches errors and returns JSON, KB tool exceptions propagate uncaught and kill the entire stream."
   artifacts:
-    - path: "backend/services/subagent_service.py"
-      issue: "run_document_analysis() is a blocking non-streaming LLM call with no timeout"
-    - path: "backend/services/llm_service.py"
-      issue: "stream_chat_completion() has no timeout on OpenAI SDK call"
+    - path: "backend/services/kb_tools_service.py"
+      issue: "_resolve_folder_by_path passes None as folder_id to Supabase query when path is a file at My Documents root (no subfolder walk)"
     - path: "backend/routers/chat.py"
-      issue: "tools_used_acc only written to DB after while-loop exits; no intermediate persistence"
-    - path: "frontend/src/hooks/useChat.ts"
-      issue: "No AbortController, no useEffect cleanup; tool events only in React state during streaming"
+      issue: "KB tool calls (kb_ls, kb_tree, kb_read, kb_grep, kb_glob) in execute_tool have no try/except — errors kill the stream instead of returning error JSON to LLM"
   missing:
-    - "Add timeouts to LLM calls in subagent_service and llm_service"
-    - "Persist tool events incrementally to DB as they complete (not just at end)"
-    - "Add AbortController with cleanup to useChat SSE fetch"
-  debug_session: .planning/debug/grep-stuck-cards-lost.md
+    - "Handle None current_folder_id in _resolve_folder_by_path file resolution — search across user's private root folders"
+    - "Wrap all KB tool calls in execute_tool with try/except returning error JSON (matching search_documents pattern)"
