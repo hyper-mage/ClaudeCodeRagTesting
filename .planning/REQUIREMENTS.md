@@ -20,11 +20,11 @@
 
 ### KB Navigation Tools
 
-- [ ] **TOOL-01**: Agent can list files and subfolders in a specific folder (ls tool)
-- [ ] **TOOL-02**: Agent can view the full hierarchical tree structure of the KB (tree tool)
-- [ ] **TOOL-03**: Agent can read a full document or specific line range from document chunks (read tool)
-- [ ] **TOOL-04**: Agent can search document content using regex patterns (grep tool)
-- [ ] **TOOL-05**: Agent can find files matching glob patterns across the KB (glob tool)
+- [x] **TOOL-01**: Agent can list files and subfolders in a specific folder (ls tool)
+- [x] **TOOL-02**: Agent can view the full hierarchical tree structure of the KB (tree tool)
+- [x] **TOOL-03**: Agent can read a full document or specific line range from document chunks (read tool)
+- [x] **TOOL-04**: Agent can search document content using regex patterns (grep tool)
+- [x] **TOOL-05**: Agent can find files matching glob patterns across the KB (glob tool)
 - [ ] **TOOL-06**: All KB tools query Supabase tables (not filesystem) and respect RLS visibility
 - [ ] **TOOL-07**: Agent tool calls are displayed transparently in the chat UI with tool-specific icons and labels
 - [ ] **TOOL-08**: Tool results show arguments used and brief output summaries in collapsible sections
@@ -103,11 +103,11 @@
 | DATA-08 | Phase 2 | Complete |
 | DATA-09 | Phase 2 | Complete |
 | DATA-10 | Phase 2 | Complete |
-| TOOL-01 | Phase 3 | Pending |
-| TOOL-02 | Phase 3 | Pending |
-| TOOL-03 | Phase 3 | Pending |
-| TOOL-04 | Phase 3 | Pending |
-| TOOL-05 | Phase 3 | Pending |
+| TOOL-01 | Phase 3 | Complete |
+| TOOL-02 | Phase 3 | Complete |
+| TOOL-03 | Phase 3 | Complete |
+| TOOL-04 | Phase 3 | Complete |
+| TOOL-05 | Phase 3 | Complete |
 | TOOL-06 | Phase 3 | Pending |
 | TOOL-07 | Phase 3 | Pending |
 | TOOL-08 | Phase 3 | Pending |

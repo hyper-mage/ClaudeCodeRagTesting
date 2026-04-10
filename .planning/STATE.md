@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed 03-04-PLAN.md
-last_updated: "2026-04-10T14:32:16.734Z"
+stopped_at: Completed 03-05-PLAN.md
+last_updated: "2026-04-10T21:01:05.797Z"
 last_activity: 2026-04-10
 progress:
   total_phases: 6
   completed_phases: 3
-  total_plans: 9
-  completed_plans: 9
+  total_plans: 10
+  completed_plans: 10
   percent: 17
 ---
 
@@ -26,7 +26,7 @@ See: .planning/PROJECT.md (updated 2026-04-07)
 ## Current Position
 
 Phase: 03 (kb-navigation-tools) — EXECUTING
-Plan: 2 of 4
+Plan: 3 of 4
 Status: Ready to execute
 Last activity: 2026-04-10
 
@@ -56,6 +56,7 @@ Progress: [█░░░░░░░░░] 17%
 | Phase 01 P02 | 1min | 3 tasks | 3 files |
 | Phase 02 P03 | 163s | 2 tasks | 3 files |
 | Phase 03 P04 | 174s | 3 tasks | 6 files |
+| Phase 03 P05 | 64s | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -73,6 +74,7 @@ Recent decisions affecting current work:
 - [Phase 01]: execute_readonly_query needs no changes -- updated RLS policies automatically enforce visibility
 - [Phase 02]: Used uuid5 deterministic UUIDs for game subfolder IDs, content-hash idempotency via existing record_manager
 - [Phase 03]: 120s streaming / 90s subagent LLM timeouts with early message creation for incremental tool persistence
+- [Phase 03]: Used conditional query building (is_ vs eq) for NULL folder_id in _resolve_folder_by_path
 
 ### Pending Todos
 
@@ -86,7 +88,7 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-10T14:32:16.728Z
-Stopped at: Completed 03-04-PLAN.md
+Last session: 2026-04-10T21:01:05.792Z
+Stopped at: Completed 03-05-PLAN.md
 Resume file: None
 Next: Phase 02
