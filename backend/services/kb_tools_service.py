@@ -90,15 +90,18 @@ def _resolve_folder_by_path(db, user_id: str, path: str) -> dict | None:
 
     if file_segment:
         # Resolve document within the folder
-        result = (
+        query = (
             db.table("documents")
             .select("id, filename, folder_id")
-            .eq("folder_id", current_folder_id)
             .eq("status", "completed")
             .ilike("filename", file_segment)
-            .or_(f"user_id.eq.{user_id},visibility.eq.public")
-            .execute()
         )
+        if current_folder_id is None:
+            # Root-level private file (My Documents/somefile.pdf with no subfolder)
+            query = query.is_("folder_id", "null").eq("user_id", user_id)
+        else:
+            query = query.eq("folder_id", current_folder_id).or_(f"user_id.eq.{user_id},visibility.eq.public")
+        result = query.execute()
         if not result.data:
             return None
         return {
