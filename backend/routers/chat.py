@@ -424,6 +424,7 @@ async def send_message(
     async def event_generator():
         full_content = ""
         tools_used_acc = []
+        assistant_msg_id = None
         try:
             # Build tools list based on availability
             settings = get_settings()
@@ -447,6 +448,16 @@ async def send_message(
             tools.append(SQL_TOOL)
             if settings.web_search_enabled:
                 tools.append(WEB_SEARCH_TOOL)
+
+            # Create assistant message early for incremental tool persistence
+            assistant_msg = db.table("messages").insert({
+                "thread_id": thread_id,
+                "user_id": user_id,
+                "role": "assistant",
+                "content": "",
+                "tools_used": [],
+            }).execute()
+            assistant_msg_id = assistant_msg.data[0]["id"]
 
             current_messages = list(messages)
 
@@ -513,6 +524,11 @@ async def send_message(
                             tool_entry["status"] = "complete"
                             tool_entry["output"] = tool_output_preview
 
+                            # Persist tool events incrementally
+                            db.table("messages").update({
+                                "tools_used": tools_used_acc,
+                            }).eq("id", assistant_msg_id).execute()
+
                             # Emit tool_result SSE event
                             yield {
                                 "event": "tool_event",
@@ -529,20 +545,11 @@ async def send_message(
                 if not tool_call_happened:
                     break
 
-            # Store assistant message with tool call data
-            msg_data = {
-                "thread_id": thread_id,
-                "user_id": user_id,
-                "role": "assistant",
+            # Update assistant message with final content
+            db.table("messages").update({
                 "content": full_content,
-            }
-            if tools_used_acc:
-                msg_data["tools_used"] = tools_used_acc
-            assistant_msg = (
-                db.table("messages")
-                .insert(msg_data)
-                .execute()
-            )
+                "tools_used": tools_used_acc if tools_used_acc else None,
+            }).eq("id", assistant_msg_id).execute()
 
             # Auto-generate title from first message
             if not thread.data.get("title"):
@@ -552,14 +559,31 @@ async def send_message(
             yield {
                 "event": "done",
                 "data": json.dumps({
-                    "message_id": assistant_msg.data[0]["id"],
+                    "message_id": assistant_msg_id,
                     "content": full_content,
                 }),
             }
         except Exception as e:
+            logger.error(f"Chat error: {e}", exc_info=True)
+            if assistant_msg_id:
+                try:
+                    db.table("messages").update({
+                        "content": "[An error occurred while generating the response]",
+                    }).eq("id", assistant_msg_id).execute()
+                except Exception:
+                    pass  # Best-effort cleanup
             yield {
                 "event": "error",
                 "data": json.dumps({"error": str(e)}),
             }
+        finally:
+            # Handle client disconnect (GeneratorExit) -- clean up ghost messages
+            if assistant_msg_id and not full_content:
+                try:
+                    db.table("messages").update({
+                        "content": "[Response interrupted]",
+                    }).eq("id", assistant_msg_id).execute()
+                except Exception:
+                    pass  # Best-effort cleanup
 
     return EventSourceResponse(event_generator())
