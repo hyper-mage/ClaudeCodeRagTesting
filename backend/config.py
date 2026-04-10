@@ -67,6 +67,10 @@ class Settings(BaseSettings):
     subagent_max_tokens: int = 4096
     subagent_max_context_chars: int = 100000  # safety limit for document size
 
+    # Timeouts (seconds)
+    llm_timeout: int = 120  # streaming chat completion
+    subagent_timeout: int = 90  # non-streaming subagent calls
+
     # Text-to-SQL
     sql_max_rows: int = 50  # max rows returned from user queries
 

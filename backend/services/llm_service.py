@@ -65,7 +65,7 @@ def stream_chat_completion(
     if tools:
         kwargs["tools"] = tools
 
-    stream = client.chat.completions.create(**kwargs)
+    stream = client.chat.completions.create(**kwargs, timeout=settings.llm_timeout)
 
     # Accumulate tool calls across chunks
     tool_calls_acc: dict[int, dict] = {}

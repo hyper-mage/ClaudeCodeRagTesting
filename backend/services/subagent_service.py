@@ -1,4 +1,5 @@
 import logging
+import openai
 from database import get_supabase
 from services.llm_service import get_llm_client
 from config import get_settings
@@ -83,13 +84,18 @@ def run_document_analysis(user_id: str, document_name: str, analysis_query: str)
         },
     ]
 
-    # Non-streaming completion
+    # Non-streaming completion with timeout
     client = get_llm_client()
-    response = client.chat.completions.create(
-        model=settings.llm_model,
-        messages=messages,
-        max_tokens=settings.subagent_max_tokens,
-    )
+    try:
+        response = client.chat.completions.create(
+            model=settings.llm_model,
+            messages=messages,
+            max_tokens=settings.subagent_max_tokens,
+            timeout=settings.subagent_timeout,
+        )
+    except openai.APITimeoutError:
+        logger.warning(f"Document analysis timed out for '{doc['filename']}'")
+        return {"error": "Document analysis timed out. The document may be too large for analysis."}
 
     analysis = response.choices[0].message.content
     return {
