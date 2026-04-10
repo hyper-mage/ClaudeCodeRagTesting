@@ -537,7 +537,7 @@ async def send_message(
                 "content": full_content,
             }
             if tools_used_acc:
-                msg_data["tools_used"] = json.dumps(tools_used_acc)
+                msg_data["tools_used"] = tools_used_acc
             assistant_msg = (
                 db.table("messages")
                 .insert(msg_data)
