@@ -35,6 +35,7 @@ def get_embedding_client() -> OpenAI:
 def stream_chat_completion(
     messages: list[dict],
     tools: list[dict] | None = None,
+    tool_guide: str | None = None,
 ) -> Generator[dict, None, None]:
     """Stream a chat completion with optional tool definitions.
 
@@ -46,9 +47,13 @@ def stream_chat_completion(
     settings = get_settings()
     client = get_llm_client()
 
+    system_content = settings.system_prompt
+    if tool_guide:
+        system_content += "\n\n" + tool_guide
+
     # Prepend system prompt
     full_messages = [
-        {"role": "system", "content": settings.system_prompt},
+        {"role": "system", "content": system_content},
         *messages,
     ]
 
