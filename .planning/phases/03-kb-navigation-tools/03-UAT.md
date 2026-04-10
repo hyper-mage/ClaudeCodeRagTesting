@@ -1,5 +1,5 @@
 ---
-status: complete
+status: diagnosed
 phase: 03-kb-navigation-tools
 source: [03-01-SUMMARY.md, 03-02-SUMMARY.md, 03-03-SUMMARY.md]
 started: 2026-04-09T12:00:00Z
@@ -66,5 +66,18 @@ blocked: 0
   reason: "User reported: it made several tool calls showing completed but got stuck reading a doc in the documents (from what i've uploaded) I switched to the documents tab to check something and came back and all the tool calls were gone with no answer, yet."
   severity: major
   test: 5
-  artifacts: []
-  missing: []
+  root_cause: "Two issues: (1) Tool loop stalls because analyze_document subagent makes blocking non-streaming LLM call with no timeout (subagent_service.py line 88), and stream_chat_completion has no timeout either (llm_service.py line 68). (2) Tool events only persist to DB after entire tool loop completes (chat.py lines 532-545); useChat.ts has no AbortController or unmount cleanup, so navigating away loses all in-flight tool state permanently."
+  artifacts:
+    - path: "backend/services/subagent_service.py"
+      issue: "run_document_analysis() is a blocking non-streaming LLM call with no timeout"
+    - path: "backend/services/llm_service.py"
+      issue: "stream_chat_completion() has no timeout on OpenAI SDK call"
+    - path: "backend/routers/chat.py"
+      issue: "tools_used_acc only written to DB after while-loop exits; no intermediate persistence"
+    - path: "frontend/src/hooks/useChat.ts"
+      issue: "No AbortController, no useEffect cleanup; tool events only in React state during streaming"
+  missing:
+    - "Add timeouts to LLM calls in subagent_service and llm_service"
+    - "Persist tool events incrementally to DB as they complete (not just at end)"
+    - "Add AbortController with cleanup to useChat SSE fetch"
+  debug_session: .planning/debug/grep-stuck-cards-lost.md
