@@ -1,23 +1,19 @@
 import ReactMarkdown from 'react-markdown'
+import ToolCallCard from './ToolCallCard'
 
 interface ToolEvent {
   tool: string
   args_preview: string
+  output?: string
+  call_id?: string
   subagent?: boolean
-  status?: 'running' | 'complete'
+  status: 'running' | 'complete'
 }
 
 interface Props {
   role: 'user' | 'assistant'
   content: string
   toolsUsed?: ToolEvent[]
-}
-
-const TOOL_LABELS: Record<string, string> = {
-  search_documents: 'Document Search',
-  query_database: 'Database Query',
-  web_search: 'Web Search',
-  analyze_document: 'Document Analysis',
 }
 
 export default function MessageBubble({ role, content, toolsUsed }: Props) {
@@ -31,24 +27,17 @@ export default function MessageBubble({ role, content, toolsUsed }: Props) {
         }`}
       >
         {role === 'assistant' && toolsUsed && toolsUsed.length > 0 && (
-          <div className="flex flex-wrap gap-1 mb-2">
+          <div className="flex flex-col gap-2 mb-2">
             {toolsUsed.map((t, i) => (
-              <span
-                key={i}
-                className={`text-xs px-2 py-0.5 rounded-full ${
-                  t.subagent
-                    ? 'bg-indigo-900/50 text-indigo-300 border border-indigo-700'
-                    : 'bg-gray-700 text-gray-300'
-                }`}
-              >
-                {t.subagent && t.status === 'running' && (
-                  <span className="inline-block w-3 h-3 mr-1 border-2 border-indigo-400 border-t-transparent rounded-full animate-spin align-middle" />
-                )}
-                {TOOL_LABELS[t.tool] || t.tool}
-                {t.subagent && t.args_preview && (
-                  <span className="ml-1 opacity-70">({t.args_preview})</span>
-                )}
-              </span>
+              <ToolCallCard
+                key={t.call_id || i}
+                tool={t.tool}
+                args_preview={t.args_preview}
+                output={t.output}
+                call_id={t.call_id}
+                subagent={t.subagent}
+                status={t.status}
+              />
             ))}
           </div>
         )}

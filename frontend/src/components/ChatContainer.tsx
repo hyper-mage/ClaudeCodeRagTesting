@@ -4,6 +4,10 @@ import ChatInput from './ChatInput'
 interface ToolEvent {
   tool: string
   args_preview: string
+  output?: string
+  call_id?: string
+  subagent?: boolean
+  status: 'running' | 'complete'
 }
 
 interface Message {

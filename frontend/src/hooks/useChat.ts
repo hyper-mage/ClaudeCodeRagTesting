@@ -4,8 +4,10 @@ import { supabase } from '../lib/supabase'
 export interface ToolEvent {
   tool: string
   args_preview: string
+  output?: string
+  call_id?: string
   subagent?: boolean
-  status?: 'running' | 'complete'
+  status: 'running' | 'complete'
 }
 
 export interface Message {
@@ -84,35 +86,55 @@ export function useChat(threadId: string | null) {
             try {
               const parsed = JSON.parse(eventData)
               if (parsed.tool_event === true) {
-                // tool usage event — add to assistant message's toolsUsed
-                setMessages(prev =>
-                  prev.map(m => {
-                    if (m.id !== assistantId) return m
-
-                    // Sub-agent complete: update existing running entry
-                    if (parsed.subagent && parsed.status === 'complete') {
-                      const updated = (m.toolsUsed || []).map(t =>
-                        t.tool === parsed.tool && t.subagent
-                          ? { ...t, status: 'complete' as const }
-                          : t
-                      )
-                      return { ...m, toolsUsed: updated }
-                    }
-
-                    // New tool event (including sub-agent start)
-                    return {
-                      ...m,
-                      toolsUsed: [
-                        ...(m.toolsUsed || []),
-                        {
+                if (parsed.type === 'tool_start') {
+                  // Add new card in running state
+                  setMessages(prev =>
+                    prev.map(m => {
+                      if (m.id !== assistantId) return m
+                      return {
+                        ...m,
+                        toolsUsed: [...(m.toolsUsed || []), {
                           tool: parsed.tool,
-                          args_preview: parsed.args_preview,
-                          ...(parsed.subagent ? { subagent: true, status: parsed.status } : {}),
-                        },
-                      ],
-                    }
-                  })
-                )
+                          args_preview: parsed.args_preview || '',
+                          call_id: parsed.call_id,
+                          subagent: parsed.subagent || false,
+                          status: 'running' as const,
+                        }],
+                      }
+                    })
+                  )
+                } else if (parsed.type === 'tool_result') {
+                  // Update existing card by call_id with output and complete status
+                  setMessages(prev =>
+                    prev.map(m => {
+                      if (m.id !== assistantId) return m
+                      return {
+                        ...m,
+                        toolsUsed: (m.toolsUsed || []).map(t =>
+                          t.call_id === parsed.call_id
+                            ? { ...t, status: 'complete' as const, output: parsed.output }
+                            : t
+                        ),
+                      }
+                    })
+                  )
+                } else {
+                  // Legacy format (no type field) — backward compat
+                  setMessages(prev =>
+                    prev.map(m => {
+                      if (m.id !== assistantId) return m
+                      return {
+                        ...m,
+                        toolsUsed: [...(m.toolsUsed || []), {
+                          tool: parsed.tool,
+                          args_preview: parsed.args_preview || '',
+                          subagent: parsed.subagent || false,
+                          status: 'complete' as const,
+                        }],
+                      }
+                    })
+                  )
+                }
               } else if (parsed.text !== undefined) {
                 // content_delta
                 setMessages(prev =>
