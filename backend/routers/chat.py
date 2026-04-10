@@ -11,6 +11,7 @@ from models.schemas import MessageCreate
 from services.llm_service import stream_chat_completion
 from services.sql_service import get_queryable_schema, execute_sql
 from services.web_search_service import search_web
+from services.kb_tools_service import kb_ls, kb_tree, kb_read, kb_grep, kb_glob
 
 try:
     from langsmith import traceable
@@ -134,6 +135,171 @@ ANALYZE_DOCUMENT_TOOL = {
 }
 
 
+KB_LS_TOOL = {
+    "type": "function",
+    "function": {
+        "name": "kb_ls",
+        "description": (
+            "List files and subfolders in a knowledge base folder. "
+            "Use this to see what's inside a specific folder."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "path": {
+                    "type": "string",
+                    "description": 'Folder path, e.g. "Board Games/Catan/" or "My Documents/"',
+                },
+            },
+            "required": ["path"],
+        },
+    },
+}
+
+KB_TREE_TOOL = {
+    "type": "function",
+    "function": {
+        "name": "kb_tree",
+        "description": (
+            "Show the hierarchical tree structure of the knowledge base. "
+            "Use this first to understand the overall KB layout before diving into specific folders."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "path": {
+                    "type": "string",
+                    "description": 'Root path for tree view. Empty string or "/" shows entire KB.',
+                    "default": "",
+                },
+                "depth": {
+                    "type": "integer",
+                    "description": "How many levels deep to show. Default 2.",
+                    "default": 2,
+                },
+            },
+            "required": [],
+        },
+    },
+}
+
+KB_READ_TOOL = {
+    "type": "function",
+    "function": {
+        "name": "kb_read",
+        "description": (
+            "Read the full content of a document in the knowledge base. "
+            "Use this to get the actual text of a specific file. "
+            "Supports optional line range for partial reads."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "path": {
+                    "type": "string",
+                    "description": 'Document path, e.g. "Board Games/Catan/rules.md"',
+                },
+                "lines": {
+                    "type": "string",
+                    "description": 'Optional line range, e.g. "1-50" or "100-200". Omit to read entire document.',
+                },
+            },
+            "required": ["path"],
+        },
+    },
+}
+
+KB_GREP_TOOL = {
+    "type": "function",
+    "function": {
+        "name": "kb_grep",
+        "description": (
+            "Search document content for specific text patterns. "
+            "Use 'keyword' mode for natural language terms (full-text search) "
+            "or 'regex' mode for exact pattern matching (POSIX regex). "
+            "Returns matched lines with surrounding context and file paths."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "pattern": {
+                    "type": "string",
+                    "description": "Search pattern -- a word/phrase for keyword mode, or a POSIX regex for regex mode",
+                },
+                "mode": {
+                    "type": "string",
+                    "enum": ["keyword", "regex"],
+                    "description": "Search mode: 'keyword' for full-text search, 'regex' for pattern matching. Default: keyword.",
+                    "default": "keyword",
+                },
+                "path": {
+                    "type": "string",
+                    "description": 'Optional folder path to scope search, e.g. "Board Games/Catan/"',
+                },
+            },
+            "required": ["pattern"],
+        },
+    },
+}
+
+KB_GLOB_TOOL = {
+    "type": "function",
+    "function": {
+        "name": "kb_glob",
+        "description": (
+            "Find files matching a glob pattern across the knowledge base. "
+            "Use * for any characters, ? for single character. "
+            "Example: 'Board Games/*/rules.md' finds all game rule files."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "pattern": {
+                    "type": "string",
+                    "description": 'Glob pattern, e.g. "Board Games/*/rules.md" or "*.md"',
+                },
+            },
+            "required": ["pattern"],
+        },
+    },
+}
+
+TOOL_SELECTION_GUIDE = """## Tool Selection Guide
+
+**Orientation** -- Understand KB structure first:
+- kb_tree: See the folder hierarchy (start here for new topics)
+- kb_ls: List contents of a specific folder
+
+**Find files** -- Locate documents by name or pattern:
+- kb_glob: Match file patterns (e.g., "Board Games/*/rules.md")
+- kb_ls: Browse a known folder
+
+**Find content** -- Search inside documents:
+- kb_grep: Exact text or regex patterns across all documents
+- search_documents: Semantic similarity search (meaning-based)
+
+**Read content** -- Get document text:
+- kb_read: Raw document text (full or line range)
+- analyze_document: LLM-powered deep analysis of a document
+
+**External** -- Information outside the KB:
+- web_search: Current web information
+- query_database: Metadata, stats, conversation history (SQL)
+
+Always start with kb_tree or kb_ls to orient yourself before reading or searching."""
+
+
+def _build_args_preview(fn_name: str, fn_args: dict) -> str:
+    """Build a human-readable args preview string for tool card display."""
+    parts = []
+    for key, value in fn_args.items():
+        if isinstance(value, str):
+            parts.append(f'{key}="{value}"')
+        else:
+            parts.append(f"{key}={value}")
+    return " ".join(parts)[:200]
+
+
 def execute_tool(fn_name: str, fn_args: dict, user_id: str) -> str:
     """Dispatch a tool call to the appropriate service and return JSON result."""
     settings = get_settings()
@@ -177,6 +343,39 @@ def execute_tool(fn_name: str, fn_args: dict, user_id: str) -> str:
             analysis_query=fn_args["query"],
         )
         return json.dumps({"tool": "analyze_document", **result})
+
+    elif fn_name == "kb_ls":
+        result = kb_ls(user_id=user_id, path=fn_args["path"])
+        return json.dumps({"tool": "kb_ls", "output": result})
+
+    elif fn_name == "kb_tree":
+        result = kb_tree(
+            user_id=user_id,
+            path=fn_args.get("path", ""),
+            depth=fn_args.get("depth", 2),
+        )
+        return json.dumps({"tool": "kb_tree", "output": result})
+
+    elif fn_name == "kb_read":
+        result = kb_read(
+            user_id=user_id,
+            path=fn_args["path"],
+            lines=fn_args.get("lines"),
+        )
+        return json.dumps({"tool": "kb_read", "output": result})
+
+    elif fn_name == "kb_grep":
+        result = kb_grep(
+            user_id=user_id,
+            pattern=fn_args["pattern"],
+            mode=fn_args.get("mode", "keyword"),
+            path=fn_args.get("path"),
+        )
+        return json.dumps({"tool": "kb_grep", "output": result})
+
+    elif fn_name == "kb_glob":
+        result = kb_glob(user_id=user_id, pattern=fn_args["pattern"])
+        return json.dumps({"tool": "kb_glob", "output": result})
 
     else:
         return json.dumps({"error": f"Unknown tool: {fn_name}"})
@@ -227,6 +426,11 @@ async def send_message(
         try:
             # Build tools list based on availability
             settings = get_settings()
+
+            # KB navigation tools -- always available (default KB always exists)
+            tools = [KB_LS_TOOL, KB_TREE_TOOL, KB_READ_TOOL, KB_GREP_TOOL, KB_GLOB_TOOL]
+
+            # Document-specific tools -- only when user has completed documents
             doc_check = (
                 db.table("documents")
                 .select("id")
@@ -235,21 +439,20 @@ async def send_message(
                 .limit(1)
                 .execute()
             )
-            tools = []
             if doc_check.data:
                 tools.append(RETRIEVAL_TOOL)
                 tools.append(ANALYZE_DOCUMENT_TOOL)
+
             tools.append(SQL_TOOL)
             if settings.web_search_enabled:
                 tools.append(WEB_SEARCH_TOOL)
-            tools = tools if tools else None
 
             current_messages = list(messages)
 
             while True:
                 tool_call_happened = False
 
-                for event in stream_chat_completion(current_messages, tools=tools):
+                for event in stream_chat_completion(current_messages, tools=tools, tool_guide=TOOL_SELECTION_GUIDE if tools else None):
                     if event["type"] == "text_delta":
                         full_content += event["text"]
                         yield {
@@ -269,18 +472,21 @@ async def send_message(
                             fn_name = tc["function"]["name"]
                             fn_args = json.loads(tc["function"]["arguments"])
 
-                            # Emit sub-agent start event (spinner in frontend)
-                            if fn_name == "analyze_document":
-                                yield {
-                                    "event": "tool_event",
-                                    "data": json.dumps({
-                                        "tool_event": True,
-                                        "tool": "analyze_document",
-                                        "subagent": True,
-                                        "status": "running",
-                                        "args_preview": fn_args.get("document_name", ""),
-                                    }),
-                                }
+                            # Build args preview for display
+                            args_preview = _build_args_preview(fn_name, fn_args)
+
+                            # Emit tool_start SSE event
+                            yield {
+                                "event": "tool_event",
+                                "data": json.dumps({
+                                    "tool_event": True,
+                                    "type": "tool_start",
+                                    "tool": fn_name,
+                                    "call_id": tc["id"],
+                                    "args_preview": args_preview,
+                                    **({"subagent": True} if fn_name == "analyze_document" else {}),
+                                }),
+                            }
 
                             tool_result = execute_tool(fn_name, fn_args, user_id)
 
@@ -290,19 +496,18 @@ async def send_message(
                                 "content": tool_result,
                             })
 
-                            # Emit tool event to frontend for attribution
-                            args_preview = fn_args.get("query", fn_args.get("sql", ""))[:100]
-                            tool_event_data = {
-                                "tool_event": True,
-                                "tool": fn_name,
-                                "args_preview": args_preview,
-                            }
-                            if fn_name == "analyze_document":
-                                tool_event_data["subagent"] = True
-                                tool_event_data["status"] = "complete"
+                            # Emit tool_result SSE event
+                            tool_output_preview = tool_result[:2000] if len(tool_result) > 2000 else tool_result
                             yield {
                                 "event": "tool_event",
-                                "data": json.dumps(tool_event_data),
+                                "data": json.dumps({
+                                    "tool_event": True,
+                                    "type": "tool_result",
+                                    "tool": fn_name,
+                                    "call_id": tc["id"],
+                                    "output": tool_output_preview,
+                                    **({"subagent": True} if fn_name == "analyze_document" else {}),
+                                }),
                             }
 
                 if not tool_call_happened:
