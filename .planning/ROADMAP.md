@@ -65,9 +65,9 @@ Plans:
 **Plans**: 3 plans
 
 Plans:
-- [ ] 03-01-PLAN.md -- KB tools service (kb_ls, kb_tree, kb_read, kb_grep, kb_glob) + Supabase RPC migrations
-- [ ] 03-02-PLAN.md -- Frontend ToolCallCard component + SSE parsing for tool_start/tool_result events
-- [ ] 03-03-PLAN.md -- Wire tools into chat loop (definitions, dispatch, SSE events, system prompt guide) + verification
+- [x] 03-01-PLAN.md -- KB tools service (kb_ls, kb_tree, kb_read, kb_grep, kb_glob) + Supabase RPC migrations
+- [x] 03-02-PLAN.md -- Frontend ToolCallCard component + SSE parsing for tool_start/tool_result events
+- [x] 03-03-PLAN.md -- Wire tools into chat loop (definitions, dispatch, SSE events, system prompt guide) + verification
 
 ### Phase 4: File Manager UI
 **Goal**: Users can visually organize their documents and the default KB in a file manager-style interface with full folder operations
