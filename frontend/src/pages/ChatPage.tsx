@@ -14,7 +14,11 @@ interface Thread {
 export default function ChatPage() {
   const [threads, setThreads] = useState<Thread[]>([])
   const [activeThreadId, setActiveThreadId] = useState<string | null>(null)
-  const { messages, isStreaming, sendMessage, loadMessages } = useChat(activeThreadId)
+  const { messages, isStreaming, sendMessage, loadMessages, cancel } = useChat(activeThreadId)
+
+  useEffect(() => {
+    return () => { cancel() }
+  }, [cancel])
 
   const loadThreads = useCallback(async () => {
     const data = await apiFetch('/api/threads')

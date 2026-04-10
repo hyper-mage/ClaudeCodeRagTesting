@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 
 export interface ToolEvent {
@@ -20,6 +20,7 @@ export interface Message {
 export function useChat(threadId: string | null) {
   const [messages, setMessages] = useState<Message[]>([])
   const [isStreaming, setIsStreaming] = useState(false)
+  const abortRef = useRef<AbortController | null>(null)
 
   const loadMessages = useCallback(async () => {
     if (!threadId) {
@@ -55,7 +56,13 @@ export function useChat(threadId: string | null) {
     setMessages(prev => [...prev, { id: assistantId, role: 'assistant', content: '' }])
     setIsStreaming(true)
 
+    // Abort any in-flight request
+    abortRef.current?.abort()
+
     try {
+      const controller = new AbortController()
+      abortRef.current = controller
+
       const { data: { session } } = await supabase.auth.getSession()
       const res = await fetch(`/api/threads/${threadId}/messages`, {
         method: 'POST',
@@ -64,6 +71,7 @@ export function useChat(threadId: string | null) {
           Authorization: `Bearer ${session?.access_token}`,
         },
         body: JSON.stringify({ content }),
+        signal: controller.signal,
       })
 
       if (!res.ok) throw new Error(`API error: ${res.status}`)
@@ -162,13 +170,23 @@ export function useChat(threadId: string | null) {
         }
       }
     } catch (err) {
+      if (err instanceof DOMException && err.name === 'AbortError') {
+        // Navigation interrupted — tool events already persisted by backend
+        return
+      }
       console.error('Chat error:', err)
       // Remove the empty assistant message on error
       setMessages(prev => prev.filter(m => m.id !== assistantId || m.content))
     } finally {
+      abortRef.current = null
       setIsStreaming(false)
     }
   }, [threadId, isStreaming])
 
-  return { messages, setMessages, isStreaming, sendMessage, loadMessages }
+  const cancel = useCallback(() => {
+    abortRef.current?.abort()
+    abortRef.current = null
+  }, [])
+
+  return { messages, setMessages, isStreaming, sendMessage, loadMessages, cancel }
 }
