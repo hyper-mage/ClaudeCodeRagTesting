@@ -423,6 +423,7 @@ async def send_message(
 
     async def event_generator():
         full_content = ""
+        tools_used_acc = []
         try:
             # Build tools list based on availability
             settings = get_settings()
@@ -475,6 +476,17 @@ async def send_message(
                             # Build args preview for display
                             args_preview = _build_args_preview(fn_name, fn_args)
 
+                            # Accumulate tool event for persistence
+                            tool_entry = {
+                                "tool": fn_name,
+                                "args_preview": args_preview,
+                                "call_id": tc["id"],
+                                "status": "running",
+                            }
+                            if fn_name == "analyze_document":
+                                tool_entry["subagent"] = True
+                            tools_used_acc.append(tool_entry)
+
                             # Emit tool_start SSE event
                             yield {
                                 "event": "tool_event",
@@ -496,8 +508,12 @@ async def send_message(
                                 "content": tool_result,
                             })
 
-                            # Emit tool_result SSE event
+                            # Update accumulated tool entry with result
                             tool_output_preview = tool_result[:2000] if len(tool_result) > 2000 else tool_result
+                            tool_entry["status"] = "complete"
+                            tool_entry["output"] = tool_output_preview
+
+                            # Emit tool_result SSE event
                             yield {
                                 "event": "tool_event",
                                 "data": json.dumps({
@@ -513,15 +529,18 @@ async def send_message(
                 if not tool_call_happened:
                     break
 
-            # Store assistant message
+            # Store assistant message with tool call data
+            msg_data = {
+                "thread_id": thread_id,
+                "user_id": user_id,
+                "role": "assistant",
+                "content": full_content,
+            }
+            if tools_used_acc:
+                msg_data["tools_used"] = json.dumps(tools_used_acc)
             assistant_msg = (
                 db.table("messages")
-                .insert({
-                    "thread_id": thread_id,
-                    "user_id": user_id,
-                    "role": "assistant",
-                    "content": full_content,
-                })
+                .insert(msg_data)
                 .execute()
             )
 

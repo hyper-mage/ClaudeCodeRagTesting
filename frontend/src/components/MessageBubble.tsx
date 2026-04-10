@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import ReactMarkdown from 'react-markdown'
 import ToolCallCard from './ToolCallCard'
 
@@ -17,6 +18,9 @@ interface Props {
 }
 
 export default function MessageBubble({ role, content, toolsUsed }: Props) {
+  const [showTools, setShowTools] = useState(true)
+  const hasTools = role === 'assistant' && toolsUsed && toolsUsed.length > 0
+
   return (
     <div className={`flex ${role === 'user' ? 'justify-end' : 'justify-start'} mb-4`}>
       <div
@@ -26,20 +30,30 @@ export default function MessageBubble({ role, content, toolsUsed }: Props) {
             : 'bg-gray-800 text-gray-100'
         }`}
       >
-        {role === 'assistant' && toolsUsed && toolsUsed.length > 0 && (
-          <div className="flex flex-col gap-2 mb-2">
-            {toolsUsed.map((t, i) => (
-              <ToolCallCard
-                key={t.call_id || i}
-                tool={t.tool}
-                args_preview={t.args_preview}
-                output={t.output}
-                call_id={t.call_id}
-                subagent={t.subagent}
-                status={t.status}
-              />
-            ))}
-          </div>
+        {hasTools && (
+          <>
+            <button
+              onClick={() => setShowTools(!showTools)}
+              className="text-xs text-gray-500 hover:text-gray-300 mb-1"
+            >
+              {showTools ? 'Hide tools' : `Show tools (${toolsUsed.length})`}
+            </button>
+            {showTools && (
+              <div className="flex flex-col gap-2 mb-2">
+                {toolsUsed.map((t, i) => (
+                  <ToolCallCard
+                    key={t.call_id || i}
+                    tool={t.tool}
+                    args_preview={t.args_preview}
+                    output={t.output}
+                    call_id={t.call_id}
+                    subagent={t.subagent}
+                    status={t.status}
+                  />
+                ))}
+              </div>
+            )}
+          </>
         )}
         {role === 'assistant' ? (
           <div className="prose prose-invert prose-sm max-w-none [&>*:first-child]:mt-0 [&>*:last-child]:mb-0">

@@ -32,7 +32,10 @@ export function useChat(threadId: string | null) {
     })
     if (res.ok) {
       const data = await res.json()
-      setMessages(data.messages)
+      setMessages(data.messages.map((m: Record<string, unknown>) => ({
+        ...m,
+        toolsUsed: m.tools_used as ToolEvent[] | undefined,
+      })))
     }
   }, [threadId])
 

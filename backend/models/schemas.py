@@ -42,6 +42,7 @@ class MessageResponse(BaseModel):
     thread_id: str
     role: str
     content: str
+    tools_used: list[dict] | None = None
     created_at: datetime
 
 
