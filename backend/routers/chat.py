@@ -345,37 +345,57 @@ def execute_tool(fn_name: str, fn_args: dict, user_id: str) -> str:
         return json.dumps({"tool": "analyze_document", **result})
 
     elif fn_name == "kb_ls":
-        result = kb_ls(user_id=user_id, path=fn_args["path"])
-        return json.dumps({"tool": "kb_ls", "output": result})
+        try:
+            result = kb_ls(user_id=user_id, path=fn_args["path"])
+            return json.dumps({"tool": "kb_ls", "output": result})
+        except Exception as e:
+            logger.error(f"kb_ls failed: {e}", exc_info=True)
+            return json.dumps({"tool": "kb_ls", "error": str(e)})
 
     elif fn_name == "kb_tree":
-        result = kb_tree(
-            user_id=user_id,
-            path=fn_args.get("path", ""),
-            depth=fn_args.get("depth", 2),
-        )
-        return json.dumps({"tool": "kb_tree", "output": result})
+        try:
+            result = kb_tree(
+                user_id=user_id,
+                path=fn_args.get("path", ""),
+                depth=fn_args.get("depth", 2),
+            )
+            return json.dumps({"tool": "kb_tree", "output": result})
+        except Exception as e:
+            logger.error(f"kb_tree failed: {e}", exc_info=True)
+            return json.dumps({"tool": "kb_tree", "error": str(e)})
 
     elif fn_name == "kb_read":
-        result = kb_read(
-            user_id=user_id,
-            path=fn_args["path"],
-            lines=fn_args.get("lines"),
-        )
-        return json.dumps({"tool": "kb_read", "output": result})
+        try:
+            result = kb_read(
+                user_id=user_id,
+                path=fn_args["path"],
+                lines=fn_args.get("lines"),
+            )
+            return json.dumps({"tool": "kb_read", "output": result})
+        except Exception as e:
+            logger.error(f"kb_read failed: {e}", exc_info=True)
+            return json.dumps({"tool": "kb_read", "error": str(e)})
 
     elif fn_name == "kb_grep":
-        result = kb_grep(
-            user_id=user_id,
-            pattern=fn_args["pattern"],
-            mode=fn_args.get("mode", "keyword"),
-            path=fn_args.get("path"),
-        )
-        return json.dumps({"tool": "kb_grep", "output": result})
+        try:
+            result = kb_grep(
+                user_id=user_id,
+                pattern=fn_args["pattern"],
+                mode=fn_args.get("mode", "keyword"),
+                path=fn_args.get("path"),
+            )
+            return json.dumps({"tool": "kb_grep", "output": result})
+        except Exception as e:
+            logger.error(f"kb_grep failed: {e}", exc_info=True)
+            return json.dumps({"tool": "kb_grep", "error": str(e)})
 
     elif fn_name == "kb_glob":
-        result = kb_glob(user_id=user_id, pattern=fn_args["pattern"])
-        return json.dumps({"tool": "kb_glob", "output": result})
+        try:
+            result = kb_glob(user_id=user_id, pattern=fn_args["pattern"])
+            return json.dumps({"tool": "kb_glob", "output": result})
+        except Exception as e:
+            logger.error(f"kb_glob failed: {e}", exc_info=True)
+            return json.dumps({"tool": "kb_glob", "error": str(e)})
 
     else:
         return json.dumps({"error": f"Unknown tool: {fn_name}"})
