@@ -79,14 +79,14 @@ Plans:
   3. User can drag and drop files/folders to reorganize them
   4. User can right-click for context menus and select multiple files for bulk operations
   5. Default KB folders are visually distinct (read-only styling) from the user's own folders
-**Plans**: TBD
+**Plans**: 4 plans
 **UI hint**: yes
 
 Plans:
-- [ ] 04-01: TBD
-- [ ] 04-02: TBD
-- [ ] 04-03: TBD
-- [ ] 04-04: TBD
+- [ ] 04-01-PLAN.md -- Backend folder CRUD API (create, rename, delete, move, list, contents) with tests
+- [ ] 04-02-PLAN.md -- Tree sidebar, folder data hook, file list view, breadcrumb, DocumentsPage rewrite
+- [ ] 04-03-PLAN.md -- Context menus, inline rename, confirm dialog, folder picker, folder creation UI
+- [ ] 04-04-PLAN.md -- Drag-and-drop (@dnd-kit/react), bulk selection, bulk action bar, drop-to-upload
 
 ### Phase 5: Explorer Sub-Agent
 **Goal**: Complex multi-step KB searches are handled by a dedicated explorer agent that traverses, summarizes, cross-references, and recommends
@@ -131,6 +131,6 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6
 | 1. Data Foundation and Schema | 2/2 | Complete | - |
 | 2. Default KB and Ingestion Extensions | 3/3 | Complete | - |
 | 3. KB Navigation Tools | 0/3 | Planning | - |
-| 4. File Manager UI | 0/4 | Not started | - |
+| 4. File Manager UI | 0/4 | Planning | - |
 | 5. Explorer Sub-Agent | 0/3 | Not started | - |
 | 6. Agent Intelligence and Polish | 0/3 | Not started | - |
