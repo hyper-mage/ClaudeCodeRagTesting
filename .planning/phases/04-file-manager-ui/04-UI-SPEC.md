@@ -5,6 +5,7 @@ status: draft
 shadcn_initialized: false
 preset: none
 created: 2026-04-10
+revised: 2026-04-10
 ---
 
 # Phase 4 — UI Design Contract
@@ -32,9 +33,8 @@ Declared values (must be multiples of 4):
 | Token | Value | Usage |
 |-------|-------|-------|
 | xs | 4px | Icon gaps, tree indent per level, inline padding (gap-1, p-1) |
-| sm | 8px | Tree item padding, compact element spacing (p-2, gap-2) |
-| md | 12px | Sidebar section padding, list row padding (px-3, p-3) |
-| lg | 16px | Content panel padding, form spacing (p-4, space-y-4) |
+| sm | 8px | Tree item padding, compact element spacing, sidebar section padding (p-2, gap-2) |
+| lg | 16px | Content panel padding, form spacing, list row padding (p-4, px-4, space-y-4) |
 | xl | 24px | Section padding, upload zone inner padding (p-6) |
 | 2xl | 48px | Upload zone large padding (p-12) |
 
@@ -51,14 +51,15 @@ Exceptions:
 |------|------|--------|-------------|----------------|
 | Body | 14px | 400 (normal) | 1.5 | text-sm |
 | Label | 12px | 400 (normal) | 1.5 | text-xs |
-| Section heading | 14px | 500 (medium) | 1.5 | text-sm font-medium |
+| Section heading | 12px | 400 (normal) | 1.5 | text-xs uppercase tracking-wider text-gray-400 |
 | Page heading | 24px | 700 (bold) | 1.2 | text-2xl font-bold |
 
 Notes:
 - Filenames in tree and list use Body (14px, 400)
 - Status badges, chunk counts, metadata, and breadcrumb segments use Label (12px, 400)
-- Sidebar section headers ("Board Games", "My Documents") use Section heading (14px, 500)
+- Sidebar section headers ("BOARD GAMES", "MY DOCUMENTS") use Section heading: uppercase 12px with wider letter-spacing and muted color to differentiate from body text without a third weight
 - No Display size needed for this phase
+- Only 2 font weights used: 400 (normal) and 700 (bold)
 
 ---
 
@@ -95,6 +96,12 @@ Additional semantic colors already established in codebase:
 | Invalid drop target | cursor-not-allowed opacity-50 | Board Games folders during drag |
 | Bulk selection active | bg-gray-800/50 | Selected rows with checkbox checked |
 | Context menu | bg-gray-900 border border-gray-700 shadow-lg | Floating menu overlay |
+
+---
+
+## Focal Point
+
+Content panel file list is the primary visual anchor -- users spend most time browsing and acting on files here. The tree sidebar is secondary navigation that sets context for the content panel. The toolbar (Upload / New Folder) is the primary action area within the content panel.
 
 ---
 
@@ -162,12 +169,22 @@ Additional semantic colors already established in codebase:
 | Error state (upload fail) | "Upload failed. Check your file type and try again." |
 | Error state (folder create fail) | "Could not create folder. Please try again." |
 | Error state (move fail) | "Could not move items. Please try again." |
-| Delete file confirmation | "Delete file": "Are you sure you want to delete {filename}? This cannot be undone." |
-| Delete folder confirmation | "Delete folder": "Delete {foldername} and all its contents? This will permanently remove {N} files and {M} subfolders." |
-| Bulk delete confirmation | "Delete {N} items": "Are you sure you want to delete {N} selected items? This cannot be undone." |
+| Delete file confirmation heading | "Delete {filename}?" |
+| Delete file confirmation body | "Are you sure you want to delete {filename}? This cannot be undone." |
+| Delete file confirmation confirm button | "Delete File" |
+| Delete file confirmation cancel button | "Keep File" |
+| Delete folder confirmation heading | "Delete {foldername}?" |
+| Delete folder confirmation body | "Delete {foldername} and all its contents? This will permanently remove {N} files and {M} subfolders." |
+| Delete folder confirmation confirm button | "Delete Folder" |
+| Delete folder confirmation cancel button | "Keep Folder" |
+| Bulk delete confirmation heading | "Delete {N} items?" |
+| Bulk delete confirmation body | "Are you sure you want to delete {N} selected items? This cannot be undone." |
+| Bulk delete confirmation confirm button | "Delete {N} Items" |
+| Bulk delete confirmation cancel button | "Keep Items" |
+| Bulk action bar content | "{N} selected" + "Delete {N} Items" button + "Move to..." button |
 | Inline rename placeholder | Current name pre-filled, fully selected |
-| Board Games tree root label | "Board Games" |
-| My Documents tree root label | "My Documents" |
+| Board Games tree root label | "BOARD GAMES" |
+| My Documents tree root label | "MY DOCUMENTS" |
 | Breadcrumb separator | "/" (forward slash, text-gray-600) |
 | Drag feedback (valid) | Blue highlight border on target folder |
 | Drag feedback (invalid) | not-allowed cursor, no highlight |
@@ -232,7 +249,7 @@ Additional semantic colors already established in codebase:
 | Interaction | Behavior |
 |-------------|----------|
 | Click segment | Navigate to that folder, update tree selection |
-| Last segment | Not clickable (current location, font-medium text-gray-200) |
+| Last segment | Not clickable (current location, text-gray-200) |
 | Other segments | Clickable, text-gray-400 hover:text-gray-200 |
 
 ### Confirm Dialog
@@ -240,8 +257,8 @@ Additional semantic colors already established in codebase:
 | Interaction | Behavior |
 |-------------|----------|
 | Appearance | Centered modal with backdrop (bg-black/50) |
-| Confirm button | "Delete" in red (bg-red-600 hover:bg-red-700) |
-| Cancel button | "Cancel" in gray (bg-gray-700 hover:bg-gray-600) |
+| Confirm button | Contextual destructive label in red (bg-red-600 hover:bg-red-700): "Delete File", "Delete Folder", or "Delete {N} Items" |
+| Cancel button | Contextual safe label in gray (bg-gray-700 hover:bg-gray-600): "Keep File", "Keep Folder", or "Keep Items" |
 | Escape | Cancel and close |
 | Click backdrop | Cancel and close |
 
@@ -250,7 +267,7 @@ Additional semantic colors already established in codebase:
 | Interaction | Behavior |
 |-------------|----------|
 | Appears | When 1+ items selected, fixed bar above file list |
-| Content | "{N} selected" + "Delete" button + "Move to..." button |
+| Content | "{N} selected" + "Delete {N} Items" button + "Move to..." button |
 | Escape | Deselect all, hide bar |
 
 ---
@@ -262,10 +279,10 @@ Additional semantic colors already established in codebase:
 | Icon  | Tree Sidebar     | Content Panel                 |
 | Bar   | (w-64)           | (flex-1)                      |
 | (w-14)|                  |                               |
-|       | [Board Games]    | [Breadcrumb: My Docs / Games] |
+|       | [BOARD GAMES]    | [Breadcrumb: My Docs / Games] |
 |       |   > Catan        | [Toolbar: Upload | New Folder]|
 |       |   > Monopoly     | [File List Table]             |
-|       | [My Documents]   |   [ ] filename  status  size  |
+|       | [MY DOCUMENTS]   |   [ ] filename  status  size  |
 |       |   > My Games     |   [ ] filename  status  size  |
 |       |                  |   [ ] filename  status  size  |
 |       |                  |                               |
