@@ -182,12 +182,148 @@ export function useFolderTree() {
     })
   }, [])
 
-  const refreshTree = useCallback(() => {
-    loadFolders()
+  const refreshTree = useCallback(async () => {
+    await loadFolders()
     if (selectedFolderId !== null) {
-      loadContents(selectedFolderId)
+      await loadContents(selectedFolderId)
     }
   }, [loadFolders, loadContents, selectedFolderId])
+
+  const createFolder = useCallback(
+    async (name: string, parentId: string | null) => {
+      if (!session) return
+      const realParent =
+        parentId === null || parentId === ROOT_PRIVATE_ID || parentId === ROOT_PUBLIC_ID
+          ? null
+          : parentId
+      const res = await fetch('/api/folders', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({ name, parent_id: realParent }),
+      })
+      if (!res.ok) {
+        const body = await res.text()
+        throw new Error(`Create folder failed: ${body}`)
+      }
+      await loadFolders()
+      if (selectedFolderId !== null) await loadContents(selectedFolderId)
+    },
+    [session, loadFolders, loadContents, selectedFolderId]
+  )
+
+  const renameFolder = useCallback(
+    async (folderId: string, name: string) => {
+      if (!session) return
+      const res = await fetch(`/api/folders/${folderId}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({ name }),
+      })
+      if (!res.ok) {
+        const body = await res.text()
+        throw new Error(`Rename folder failed: ${body}`)
+      }
+      await loadFolders()
+      if (selectedFolderId !== null) await loadContents(selectedFolderId)
+    },
+    [session, loadFolders, loadContents, selectedFolderId]
+  )
+
+  const deleteFolder = useCallback(
+    async (folderId: string) => {
+      if (!session) return
+      const res = await fetch(`/api/folders/${folderId}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      })
+      if (!res.ok) {
+        const body = await res.text()
+        throw new Error(`Delete folder failed: ${body}`)
+      }
+      if (selectedFolderId === folderId) {
+        setSelectedFolderId(null)
+        setFolderContents(null)
+      }
+      await loadFolders()
+      if (selectedFolderId !== null && selectedFolderId !== folderId) {
+        await loadContents(selectedFolderId)
+      }
+    },
+    [session, loadFolders, loadContents, selectedFolderId]
+  )
+
+  const moveFolder = useCallback(
+    async (folderId: string, newParentId: string | null) => {
+      if (!session) return
+      const realParent =
+        newParentId === ROOT_PRIVATE_ID || newParentId === ROOT_PUBLIC_ID
+          ? null
+          : newParentId
+      const res = await fetch(`/api/folders/${folderId}/move`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({ new_parent_id: realParent }),
+      })
+      if (!res.ok) {
+        const body = await res.text()
+        throw new Error(`Move folder failed: ${body}`)
+      }
+      await loadFolders()
+      if (selectedFolderId !== null) await loadContents(selectedFolderId)
+    },
+    [session, loadFolders, loadContents, selectedFolderId]
+  )
+
+  const moveDocument = useCallback(
+    async (docId: string, folderId: string | null) => {
+      if (!session) return
+      const realFolder =
+        folderId === ROOT_PRIVATE_ID || folderId === ROOT_PUBLIC_ID ? null : folderId
+      const res = await fetch(`/api/documents/${docId}/move`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({ folder_id: realFolder }),
+      })
+      if (!res.ok) {
+        const body = await res.text()
+        throw new Error(`Move document failed: ${body}`)
+      }
+      if (selectedFolderId !== null) await loadContents(selectedFolderId)
+    },
+    [session, loadContents, selectedFolderId]
+  )
+
+  const renameDocument = useCallback(
+    async (docId: string, filename: string) => {
+      if (!session) return
+      const res = await fetch(`/api/documents/${docId}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({ filename }),
+      })
+      if (!res.ok) {
+        const body = await res.text()
+        throw new Error(`Rename document failed: ${body}`)
+      }
+      if (selectedFolderId !== null) await loadContents(selectedFolderId)
+    },
+    [session, loadContents, selectedFolderId]
+  )
 
   const breadcrumbs = useMemo<BreadcrumbSegment[]>(() => {
     if (selectedFolderId === null) return []
@@ -230,5 +366,11 @@ export function useFolderTree() {
     toggleExpand,
     refreshTree,
     breadcrumbs,
+    createFolder,
+    renameFolder,
+    deleteFolder,
+    moveFolder,
+    moveDocument,
+    renameDocument,
   }
 }

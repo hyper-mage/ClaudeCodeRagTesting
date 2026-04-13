@@ -1,7 +1,8 @@
-import { Plus } from 'lucide-react'
+import { Plus, Folder } from 'lucide-react'
 import type { FolderNode } from '../hooks/useFolderTree'
 import { ROOT_PUBLIC_ID, ROOT_PRIVATE_ID } from '../hooks/useFolderTree'
 import FolderTreeItem from './FolderTreeItem'
+import InlineRename from './InlineRename'
 
 interface Props {
   folders: FolderNode[]
@@ -10,7 +11,14 @@ interface Props {
   onSelect: (id: string | null) => void
   onToggleExpand: (id: string) => void
   onContextMenu?: (e: React.MouseEvent, node: FolderNode) => void
-  onCreateRootFolder?: () => void
+  renamingId?: string | null
+  onStartRename?: (id: string) => void
+  onConfirmRename?: (id: string, newName: string) => void
+  onCancelRename?: () => void
+  creatingUnderId?: string | null
+  onStartCreate?: (parentId: string) => void
+  onConfirmCreate?: (parentId: string | null, name: string) => void
+  onCancelCreate?: () => void
 }
 
 export default function FolderTree({
@@ -20,10 +28,19 @@ export default function FolderTree({
   onSelect,
   onToggleExpand,
   onContextMenu,
-  onCreateRootFolder,
+  renamingId,
+  onStartRename,
+  onConfirmRename,
+  onCancelRename,
+  creatingUnderId,
+  onStartCreate,
+  onConfirmCreate,
+  onCancelCreate,
 }: Props) {
   const publicRoot = folders.find(f => f.id === ROOT_PUBLIC_ID)
   const privateRoot = folders.find(f => f.id === ROOT_PRIVATE_ID)
+
+  const creatingAtPrivateRoot = creatingUnderId === ROOT_PRIVATE_ID
 
   return (
     <div className="flex-1 overflow-y-auto py-2">
@@ -60,7 +77,7 @@ export default function FolderTree({
           </span>
           <button
             type="button"
-            onClick={() => onCreateRootFolder?.()}
+            onClick={() => onStartCreate?.(ROOT_PRIVATE_ID)}
             className="text-gray-500 hover:text-gray-200 shrink-0"
             aria-label="New folder"
             title="New folder"
@@ -68,6 +85,24 @@ export default function FolderTree({
             <Plus size={14} />
           </button>
         </div>
+        {creatingAtPrivateRoot && (
+          <div
+            className="flex items-center py-1.5 pr-2"
+            style={{ paddingLeft: '8px' }}
+          >
+            <div className="shrink-0 w-4 h-4" />
+            <span className="shrink-0 ml-0.5 text-gray-400">
+              <Folder size={14} />
+            </span>
+            <span className="ml-1.5 flex-1">
+              <InlineRename
+                placeholder="New folder name"
+                onConfirm={name => onConfirmCreate?.(null, name)}
+                onCancel={() => onCancelCreate?.()}
+              />
+            </span>
+          </div>
+        )}
         {privateRoot?.children.map(node => (
           <FolderTreeItem
             key={node.id}
@@ -78,6 +113,13 @@ export default function FolderTree({
             onSelect={onSelect}
             onToggleExpand={onToggleExpand}
             onContextMenu={onContextMenu}
+            renamingId={renamingId}
+            onStartRename={onStartRename}
+            onConfirmRename={onConfirmRename}
+            onCancelRename={onCancelRename}
+            creatingUnderId={creatingUnderId}
+            onConfirmCreate={onConfirmCreate}
+            onCancelCreate={onCancelCreate}
           />
         ))}
       </div>

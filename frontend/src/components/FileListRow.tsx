@@ -1,10 +1,15 @@
 import { File, FileText, Image, Trash2 } from 'lucide-react'
 import type { Document } from '../hooks/useDocuments'
+import InlineRename from './InlineRename'
 
 interface Props {
   doc: Document
   onDelete: (id: string) => void
   onContextMenu?: (e: React.MouseEvent, doc: Document) => void
+  isRenaming?: boolean
+  onStartRename?: (id: string) => void
+  onConfirmRename?: (id: string, newName: string) => void
+  onCancelRename?: () => void
 }
 
 const STATUS_STYLES: Record<string, string> = {
@@ -38,7 +43,15 @@ function extensionOf(filename: string): string {
   return parts[parts.length - 1].toUpperCase()
 }
 
-export default function FileListRow({ doc, onDelete, onContextMenu }: Props) {
+export default function FileListRow({
+  doc,
+  onDelete,
+  onContextMenu,
+  isRenaming,
+  onStartRename,
+  onConfirmRename,
+  onCancelRename,
+}: Props) {
   return (
     <div
       className="flex items-center px-4 py-2 hover:bg-gray-800 text-sm border-b border-gray-800 group"
@@ -47,7 +60,22 @@ export default function FileListRow({ doc, onDelete, onContextMenu }: Props) {
       {/* Checkbox placeholder for Plan 04 */}
       <div className="w-4 shrink-0" />
       {renderIcon(doc.mime_type || '')}
-      <div className="flex-1 truncate text-gray-200 text-sm">{doc.filename}</div>
+      {isRenaming ? (
+        <div className="flex-1" onClick={e => e.stopPropagation()}>
+          <InlineRename
+            currentName={doc.filename}
+            onConfirm={name => onConfirmRename?.(doc.id, name)}
+            onCancel={() => onCancelRename?.()}
+          />
+        </div>
+      ) : (
+        <div
+          className="flex-1 truncate text-gray-200 text-sm"
+          onDoubleClick={() => onStartRename?.(doc.id)}
+        >
+          {doc.filename}
+        </div>
+      )}
       <span
         className={`px-1.5 py-0.5 rounded text-xs ${STATUS_STYLES[doc.status] ?? 'bg-gray-600 text-gray-200'} mr-4`}
       >
