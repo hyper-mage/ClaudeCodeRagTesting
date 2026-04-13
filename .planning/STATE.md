@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed 04-02-PLAN.md
-last_updated: "2026-04-13T15:19:17.955Z"
+stopped_at: Completed 04-03-PLAN.md
+last_updated: "2026-04-13T15:27:21.533Z"
 last_activity: 2026-04-13
 progress:
   total_phases: 6
   completed_phases: 3
   total_plans: 14
-  completed_plans: 12
+  completed_plans: 13
   percent: 17
 ---
 
@@ -26,7 +26,7 @@ See: .planning/PROJECT.md (updated 2026-04-07)
 ## Current Position
 
 Phase: 04 (file-manager-ui) — EXECUTING
-Plan: 3 of 4
+Plan: 4 of 4
 Status: Ready to execute
 Last activity: 2026-04-13
 
@@ -59,6 +59,7 @@ Progress: [█░░░░░░░░░] 17%
 | Phase 03 P05 | 64s | 2 tasks | 2 files |
 | Phase 04 P01 | 4min | 2 tasks | 5 files |
 | Phase 04 P02 | 420 | 2 tasks | 9 files |
+| Phase 04 P03 | 900 | 3 tasks | 12 files |
 
 ## Accumulated Context
 
@@ -80,6 +81,8 @@ Recent decisions affecting current work:
 - [Phase 04]: [Phase 04]: Folder ltree root scheme my_documents.{label} with UNIQUE(user_id,path) constraint for user isolation
 - [Phase 04]: [Phase 04]: Bulk document ops validate ALL items before any storage/DB mutation to ensure atomic rejection
 - [Phase 04]: Two virtual folder roots (root-public/root-private) materialized client-side in useFolderTree
+- [Phase 04]: ContextMenu uses ref-callback position measurement instead of setState-in-effect
+- [Phase 04]: Virtual root sentinels (ROOT_PRIVATE_ID) coerced to null at hook boundary, never leak to API
 
 ### Pending Todos
 
@@ -93,7 +96,7 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-13T15:19:17.947Z
-Stopped at: Completed 04-02-PLAN.md
+Last session: 2026-04-13T15:27:21.525Z
+Stopped at: Completed 04-03-PLAN.md
 Resume file: None
 Next: Phase 02
