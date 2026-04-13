@@ -2,10 +2,11 @@ import { useState, useRef, type DragEvent } from 'react'
 import { Upload } from 'lucide-react'
 
 interface Props {
-  onUpload: (file: File) => Promise<any>
+  onUpload: (file: File, folderId?: string) => Promise<any>
+  folderId?: string
 }
 
-export default function FileUpload({ onUpload }: Props) {
+export default function FileUpload({ onUpload, folderId }: Props) {
   const [isDragging, setIsDragging] = useState(false)
   const [isUploading, setIsUploading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -24,7 +25,7 @@ export default function FileUpload({ onUpload }: Props) {
     }
     setIsUploading(true)
     try {
-      const result = await onUpload(file)
+      const result = await onUpload(file, folderId)
       if (result?.duplicate) {
         setInfo(result.message || 'This file has already been uploaded')
       }

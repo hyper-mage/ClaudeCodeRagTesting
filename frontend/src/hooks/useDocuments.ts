@@ -44,10 +44,11 @@ export function useDocuments() {
     }
   }, [session])
 
-  const uploadDocument = useCallback(async (file: File) => {
+  const uploadDocument = useCallback(async (file: File, folderId?: string) => {
     if (!session) return
     const formData = new FormData()
     formData.append('file', file)
+    if (folderId) formData.append('folder_id', folderId)
 
     const res = await fetch('/api/documents/upload', {
       method: 'POST',
