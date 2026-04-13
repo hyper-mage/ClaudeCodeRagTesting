@@ -3,6 +3,7 @@ import { Folder, FolderPlus, Upload } from 'lucide-react'
 import type { Document } from '../hooks/useDocuments'
 import type { FolderNode, FolderRow } from '../hooks/useFolderTree'
 import FileListRow from './FileListRow'
+import InlineRename from './InlineRename'
 
 interface Props {
   folder: FolderRow | null
@@ -13,8 +14,15 @@ interface Props {
   onSelectFolder: (id: string) => void
   onUpload: (file: File) => Promise<unknown>
   isReadOnly: boolean
-  onNewFolder?: () => void
   onContextMenu?: (e: React.MouseEvent, target: FolderNode | Document) => void
+  renamingId?: string | null
+  onStartRename?: (id: string) => void
+  onConfirmRename?: (id: string, newName: string) => void
+  onCancelRename?: () => void
+  creatingInCurrentFolder?: boolean
+  onStartCreate?: () => void
+  onConfirmCreate?: (name: string) => void
+  onCancelCreate?: () => void
 }
 
 export default function FileListView({
@@ -26,8 +34,15 @@ export default function FileListView({
   onSelectFolder,
   onUpload,
   isReadOnly,
-  onNewFolder,
   onContextMenu,
+  renamingId,
+  onStartRename,
+  onConfirmRename,
+  onCancelRename,
+  creatingInCurrentFolder,
+  onStartCreate,
+  onConfirmCreate,
+  onCancelCreate,
 }: Props) {
   const fileInputRef = useRef<HTMLInputElement>(null)
 
@@ -47,7 +62,8 @@ export default function FileListView({
 
   const folderName = folder?.name ?? ''
 
-  const isEmpty = subfolders.length === 0 && documents.length === 0
+  const isEmpty =
+    subfolders.length === 0 && documents.length === 0 && !creatingInCurrentFolder
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden">
@@ -66,7 +82,7 @@ export default function FileListView({
             </button>
             <button
               type="button"
-              onClick={() => onNewFolder?.()}
+              onClick={() => onStartCreate?.()}
               className="bg-gray-700 hover:bg-gray-600 text-white text-xs px-3 py-1.5 rounded flex items-center gap-1"
             >
               <FolderPlus size={14} />
@@ -106,6 +122,24 @@ export default function FileListView({
           </div>
         ) : (
           <>
+            {creatingInCurrentFolder && (
+              <div className="flex items-center px-4 py-2 text-sm border-b border-gray-800">
+                <div className="w-4 shrink-0" />
+                <Folder size={14} className="text-gray-400 mr-2 shrink-0" />
+                <div className="flex-1">
+                  <InlineRename
+                    placeholder="New folder name"
+                    onConfirm={name => onConfirmCreate?.(name)}
+                    onCancel={() => onCancelCreate?.()}
+                  />
+                </div>
+                <span className="w-20 text-xs text-gray-500 text-right">
+                  FOLDER
+                </span>
+                <span className="w-20 text-xs text-gray-500 text-right" />
+                <div className="w-4 ml-2 shrink-0" />
+              </div>
+            )}
             {subfolders.map(sf => (
               <div
                 key={sf.id}
@@ -133,6 +167,10 @@ export default function FileListView({
                 doc={doc}
                 onDelete={onDeleteDoc}
                 onContextMenu={onContextMenu}
+                isRenaming={renamingId === doc.id}
+                onStartRename={onStartRename}
+                onConfirmRename={onConfirmRename}
+                onCancelRename={onCancelRename}
               />
             ))}
           </>
