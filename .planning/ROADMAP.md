@@ -83,7 +83,7 @@ Plans:
 **UI hint**: yes
 
 Plans:
-- [ ] 04-01-PLAN.md -- Backend folder CRUD API (create, rename, delete, move, list, contents) with tests
+- [x] 04-01-PLAN.md -- Backend folder CRUD API (create, rename, delete, move, list, contents) with tests
 - [ ] 04-02-PLAN.md -- Tree sidebar, folder data hook, file list view, breadcrumb, DocumentsPage rewrite
 - [ ] 04-03-PLAN.md -- Context menus, inline rename, confirm dialog, folder picker, folder creation UI
 - [ ] 04-04-PLAN.md -- Drag-and-drop (@dnd-kit/react), bulk selection, bulk action bar, drop-to-upload
