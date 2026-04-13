@@ -8,7 +8,7 @@
 ### Data Foundation
 
 - [x] **DATA-01**: User can create folders and subfolders to organize their documents
-- [ ] **DATA-02**: User can see a hierarchical folder structure in the ingestion interface
+- [x] **DATA-02**: User can see a hierarchical folder structure in the ingestion interface
 - [x] **DATA-03**: System stores folder hierarchy in Supabase with materialized paths for efficient tree queries
 - [x] **DATA-04**: Default board game KB ships with 10 pre-seeded popular games organized in folders
 - [x] **DATA-05**: All authenticated users can read the default KB content (shared visibility)
@@ -48,7 +48,7 @@
 
 ### File Manager UI
 
-- [ ] **FMGR-01**: Ingestion interface displays a tree sidebar showing folder hierarchy
+- [x] **FMGR-01**: Ingestion interface displays a tree sidebar showing folder hierarchy
 - [x] **FMGR-02**: User can create new folders and subfolders via the UI
 - [x] **FMGR-03**: User can rename folders and files
 - [x] **FMGR-04**: User can delete folders (with confirmation) and files
@@ -57,7 +57,7 @@
 - [x] **FMGR-07**: User can select multiple files for bulk move or delete operations
 - [x] **FMGR-08**: Default KB folders are visually distinct (read-only indicator, different styling)
 - [ ] **FMGR-09**: User can upload files by dropping them into a specific folder in the tree
-- [ ] **FMGR-10**: Breadcrumb navigation shows current folder path
+- [x] **FMGR-10**: Breadcrumb navigation shows current folder path
 
 ## v2 Requirements
 
@@ -94,7 +94,7 @@
 | Requirement | Phase | Status |
 |-------------|-------|--------|
 | DATA-01 | Phase 1 | Complete |
-| DATA-02 | Phase 4 | Pending |
+| DATA-02 | Phase 4 | Complete |
 | DATA-03 | Phase 1 | Complete |
 | DATA-04 | Phase 2 | Complete |
 | DATA-05 | Phase 1 | Complete |
@@ -122,7 +122,7 @@
 | EXPL-04 | Phase 5 | Pending |
 | EXPL-05 | Phase 5 | Pending |
 | EXPL-06 | Phase 5 | Pending |
-| FMGR-01 | Phase 4 | Pending |
+| FMGR-01 | Phase 4 | Complete |
 | FMGR-02 | Phase 4 | Complete |
 | FMGR-03 | Phase 4 | Complete |
 | FMGR-04 | Phase 4 | Complete |
@@ -131,7 +131,7 @@
 | FMGR-07 | Phase 4 | Complete |
 | FMGR-08 | Phase 4 | Complete |
 | FMGR-09 | Phase 4 | Pending |
-| FMGR-10 | Phase 4 | Pending |
+| FMGR-10 | Phase 4 | Complete |
 
 **Coverage:**
 - v1 requirements: 39 total
