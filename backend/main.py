@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from routers import threads, chat, documents
+from routers import threads, chat, documents, folders
 from services.tracing import setup_tracing
 
 setup_tracing()
@@ -18,6 +18,7 @@ app.add_middleware(
 app.include_router(threads.router)
 app.include_router(chat.router)
 app.include_router(documents.router)
+app.include_router(folders.router)
 
 
 @app.get("/api/health")

@@ -1,6 +1,7 @@
 import uuid
 import logging
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
+from pydantic import BaseModel
 from auth import get_user_id
 from database import get_supabase
 from services.ingestion_service import process_document, process_document_incremental
@@ -152,3 +153,167 @@ async def delete_document(doc_id: str, user_id: str = Depends(get_user_id)):
 
     # Delete document (chunks cascade-deleted)
     db.table("documents").delete().eq("id", doc_id).execute()
+
+
+# ---------------------------------------------------------------------------
+# Rename / Move / Bulk operations (Phase 04)
+# ---------------------------------------------------------------------------
+
+
+class DocumentRename(BaseModel):
+    filename: str
+
+
+class DocumentMove(BaseModel):
+    folder_id: str | None = None
+
+
+class BulkIds(BaseModel):
+    ids: list[str]
+
+
+class BulkMove(BaseModel):
+    ids: list[str]
+    folder_id: str | None = None
+
+
+def _get_owned_private_document_or_403(db, doc_id: str, user_id: str) -> dict:
+    """Fetch a document by id and enforce ownership + private visibility.
+
+    Returns the document dict. Raises 404 if not found, 403 if public
+    or not owned by user.
+    """
+    result = (
+        db.table("documents")
+        .select("*")
+        .eq("id", doc_id)
+        .maybe_single()
+        .execute()
+    )
+    if not result or not result.data:
+        raise HTTPException(status_code=404, detail="Document not found")
+    data = result.data
+    if data.get("visibility") == "public":
+        raise HTTPException(
+            status_code=403,
+            detail="Cannot modify read-only (public) documents",
+        )
+    if data.get("user_id") != user_id:
+        raise HTTPException(status_code=403, detail="Not allowed")
+    return data
+
+
+def _ensure_target_folder_writable(db, folder_id: str | None, user_id: str) -> None:
+    """If folder_id is provided, verify target folder is private & owned."""
+    if folder_id is None:
+        return
+    result = (
+        db.table("folders")
+        .select("*")
+        .eq("id", folder_id)
+        .maybe_single()
+        .execute()
+    )
+    if not result or not result.data:
+        raise HTTPException(status_code=404, detail="Target folder not found")
+    target = result.data
+    if target.get("visibility") == "public":
+        raise HTTPException(
+            status_code=403,
+            detail="Cannot move items into read-only (public) folders",
+        )
+    if target.get("user_id") != user_id:
+        raise HTTPException(status_code=403, detail="Not allowed")
+
+
+@router.patch("/{doc_id}")
+async def rename_document(
+    doc_id: str,
+    body: DocumentRename,
+    user_id: str = Depends(get_user_id),
+):
+    """Rename a private document. Public documents rejected with 403."""
+    db = get_supabase()
+    _get_owned_private_document_or_403(db, doc_id, user_id)
+    db.table("documents").update({"filename": body.filename}).eq("id", doc_id).execute()
+    result = (
+        db.table("documents")
+        .select("*")
+        .eq("id", doc_id)
+        .single()
+        .execute()
+    )
+    return result.data
+
+
+@router.patch("/{doc_id}/move")
+async def move_document(
+    doc_id: str,
+    body: DocumentMove,
+    user_id: str = Depends(get_user_id),
+):
+    """Move a private document to a target private folder (or root)."""
+    db = get_supabase()
+    _get_owned_private_document_or_403(db, doc_id, user_id)
+    _ensure_target_folder_writable(db, body.folder_id, user_id)
+    db.table("documents").update({"folder_id": body.folder_id}).eq(
+        "id", doc_id
+    ).execute()
+    result = (
+        db.table("documents")
+        .select("*")
+        .eq("id", doc_id)
+        .single()
+        .execute()
+    )
+    return result.data
+
+
+@router.post("/bulk-delete")
+async def bulk_delete_documents(
+    body: BulkIds,
+    user_id: str = Depends(get_user_id),
+):
+    """Bulk delete documents. Rejects entire batch (403) if ANY doc is
+    not owned by the user or is public. Removes storage files first, then
+    DB rows (chunks cascade)."""
+    db = get_supabase()
+    if not body.ids:
+        return {"deleted": 0}
+
+    # Validate every doc (ownership + private) before any mutation
+    validated: list[dict] = []
+    for doc_id in body.ids:
+        validated.append(_get_owned_private_document_or_403(db, doc_id, user_id))
+
+    storage_paths = [d["storage_path"] for d in validated if d.get("storage_path")]
+    if storage_paths:
+        try:
+            db.storage.from_("documents").remove(storage_paths)
+        except Exception as e:
+            logger.warning(f"Bulk storage cleanup partial failure: {e}")
+
+    db.table("documents").delete().in_("id", body.ids).execute()
+    return {"deleted": len(body.ids)}
+
+
+@router.post("/bulk-move")
+async def bulk_move_documents(
+    body: BulkMove,
+    user_id: str = Depends(get_user_id),
+):
+    """Bulk move documents into a target private folder (or root).
+    Rejects entire batch (403) if target is public OR any doc is not
+    owned / is public."""
+    db = get_supabase()
+    if not body.ids:
+        return {"moved": 0}
+
+    _ensure_target_folder_writable(db, body.folder_id, user_id)
+    for doc_id in body.ids:
+        _get_owned_private_document_or_403(db, doc_id, user_id)
+
+    db.table("documents").update({"folder_id": body.folder_id}).in_(
+        "id", body.ids
+    ).execute()
+    return {"moved": len(body.ids)}
