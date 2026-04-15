@@ -18,6 +18,7 @@ import ContextMenuItem from '../components/ContextMenuItem'
 import ConfirmDialog from '../components/ConfirmDialog'
 import FolderPicker from '../components/FolderPicker'
 import { useSelection } from '../hooks/useSelection'
+import { useToast } from '../contexts/ToastContext'
 import type { FolderNode } from '../hooks/useFolderTree'
 import type { Document } from '../hooks/useDocuments'
 
@@ -67,6 +68,7 @@ export default function DocumentsPage() {
     refreshTree,
   } = useFolderTree()
 
+  const { showToast } = useToast()
   const { menu, openMenu, closeMenu } = useContextMenu()
   const [renamingId, setRenamingId] = useState<string | null>(null)
   const [creatingUnderId, setCreatingUnderId] = useState<string | null>(null)
@@ -103,15 +105,40 @@ export default function DocumentsPage() {
         targetFolderId = selectedFolderId
       }
     }
-    return await uploadDocument(file, targetFolderId)
+    const result = await uploadDocument(file, targetFolderId)
+    if (result?.duplicate) {
+      showToast(
+        result.message || `"${file.name}" was already uploaded`,
+        'warning'
+      )
+    } else if (result) {
+      showToast(`Uploaded "${file.name}"`, 'success')
+    }
+    // Always refresh the active folder view so the new doc (or surfaced
+    // duplicate) is reflected without a manual page reload.
+    await refreshTree()
+    return result
   }
 
   // External file dropped onto a tree folder -> upload to that folder.
   const handleExternalFileDrop = async (file: File, folderId: string) => {
     try {
-      await uploadDocument(file, folderId)
+      const result = await uploadDocument(file, folderId)
+      if (result?.duplicate) {
+        showToast(
+          result.message || `"${file.name}" was already uploaded`,
+          'warning'
+        )
+      } else if (result) {
+        showToast(`Uploaded "${file.name}"`, 'success')
+      }
+      await refreshTree()
     } catch (err) {
       console.error(err)
+      showToast(
+        err instanceof Error ? err.message : 'Upload failed',
+        'error'
+      )
     }
   }
 
@@ -277,6 +304,10 @@ export default function DocumentsPage() {
             onConfirmCreate={handleConfirmCreate}
             onCancelCreate={() => setCreatingUnderId(null)}
             onExternalFileDrop={handleExternalFileDrop}
+            // FileListView renders a root-level create input when the My
+            // Documents virtual root is selected; suppress the duplicate tree
+            // input in that case to avoid focus-stealing onBlur cancellation.
+            suppressRootCreate={selectedFolderId === ROOT_PRIVATE_ID}
           />
         </div>
 

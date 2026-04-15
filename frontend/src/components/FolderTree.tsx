@@ -20,6 +20,9 @@ interface Props {
   onConfirmCreate?: (parentId: string | null, name: string) => void
   onCancelCreate?: () => void
   onExternalFileDrop?: (file: File, folderId: string) => void
+  // When true, FileListView will render the root-level create input;
+  // suppress the duplicate render here to avoid focus-stealing/onBlur cancel.
+  suppressRootCreate?: boolean
 }
 
 export default function FolderTree({
@@ -38,11 +41,13 @@ export default function FolderTree({
   onConfirmCreate,
   onCancelCreate,
   onExternalFileDrop,
+  suppressRootCreate,
 }: Props) {
   const publicRoot = folders.find(f => f.id === ROOT_PUBLIC_ID)
   const privateRoot = folders.find(f => f.id === ROOT_PRIVATE_ID)
 
-  const creatingAtPrivateRoot = creatingUnderId === ROOT_PRIVATE_ID
+  const creatingAtPrivateRoot =
+    creatingUnderId === ROOT_PRIVATE_ID && !suppressRootCreate
 
   return (
     <div className="flex-1 overflow-y-auto py-2">
