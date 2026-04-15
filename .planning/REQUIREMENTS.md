@@ -52,11 +52,11 @@
 - [x] **FMGR-02**: User can create new folders and subfolders via the UI
 - [x] **FMGR-03**: User can rename folders and files
 - [x] **FMGR-04**: User can delete folders (with confirmation) and files
-- [ ] **FMGR-05**: User can drag and drop files and folders to move/reorder them
+- [x] **FMGR-05**: User can drag and drop files and folders to move/reorder them
 - [x] **FMGR-06**: Right-click context menus provide folder/file operations (rename, delete, move, new subfolder)
 - [x] **FMGR-07**: User can select multiple files for bulk move or delete operations
 - [x] **FMGR-08**: Default KB folders are visually distinct (read-only indicator, different styling)
-- [ ] **FMGR-09**: User can upload files by dropping them into a specific folder in the tree
+- [x] **FMGR-09**: User can upload files by dropping them into a specific folder in the tree
 - [x] **FMGR-10**: Breadcrumb navigation shows current folder path
 
 ## v2 Requirements
@@ -126,11 +126,11 @@
 | FMGR-02 | Phase 4 | Complete |
 | FMGR-03 | Phase 4 | Complete |
 | FMGR-04 | Phase 4 | Complete |
-| FMGR-05 | Phase 4 | Pending |
+| FMGR-05 | Phase 4 | Complete |
 | FMGR-06 | Phase 4 | Complete |
 | FMGR-07 | Phase 4 | Complete |
 | FMGR-08 | Phase 4 | Complete |
-| FMGR-09 | Phase 4 | Pending |
+| FMGR-09 | Phase 4 | Complete |
 | FMGR-10 | Phase 4 | Complete |
 
 **Coverage:**
