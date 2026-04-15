@@ -1,4 +1,5 @@
 import { File, FileText, Image, Trash2 } from 'lucide-react'
+import { useDraggable } from '@dnd-kit/react'
 import type { Document } from '../hooks/useDocuments'
 import InlineRename from './InlineRename'
 
@@ -10,6 +11,8 @@ interface Props {
   onStartRename?: (id: string) => void
   onConfirmRename?: (id: string, newName: string) => void
   onCancelRename?: () => void
+  isSelected?: boolean
+  onToggleSelect?: (id: string, shiftKey: boolean) => void
 }
 
 const STATUS_STYLES: Record<string, string> = {
@@ -51,15 +54,48 @@ export default function FileListRow({
   onStartRename,
   onConfirmRename,
   onCancelRename,
+  isSelected,
+  onToggleSelect,
 }: Props) {
+  const { ref: dragRef, isDragging } = useDraggable({
+    id: `file-${doc.id}`,
+  })
+
+  const rowClasses = [
+    'flex items-center px-4 py-2 text-sm border-b border-gray-800 group',
+    isSelected ? 'bg-gray-800/50' : 'hover:bg-gray-800',
+    isDragging ? 'opacity-50' : '',
+  ]
+    .filter(Boolean)
+    .join(' ')
+
   return (
     <div
-      className="flex items-center px-4 py-2 hover:bg-gray-800 text-sm border-b border-gray-800 group"
+      ref={dragRef}
+      className={rowClasses}
       onContextMenu={e => onContextMenu?.(e, doc)}
+      onClick={e => {
+        // Clicking the row (not the checkbox) with shift performs range select.
+        if (e.shiftKey && onToggleSelect) {
+          e.preventDefault()
+          onToggleSelect(doc.id, true)
+        }
+      }}
     >
-      {/* Checkbox placeholder for Plan 04 */}
-      <div className="w-4 shrink-0" />
-      {renderIcon(doc.mime_type || '')}
+      {/* Checkbox */}
+      <div className="w-4 shrink-0 flex items-center">
+        <input
+          type="checkbox"
+          checked={!!isSelected}
+          onChange={() => onToggleSelect?.(doc.id, false)}
+          onClick={e => {
+            e.stopPropagation()
+          }}
+          className="accent-blue-600"
+          aria-label={`Select ${doc.filename}`}
+        />
+      </div>
+      <span className="ml-2 flex items-center">{renderIcon(doc.mime_type || '')}</span>
       {isRenaming ? (
         <div className="flex-1" onClick={e => e.stopPropagation()}>
           <InlineRename
@@ -89,7 +125,10 @@ export default function FileListRow({
       </span>
       <button
         type="button"
-        onClick={() => onDelete(doc.id)}
+        onClick={e => {
+          e.stopPropagation()
+          onDelete(doc.id)
+        }}
         className="opacity-0 group-hover:opacity-100 text-gray-500 hover:text-red-400 ml-2 shrink-0"
         aria-label="Delete"
       >

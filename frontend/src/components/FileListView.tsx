@@ -1,9 +1,10 @@
-import { useRef } from 'react'
+import { useRef, useState } from 'react'
 import { Folder, FolderPlus, Upload } from 'lucide-react'
 import type { Document } from '../hooks/useDocuments'
 import type { FolderNode, FolderRow } from '../hooks/useFolderTree'
 import FileListRow from './FileListRow'
 import InlineRename from './InlineRename'
+import BulkActionBar from './BulkActionBar'
 
 interface Props {
   folder: FolderRow | null
@@ -23,6 +24,12 @@ interface Props {
   onStartCreate?: () => void
   onConfirmCreate?: (name: string) => void
   onCancelCreate?: () => void
+  // Bulk selection props
+  selectedIds?: Set<string>
+  onToggleSelect?: (id: string, shiftKey: boolean) => void
+  onBulkDelete?: () => void
+  onBulkMove?: () => void
+  onClearSelection?: () => void
 }
 
 export default function FileListView({
@@ -43,8 +50,14 @@ export default function FileListView({
   onStartCreate,
   onConfirmCreate,
   onCancelCreate,
+  selectedIds,
+  onToggleSelect,
+  onBulkDelete,
+  onBulkMove,
+  onClearSelection,
 }: Props) {
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const [externalDragOver, setExternalDragOver] = useState(false)
 
   const triggerUpload = () => fileInputRef.current?.click()
 
@@ -61,9 +74,49 @@ export default function FileListView({
   }
 
   const folderName = folder?.name ?? ''
+  const selectedCount = selectedIds?.size ?? 0
 
   const isEmpty =
     subfolders.length === 0 && documents.length === 0 && !creatingInCurrentFolder
+
+  // External file drop zone for the current folder (not an @dnd-kit target).
+  const handleListDragOver = (e: React.DragEvent) => {
+    if (!e.dataTransfer.types.includes('Files')) return
+    e.preventDefault()
+    if (isReadOnly) {
+      e.dataTransfer.dropEffect = 'none'
+      return
+    }
+    e.dataTransfer.dropEffect = 'copy'
+    if (!externalDragOver) setExternalDragOver(true)
+  }
+
+  const handleListDragLeave = (e: React.DragEvent) => {
+    if (!e.dataTransfer.types.includes('Files')) return
+    setExternalDragOver(false)
+  }
+
+  const handleListDrop = async (e: React.DragEvent) => {
+    if (!e.dataTransfer.types.includes('Files')) return
+    e.preventDefault()
+    setExternalDragOver(false)
+    if (isReadOnly) return
+    const file = e.dataTransfer.files?.[0]
+    if (file) {
+      try {
+        await onUpload(file)
+      } catch {
+        // Swallow -- upload hook logs errors
+      }
+    }
+  }
+
+  const contentClasses = [
+    'flex-1 overflow-y-auto',
+    externalDragOver && !isReadOnly ? 'bg-blue-500/5 border-2 border-dashed border-blue-500/50' : '',
+  ]
+    .filter(Boolean)
+    .join(' ')
 
   return (
     <div className="flex-1 flex flex-col overflow-hidden">
@@ -99,8 +152,23 @@ export default function FileListView({
         />
       </div>
 
-      {/* Content list */}
-      <div className="flex-1 overflow-y-auto">
+      {/* Bulk Action Bar */}
+      {selectedCount > 0 && (
+        <BulkActionBar
+          selectedCount={selectedCount}
+          onDelete={() => onBulkDelete?.()}
+          onMove={() => onBulkMove?.()}
+          onClear={() => onClearSelection?.()}
+        />
+      )}
+
+      {/* Content list (with external file drop zone) */}
+      <div
+        className={contentClasses}
+        onDragOver={handleListDragOver}
+        onDragLeave={handleListDragLeave}
+        onDrop={handleListDrop}
+      >
         {loading ? (
           <div className="p-4 text-sm text-gray-500">Loading...</div>
         ) : isEmpty ? (
@@ -171,6 +239,8 @@ export default function FileListView({
                 onStartRename={onStartRename}
                 onConfirmRename={onConfirmRename}
                 onCancelRename={onCancelRename}
+                isSelected={selectedIds?.has(doc.id) ?? false}
+                onToggleSelect={onToggleSelect}
               />
             ))}
           </>

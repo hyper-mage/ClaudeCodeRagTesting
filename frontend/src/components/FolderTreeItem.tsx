@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import {
   ChevronDown,
   ChevronRight,
@@ -5,6 +6,7 @@ import {
   FolderOpen,
   Shield,
 } from 'lucide-react'
+import { useDraggable, useDroppable } from '@dnd-kit/react'
 import type { FolderNode } from '../hooks/useFolderTree'
 import InlineRename from './InlineRename'
 
@@ -23,6 +25,7 @@ interface Props {
   creatingUnderId?: string | null
   onConfirmCreate?: (parentId: string | null, name: string) => void
   onCancelCreate?: () => void
+  onExternalFileDrop?: (file: File, folderId: string) => void
 }
 
 export default function FolderTreeItem({
@@ -40,6 +43,7 @@ export default function FolderTreeItem({
   creatingUnderId,
   onConfirmCreate,
   onCancelCreate,
+  onExternalFileDrop,
 }: Props) {
   const isExpanded = expandedIds.has(node.id)
   const isSelected = selectedId === node.id
@@ -48,10 +52,69 @@ export default function FolderTreeItem({
   const isRenaming = renamingId === node.id && !isPublic
   const isCreatingUnder = creatingUnderId === node.id
 
+  // @dnd-kit droppable -- public folders are non-drop targets (we still render
+  // the ref so isDropTarget reports correctly, but the onDragEnd handler in
+  // DocumentsPage checks visibility and ignores public targets).
+  const { ref: dropRef, isDropTarget } = useDroppable({
+    id: `folder-${node.id}`,
+    disabled: isPublic,
+  })
+
+  // @dnd-kit draggable -- private folders are draggable sources. Public
+  // folders skip the draggable entirely.
+  const { ref: dragRef, isDragging } = useDraggable({
+    id: `folder-${node.id}`,
+    disabled: isPublic,
+  })
+
+  // Compose dnd-kit drop + drag refs onto the same row element.
+  const setRowRef = (el: HTMLDivElement | null) => {
+    dropRef(el)
+    dragRef(el)
+  }
+
+  // Native external file drag state (separate from @dnd-kit, detected via
+  // dataTransfer.types containing 'Files').
+  const [externalDragOver, setExternalDragOver] = useState(false)
+
+  const handleNativeDragOver = (e: React.DragEvent) => {
+    if (!e.dataTransfer.types.includes('Files')) return
+    e.preventDefault()
+    if (isPublic) {
+      e.dataTransfer.dropEffect = 'none'
+      return
+    }
+    e.dataTransfer.dropEffect = 'copy'
+    if (!externalDragOver) setExternalDragOver(true)
+  }
+
+  const handleNativeDragLeave = (e: React.DragEvent) => {
+    if (!e.dataTransfer.types.includes('Files')) return
+    setExternalDragOver(false)
+  }
+
+  const handleNativeDrop = (e: React.DragEvent) => {
+    if (!e.dataTransfer.types.includes('Files')) return
+    e.preventDefault()
+    setExternalDragOver(false)
+    if (isPublic) return
+    const file = e.dataTransfer.files?.[0]
+    if (file) onExternalFileDrop?.(file, node.id)
+  }
+
+  // Drop-target visual styles (internal dnd-kit OR external file drag).
+  const showDropHighlight = (isDropTarget || externalDragOver) && !isPublic
+  const showInvalidTarget = (isDropTarget || externalDragOver) && isPublic
+
   const rowClasses = [
     'flex items-center py-1.5 pr-2 cursor-pointer group',
     isSelected ? 'bg-gray-800 text-white' : 'hover:bg-gray-800',
-  ].join(' ')
+    isDragging ? 'opacity-50' : '',
+    showDropHighlight ? 'border-2 border-blue-500 bg-blue-500/10' : '',
+    showInvalidTarget ? 'cursor-not-allowed opacity-50' : '',
+  ]
+    .filter(Boolean)
+    .join(' ')
 
   const nameClasses = [
     'text-sm truncate ml-1.5',
@@ -65,10 +128,14 @@ export default function FolderTreeItem({
   return (
     <div>
       <div
+        ref={setRowRef}
         className={rowClasses}
         style={{ paddingLeft: `${depth * 16 + 8}px` }}
         onClick={() => onSelect(node.id)}
         onContextMenu={e => onContextMenu?.(e, node)}
+        onDragOver={handleNativeDragOver}
+        onDragLeave={handleNativeDragLeave}
+        onDrop={handleNativeDrop}
       >
         <button
           type="button"
@@ -156,6 +223,7 @@ export default function FolderTreeItem({
                 creatingUnderId={creatingUnderId}
                 onConfirmCreate={onConfirmCreate}
                 onCancelCreate={onCancelCreate}
+                onExternalFileDrop={onExternalFileDrop}
               />
             ))}
         </div>

@@ -80,6 +80,45 @@ export function useDocuments() {
     setDocuments(prev => prev.filter(d => d.id !== id))
   }, [session])
 
+  const bulkDeleteDocuments = useCallback(
+    async (ids: string[]) => {
+      if (!session || ids.length === 0) return
+      const res = await fetch('/api/documents/bulk-delete', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({ ids }),
+      })
+      if (!res.ok) {
+        const body = await res.text()
+        throw new Error(`Bulk delete failed: ${body}`)
+      }
+      setDocuments(prev => prev.filter(d => !ids.includes(d.id)))
+    },
+    [session]
+  )
+
+  const bulkMoveDocuments = useCallback(
+    async (ids: string[], folderId: string | null) => {
+      if (!session || ids.length === 0) return
+      const res = await fetch('/api/documents/bulk-move', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({ ids, folder_id: folderId }),
+      })
+      if (!res.ok) {
+        const body = await res.text()
+        throw new Error(`Bulk move failed: ${body}`)
+      }
+    },
+    [session]
+  )
+
   // Realtime subscription for document status updates
   useEffect(() => {
     if (!user) return
@@ -118,5 +157,13 @@ export function useDocuments() {
     loadDocuments()
   }, [loadDocuments])
 
-  return { documents, loading, uploadDocument, deleteDocument, loadDocuments }
+  return {
+    documents,
+    loading,
+    uploadDocument,
+    deleteDocument,
+    bulkDeleteDocuments,
+    bulkMoveDocuments,
+    loadDocuments,
+  }
 }

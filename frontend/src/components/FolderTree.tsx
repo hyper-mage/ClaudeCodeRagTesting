@@ -19,6 +19,7 @@ interface Props {
   onStartCreate?: (parentId: string) => void
   onConfirmCreate?: (parentId: string | null, name: string) => void
   onCancelCreate?: () => void
+  onExternalFileDrop?: (file: File, folderId: string) => void
 }
 
 export default function FolderTree({
@@ -36,6 +37,7 @@ export default function FolderTree({
   onStartCreate,
   onConfirmCreate,
   onCancelCreate,
+  onExternalFileDrop,
 }: Props) {
   const publicRoot = folders.find(f => f.id === ROOT_PUBLIC_ID)
   const privateRoot = folders.find(f => f.id === ROOT_PRIVATE_ID)
@@ -62,6 +64,7 @@ export default function FolderTree({
             onSelect={onSelect}
             onToggleExpand={onToggleExpand}
             onContextMenu={onContextMenu}
+            onExternalFileDrop={onExternalFileDrop}
           />
         ))}
       </div>
@@ -120,6 +123,7 @@ export default function FolderTree({
             creatingUnderId={creatingUnderId}
             onConfirmCreate={onConfirmCreate}
             onCancelCreate={onCancelCreate}
+            onExternalFileDrop={onExternalFileDrop}
           />
         ))}
       </div>
