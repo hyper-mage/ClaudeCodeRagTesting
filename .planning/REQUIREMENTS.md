@@ -39,12 +39,12 @@
 
 ### Explorer Sub-Agent
 
-- [ ] **EXPL-01**: Explorer sub-agent can perform multi-step KB traversal using all navigation tools (ls, tree, read, grep, glob)
-- [ ] **EXPL-02**: Explorer sub-agent can generate summaries of folder contents on request
+- [x] **EXPL-01**: Explorer sub-agent can perform multi-step KB traversal using all navigation tools (ls, tree, read, grep, glob)
+- [x] **EXPL-02**: Explorer sub-agent can generate summaries of folder contents on request
 - [ ] **EXPL-03**: Explorer sub-agent can discover cross-references between games (e.g., games with similar mechanics)
 - [ ] **EXPL-04**: Explorer sub-agent can recommend related games based on the current conversation context
-- [ ] **EXPL-05**: Explorer sub-agent has output budget limits to prevent returning excessive content to the parent agent
-- [ ] **EXPL-06**: Explorer sub-agent progress is streamed to the frontend via SSE events
+- [x] **EXPL-05**: Explorer sub-agent has output budget limits to prevent returning excessive content to the parent agent
+- [x] **EXPL-06**: Explorer sub-agent progress is streamed to the frontend via SSE events
 
 ### File Manager UI
 
@@ -116,12 +116,12 @@
 | AGNT-03 | Phase 6 | Pending |
 | AGNT-04 | Phase 6 | Pending |
 | AGNT-05 | Phase 6 | Pending |
-| EXPL-01 | Phase 5 | Pending |
-| EXPL-02 | Phase 5 | Pending |
+| EXPL-01 | Phase 5 | Complete |
+| EXPL-02 | Phase 5 | Complete |
 | EXPL-03 | Phase 5 | Pending |
 | EXPL-04 | Phase 5 | Pending |
-| EXPL-05 | Phase 5 | Pending |
-| EXPL-06 | Phase 5 | Pending |
+| EXPL-05 | Phase 5 | Complete |
+| EXPL-06 | Phase 5 | Complete |
 | FMGR-01 | Phase 4 | Complete |
 | FMGR-02 | Phase 4 | Complete |
 | FMGR-03 | Phase 4 | Complete |

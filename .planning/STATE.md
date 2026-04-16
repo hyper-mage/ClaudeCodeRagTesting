@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: verifying
-stopped_at: Completed 04-04-PLAN.md
-last_updated: "2026-04-16T03:38:36.213Z"
+status: executing
+stopped_at: Completed 05-01-test-scaffold-and-contracts-PLAN.md
+last_updated: "2026-04-16T20:09:28.587Z"
 last_activity: 2026-04-16
 progress:
   total_phases: 6
   completed_phases: 4
-  total_plans: 14
-  completed_plans: 14
+  total_plans: 18
+  completed_plans: 15
   percent: 17
 ---
 
@@ -21,13 +21,13 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-07)
 
 **Core value:** The agent can intelligently search and reason across a structured board game knowledge base -- finding rules, comparing mechanics, and recommending games -- using the right tool for the job, transparently.
-**Current focus:** Phase 04 — file-manager-ui
+**Current focus:** Phase 05 — explorer-sub-agent
 
 ## Current Position
 
-Phase: 5
-Plan: Not started
-Status: Phase complete — ready for verification
+Phase: 05 (explorer-sub-agent) — EXECUTING
+Plan: 2 of 4
+Status: Ready to execute
 Last activity: 2026-04-16
 
 Progress: [█░░░░░░░░░] 17%
@@ -61,6 +61,7 @@ Progress: [█░░░░░░░░░] 17%
 | Phase 04 P02 | 420 | 2 tasks | 9 files |
 | Phase 04 P03 | 900 | 3 tasks | 12 files |
 | Phase 04-file-manager-ui P04 | 60min | 2 tasks | 10 files |
+| Phase 05-explorer-sub-agent P01 | 4 min | 2 tasks | 10 files |
 
 ## Accumulated Context
 
@@ -87,6 +88,9 @@ Recent decisions affecting current work:
 - [Phase 04-file-manager-ui]: Suppress duplicate root-create inline input via suppressRootCreate prop to prevent focus-stealing onBlur cancel
 - [Phase 04-file-manager-ui]: In-house ToastContext (no new dep) for duplicate-upload feedback and upload status
 - [Phase 04-file-manager-ui]: Post-upload refresh via useFolderTree.refreshTree() (authoritative) instead of optimistic insert
+- [Phase 05-explorer-sub-agent]: Used Pydantic Field(max_length=...) for ExplorerResult/Finding caps so oversized output fails at validation, not silently downstream
+- [Phase 05-explorer-sub-agent]: Test scaffolds use pytest.mark.skip with reason='... in Plan 0X' to make downstream-plan ownership explicit; collection succeeds without false failures
+- [Phase 05-explorer-sub-agent]: stub_db_chain returns the same MagicMock for every chain attribute so Plan 03 integration tests don't bind to call ordering
 
 ### Pending Todos
 
@@ -100,7 +104,7 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-15T20:04:45.217Z
-Stopped at: Completed 04-04-PLAN.md
+Last session: 2026-04-16T20:09:28.578Z
+Stopped at: Completed 05-01-test-scaffold-and-contracts-PLAN.md
 Resume file: None
 Next: Phase 02
