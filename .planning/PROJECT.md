@@ -38,8 +38,8 @@ The agent can intelligently search and reason across a structured board game kno
 ### Active
 
 - [ ] Context-aware source selection (agent decides default KB vs private docs vs both)
-- [ ] File manager-style folder/subfolder UI for organizing documents
-- [ ] Hierarchical folder structure in Supabase storage and DB
+- [x] File manager-style folder/subfolder UI for organizing documents — Validated in Phase 4
+- [x] Hierarchical folder structure in Supabase storage and DB — Validated in Phase 1 (schema) + Phase 4 (UI)
 - [ ] KB navigation tools: ls (list files in folder)
 - [ ] KB navigation tools: tree (hierarchical structure view)
 - [ ] KB navigation tools: grep (regex content search across chunks)
@@ -116,4 +116,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-04-08 after Phase 2 completion*
+*Last updated: 2026-04-16 after Phase 4 completion*
