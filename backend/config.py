@@ -67,6 +67,20 @@ class Settings(BaseSettings):
     subagent_max_tokens: int = 4096
     subagent_max_context_chars: int = 100000  # safety limit for document size
 
+    # Explorer sub-agent (Phase 5)
+    explorer_system_prompt: str = (
+        "You are the KB Explorer -- a specialist sub-agent for deep, multi-step "
+        "knowledge-base traversal. You have the KB navigation tools: kb_tree, kb_ls, "
+        "kb_glob, kb_grep, kb_read. Start with kb_tree to orient yourself, narrow with "
+        "kb_ls/kb_glob, then read only what you need. Return focused, well-cited "
+        "evidence as a structured summary. Do NOT return raw tool output. Stop "
+        "exploring the moment you have enough to answer."
+    )
+    explorer_max_iterations: int = 6
+    explorer_max_tool_calls: int = 10
+    explorer_max_summary_chars: int = 3000
+    explorer_timeout: int = 120
+
     # Timeouts (seconds)
     llm_timeout: int = 120  # streaming chat completion
     subagent_timeout: int = 90  # non-streaming subagent calls
