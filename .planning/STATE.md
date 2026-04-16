@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed 05-01-test-scaffold-and-contracts-PLAN.md
-last_updated: "2026-04-16T20:09:28.587Z"
+stopped_at: Completed 05-02-explorer-service-PLAN.md
+last_updated: "2026-04-16T20:17:33.514Z"
 last_activity: 2026-04-16
 progress:
   total_phases: 6
   completed_phases: 4
   total_plans: 18
-  completed_plans: 15
+  completed_plans: 16
   percent: 17
 ---
 
@@ -26,7 +26,7 @@ See: .planning/PROJECT.md (updated 2026-04-07)
 ## Current Position
 
 Phase: 05 (explorer-sub-agent) — EXECUTING
-Plan: 2 of 4
+Plan: 3 of 4
 Status: Ready to execute
 Last activity: 2026-04-16
 
@@ -62,6 +62,7 @@ Progress: [█░░░░░░░░░] 17%
 | Phase 04 P03 | 900 | 3 tasks | 12 files |
 | Phase 04-file-manager-ui P04 | 60min | 2 tasks | 10 files |
 | Phase 05-explorer-sub-agent P01 | 4 min | 2 tasks | 10 files |
+| Phase 05-explorer-sub-agent P02 | 7 min | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -91,6 +92,10 @@ Recent decisions affecting current work:
 - [Phase 05-explorer-sub-agent]: Used Pydantic Field(max_length=...) for ExplorerResult/Finding caps so oversized output fails at validation, not silently downstream
 - [Phase 05-explorer-sub-agent]: Test scaffolds use pytest.mark.skip with reason='... in Plan 0X' to make downstream-plan ownership explicit; collection succeeds without false failures
 - [Phase 05-explorer-sub-agent]: stub_db_chain returns the same MagicMock for every chain attribute so Plan 03 integration tests don't bind to call ordering
+- [Phase 05-explorer-sub-agent]: Lazy import of KB_*_TOOL schemas inside _explorer_tool_schemas() to break the circular dep between routers/chat.py and services/explorer_service.py
+- [Phase 05-explorer-sub-agent]: Server overwrites tools_used/iterations/budget_exhausted on the parsed ExplorerResult so the LLM cannot misreport its own resource consumption
+- [Phase 05-explorer-sub-agent]: Three-tier structured-output fallback (json_schema -> json_object -> regex extract -> hardcoded refusal) so the explorer never raises to the parent
+- [Phase 05-explorer-sub-agent]: Budget tests patch services.explorer_service.get_settings directly (MagicMock) instead of monkeypatch.setenv to avoid silent fallback to defaults
 
 ### Pending Todos
 
@@ -104,7 +109,7 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-16T20:09:28.578Z
-Stopped at: Completed 05-01-test-scaffold-and-contracts-PLAN.md
+Last session: 2026-04-16T20:17:22.691Z
+Stopped at: Completed 05-02-explorer-service-PLAN.md
 Resume file: None
 Next: Phase 02
