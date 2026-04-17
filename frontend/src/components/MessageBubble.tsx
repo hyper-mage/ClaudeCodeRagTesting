@@ -1,15 +1,7 @@
 import { useState } from 'react'
 import ReactMarkdown from 'react-markdown'
 import ToolCallCard from './ToolCallCard'
-
-interface ToolEvent {
-  tool: string
-  args_preview: string
-  output?: string
-  call_id?: string
-  subagent?: boolean
-  status: 'running' | 'complete'
-}
+import type { ToolEvent } from '../hooks/useChat'
 
 interface Props {
   role: 'user' | 'assistant'
@@ -49,6 +41,7 @@ export default function MessageBubble({ role, content, toolsUsed }: Props) {
                     call_id={t.call_id}
                     subagent={t.subagent}
                     status={t.status}
+                    subEvents={t.subEvents}
                   />
                 ))}
               </div>
