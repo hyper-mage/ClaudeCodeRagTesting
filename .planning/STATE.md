@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed 05-02-explorer-service-PLAN.md
-last_updated: "2026-04-16T20:17:33.514Z"
-last_activity: 2026-04-16
+stopped_at: Completed 05-03-parent-tool-and-modes-PLAN.md
+last_updated: "2026-04-17T14:34:07.808Z"
+last_activity: 2026-04-17
 progress:
   total_phases: 6
   completed_phases: 4
   total_plans: 18
-  completed_plans: 16
+  completed_plans: 17
   percent: 17
 ---
 
@@ -26,9 +26,9 @@ See: .planning/PROJECT.md (updated 2026-04-07)
 ## Current Position
 
 Phase: 05 (explorer-sub-agent) — EXECUTING
-Plan: 3 of 4
+Plan: 4 of 4
 Status: Ready to execute
-Last activity: 2026-04-16
+Last activity: 2026-04-17
 
 Progress: [█░░░░░░░░░] 17%
 
@@ -63,6 +63,7 @@ Progress: [█░░░░░░░░░] 17%
 | Phase 04-file-manager-ui P04 | 60min | 2 tasks | 10 files |
 | Phase 05-explorer-sub-agent P01 | 4 min | 2 tasks | 10 files |
 | Phase 05-explorer-sub-agent P02 | 7 min | 2 tasks | 4 files |
+| Phase 05-explorer-sub-agent P03 | 848 | 3 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -96,6 +97,9 @@ Recent decisions affecting current work:
 - [Phase 05-explorer-sub-agent]: Server overwrites tools_used/iterations/budget_exhausted on the parsed ExplorerResult so the LLM cannot misreport its own resource consumption
 - [Phase 05-explorer-sub-agent]: Three-tier structured-output fallback (json_schema -> json_object -> regex extract -> hardcoded refusal) so the explorer never raises to the parent
 - [Phase 05-explorer-sub-agent]: Budget tests patch services.explorer_service.get_settings directly (MagicMock) instead of monkeypatch.setenv to avoid silent fallback to defaults
+- [Phase 05-explorer-sub-agent]: asyncio.to_thread + queue.Queue bridges sync explorer generator to async SSE event_generator without blocking event loop
+- [Phase 05-explorer-sub-agent]: is_subagent flag unifies analyze_document and explore_kb tagging in tool_start/tool_result SSE events
+- [Phase 05-explorer-sub-agent]: Integration tests route db.table() by table name to operation-specific stub_db_chain instances for correct mock shapes
 
 ### Pending Todos
 
@@ -109,7 +113,7 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-16T20:17:22.691Z
-Stopped at: Completed 05-02-explorer-service-PLAN.md
+Last session: 2026-04-17T14:34:07.802Z
+Stopped at: Completed 05-03-parent-tool-and-modes-PLAN.md
 Resume file: None
 Next: Phase 02

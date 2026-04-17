@@ -132,5 +132,5 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6
 | 2. Default KB and Ingestion Extensions | 3/3 | Complete | - |
 | 3. KB Navigation Tools | 0/3 | Planning | - |
 | 4. File Manager UI | 0/4 | Planning | - |
-| 5. Explorer Sub-Agent | 0/3 | Not started | - |
+| 5. Explorer Sub-Agent | 3/4 | In Progress|  |
 | 6. Agent Intelligence and Polish | 0/3 | Not started | - |
