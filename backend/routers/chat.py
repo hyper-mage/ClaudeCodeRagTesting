@@ -264,6 +264,42 @@ KB_GLOB_TOOL = {
     },
 }
 
+EXPLORE_KB_TOOL = {
+    "type": "function",
+    "function": {
+        "name": "explore_kb",
+        "description": (
+            "Spawn an explorer sub-agent for complex, multi-step exploration of the knowledge base. "
+            "Use when a single tool call cannot answer the question -- for example: "
+            "(1) summarizing an entire folder's contents, "
+            "(2) finding cross-references across multiple games, "
+            "(3) recommending games similar to one mentioned by the user. "
+            "DO NOT use for simple lookups -- kb_ls, kb_read, kb_grep are faster. "
+            "When using mode='find_similar', resolve the seed game in `query` first "
+            "(e.g. 'Find games similar to Catan. Focus on trading and resource management.')."
+        ),
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "mode": {
+                    "type": "string",
+                    "enum": ["deep_search", "summarize", "find_similar"],
+                    "description": (
+                        "deep_search: multi-step search across the KB. "
+                        "summarize: produce a synthesis of a folder's contents. "
+                        "find_similar: find games with mechanics similar to a given game."
+                    ),
+                },
+                "query": {
+                    "type": "string",
+                    "description": "The question or task for the explorer. Be specific; include any folder paths or game names.",
+                },
+            },
+            "required": ["mode", "query"],
+        },
+    },
+}
+
 TOOL_SELECTION_GUIDE = """## Tool Selection Guide
 
 **Orientation** -- Understand KB structure first:
@@ -285,6 +321,11 @@ TOOL_SELECTION_GUIDE = """## Tool Selection Guide
 **External** -- Information outside the KB:
 - web_search: Current web information
 - query_database: Metadata, stats, conversation history (SQL)
+
+**Deep exploration** -- Multi-step KB traversal (use sparingly):
+- explore_kb (mode='summarize'): coherent synthesis of a folder's contents
+- explore_kb (mode='find_similar'): cross-reference games with similar mechanics (resolve seed game in the query)
+- explore_kb (mode='deep_search'): broad multi-step search when one tool isn't enough
 
 Always start with kb_tree or kb_ls to orient yourself before reading or searching."""
 
@@ -450,7 +491,7 @@ async def send_message(
             settings = get_settings()
 
             # KB navigation tools -- always available (default KB always exists)
-            tools = [KB_LS_TOOL, KB_TREE_TOOL, KB_READ_TOOL, KB_GREP_TOOL, KB_GLOB_TOOL]
+            tools = [KB_LS_TOOL, KB_TREE_TOOL, KB_READ_TOOL, KB_GREP_TOOL, KB_GLOB_TOOL, EXPLORE_KB_TOOL]
 
             # Document-specific tools -- only when user has completed documents
             doc_check = (
@@ -514,7 +555,8 @@ async def send_message(
                                 "call_id": tc["id"],
                                 "status": "running",
                             }
-                            if fn_name == "analyze_document":
+                            is_subagent = fn_name in ("analyze_document", "explore_kb")
+                            if is_subagent:
                                 tool_entry["subagent"] = True
                             tools_used_acc.append(tool_entry)
 
@@ -527,11 +569,77 @@ async def send_message(
                                     "tool": fn_name,
                                     "call_id": tc["id"],
                                     "args_preview": args_preview,
-                                    **({"subagent": True} if fn_name == "analyze_document" else {}),
+                                    **({"subagent": True} if is_subagent else {}),
                                 }),
                             }
 
-                            tool_result = execute_tool(fn_name, fn_args, user_id)
+                            # Dispatch
+                            if fn_name == "explore_kb":
+                                import asyncio
+                                from services.explorer_service import run_exploration
+
+                                import queue as _queue
+                                q: _queue.Queue = _queue.Queue()
+                                SENTINEL = object()
+
+                                def _drive():
+                                    try:
+                                        for ev in run_exploration(
+                                            user_id=user_id,
+                                            query=fn_args["query"],
+                                            mode=fn_args.get("mode", "deep_search"),
+                                        ):
+                                            q.put(ev)
+                                    except Exception as ex:
+                                        q.put({"type": "error", "error": str(ex)})
+                                    finally:
+                                        q.put(SENTINEL)
+
+                                task = asyncio.create_task(asyncio.to_thread(_drive))
+                                final_result_dict = None
+                                while True:
+                                    sub_ev = await asyncio.to_thread(q.get)
+                                    if sub_ev is SENTINEL:
+                                        break
+                                    if sub_ev.get("type") == "result":
+                                        final_result_dict = sub_ev["result"]
+                                        continue
+                                    if sub_ev.get("type") == "error":
+                                        final_result_dict = {
+                                            "mode": fn_args.get("mode", "deep_search"),
+                                            "query": fn_args["query"],
+                                            "findings": [],
+                                            "synthesis": f"Explorer failed: {sub_ev['error']}",
+                                            "tools_used": [],
+                                            "iterations": 0,
+                                            "budget_exhausted": True,
+                                        }
+                                        continue
+                                    # sub_iteration / sub_tool_start / sub_tool_result -> SSE sub_event row
+                                    yield {
+                                        "event": "tool_event",
+                                        "data": json.dumps({
+                                            "tool_event": True,
+                                            "type": "sub_event",
+                                            "subagent": True,
+                                            "parent_call_id": tc["id"],
+                                            "sub_event": sub_ev,
+                                        }),
+                                    }
+                                await task
+                                if final_result_dict is None:
+                                    final_result_dict = {
+                                        "mode": fn_args.get("mode", "deep_search"),
+                                        "query": fn_args["query"],
+                                        "findings": [],
+                                        "synthesis": "Explorer produced no result.",
+                                        "tools_used": [],
+                                        "iterations": 0,
+                                        "budget_exhausted": True,
+                                    }
+                                tool_result = json.dumps({"tool": "explore_kb", **final_result_dict})
+                            else:
+                                tool_result = execute_tool(fn_name, fn_args, user_id)
 
                             current_messages.append({
                                 "role": "tool",
@@ -558,7 +666,7 @@ async def send_message(
                                     "tool": fn_name,
                                     "call_id": tc["id"],
                                     "output": tool_output_preview,
-                                    **({"subagent": True} if fn_name == "analyze_document" else {}),
+                                    **({"subagent": True} if is_subagent else {}),
                                 }),
                             }
 
