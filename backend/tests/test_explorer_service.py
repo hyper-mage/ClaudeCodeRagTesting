@@ -137,16 +137,57 @@ def test_summarize_mode():
     assert result["synthesis"]
 
 
-@pytest.mark.skip(reason="Explorer modes wired in Plan 03")
 def test_find_similar_mode():
-    """EXPL-03: mode='find_similar' assembles findings across multiple games."""
-    pass
+    """EXPL-03: mode='find_similar' assembles >=2 findings across multiple games."""
+    from services import explorer_service
+    # The scenario has 3 responses (2 tool-call turns + 1 voluntary stop).
+    # _summarize_findings makes an additional call, so we append the summary
+    # response (same JSON the voluntary-stop turn carried) as a 4th item.
+    summary_json = json.dumps({
+        "mode": "find_similar",
+        "query": "Games like Azul",
+        "findings": [
+            {"title": "Sagrada", "path": "Board Games/Sagrada/rules.md",
+             "excerpt": "Dice drafting and pattern building", "relevance": "Pattern building like Azul"},
+            {"title": "Calico", "path": "Board Games/Calico/rules.md",
+             "excerpt": "Quilt-tile placement", "relevance": "Tile placement like Azul"},
+        ],
+        "synthesis": "Sagrada and Calico share Azul's pattern-building/tile-placement core.",
+        "tools_used": [],
+        "iterations": 0,
+        "budget_exhausted": False,
+    })
+    scenario = EXPLORER_SCENARIOS["find_similar_azul"] + [make_response(content=summary_json)]
+    client = mock_llm_client(scenario)
+    with patch.object(explorer_service, "get_llm_client", return_value=client), \
+         patch.object(explorer_service, "kb_grep", return_value="match snippets"), \
+         patch.object(explorer_service, "kb_ls", return_value="Sagrada/\nCalico/"):
+        events = list(explorer_service.run_exploration(
+            TEST_USER_ID, "Find games similar to Azul. Focus on tile placement.", "find_similar"))
+    result = events[-1]["result"]
+    assert result["mode"] == "find_similar"
+    assert len(result["findings"]) >= 2
+    for f in result["findings"]:
+        assert f["path"] and f["relevance"]
 
 
-@pytest.mark.skip(reason="Explorer modes wired in Plan 03")
 def test_recommendation_seed():
-    """EXPL-04: Explorer accepts conversation-derived seed query."""
-    pass
+    """EXPL-04: explorer receives parent-resolved seed query verbatim in its user message."""
+    from services import explorer_service
+    seed = "Find games similar to Catan. Focus on trading and resource management."
+    captured: list[list[dict]] = []
+    def _capture_create(**kwargs):
+        captured.append(kwargs["messages"])
+        # Stop immediately by returning no tool calls
+        return make_response(content="", finish_reason="stop")
+    client = MagicMock()
+    client.chat.completions.create = MagicMock(side_effect=_capture_create)
+    with patch.object(explorer_service, "get_llm_client", return_value=client):
+        list(explorer_service.run_exploration(TEST_USER_ID, seed, "find_similar"))
+    assert captured, "LLM not called"
+    # First call's user message must contain the seed
+    user_msgs = [m for m in captured[0] if m["role"] == "user"]
+    assert any(seed in m["content"] for m in user_msgs)
 
 
 def test_iteration_budget():
