@@ -1,6 +1,15 @@
 import { useState, useCallback, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 
+export interface SubEvent {
+  type: 'sub_iteration' | 'sub_tool_start' | 'sub_tool_result'
+  iteration?: number
+  call_id?: string
+  tool?: string
+  args_preview?: string
+  output?: string
+}
+
 export interface ToolEvent {
   tool: string
   args_preview: string
@@ -8,6 +17,7 @@ export interface ToolEvent {
   call_id?: string
   subagent?: boolean
   status: 'running' | 'complete'
+  subEvents?: SubEvent[]
 }
 
 export interface Message {
@@ -124,6 +134,21 @@ export function useChat(threadId: string | null) {
                         toolsUsed: (m.toolsUsed || []).map(t =>
                           t.call_id === parsed.call_id
                             ? { ...t, status: 'complete' as const, output: parsed.output }
+                            : t
+                        ),
+                      }
+                    })
+                  )
+                } else if (parsed.type === 'sub_event') {
+                  // Explorer sub-agent progress event — append to parent ToolEvent's subEvents
+                  setMessages(prev =>
+                    prev.map(m => {
+                      if (m.id !== assistantId) return m
+                      return {
+                        ...m,
+                        toolsUsed: (m.toolsUsed || []).map(t =>
+                          t.call_id === parsed.parent_call_id
+                            ? { ...t, subEvents: [...(t.subEvents || []), parsed.sub_event as SubEvent] }
                             : t
                         ),
                       }
