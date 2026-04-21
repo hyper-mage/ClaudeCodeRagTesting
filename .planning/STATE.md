@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: executing
-stopped_at: Completed 05-03-parent-tool-and-modes-PLAN.md
-last_updated: "2026-04-17T14:34:07.808Z"
-last_activity: 2026-04-17
+status: verifying
+stopped_at: Completed 05-04-frontend-streaming-ui-PLAN.md
+last_updated: "2026-04-21T15:40:02.413Z"
+last_activity: 2026-04-21
 progress:
   total_phases: 6
-  completed_phases: 4
+  completed_phases: 5
   total_plans: 18
-  completed_plans: 17
+  completed_plans: 18
   percent: 17
 ---
 
@@ -27,8 +27,8 @@ See: .planning/PROJECT.md (updated 2026-04-07)
 
 Phase: 05 (explorer-sub-agent) — EXECUTING
 Plan: 4 of 4
-Status: Ready to execute
-Last activity: 2026-04-17
+Status: Phase complete — ready for verification
+Last activity: 2026-04-21
 
 Progress: [█░░░░░░░░░] 17%
 
@@ -64,6 +64,7 @@ Progress: [█░░░░░░░░░] 17%
 | Phase 05-explorer-sub-agent P01 | 4 min | 2 tasks | 10 files |
 | Phase 05-explorer-sub-agent P02 | 7 min | 2 tasks | 4 files |
 | Phase 05-explorer-sub-agent P03 | 848 | 3 tasks | 3 files |
+| Phase 05-explorer-sub-agent P04 | 15min | 3 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -100,6 +101,7 @@ Recent decisions affecting current work:
 - [Phase 05-explorer-sub-agent]: asyncio.to_thread + queue.Queue bridges sync explorer generator to async SSE event_generator without blocking event loop
 - [Phase 05-explorer-sub-agent]: is_subagent flag unifies analyze_document and explore_kb tagging in tool_start/tool_result SSE events
 - [Phase 05-explorer-sub-agent]: Integration tests route db.table() by table name to operation-specific stub_db_chain instances for correct mock shapes
+- [Phase 05-explorer-sub-agent]: Hardcoded EXPLORER_MAX_TOOL_CALLS=10 in ToolCallCard; subEvents not persisted to DB (replay on reload shows only final synthesis)
 
 ### Pending Todos
 
@@ -113,7 +115,7 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-17T14:34:07.802Z
-Stopped at: Completed 05-03-parent-tool-and-modes-PLAN.md
+Last session: 2026-04-21T15:40:00.661Z
+Stopped at: Completed 05-04-frontend-streaming-ui-PLAN.md
 Resume file: None
 Next: Phase 02

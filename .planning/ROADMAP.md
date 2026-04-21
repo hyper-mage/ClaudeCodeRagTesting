@@ -16,7 +16,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [ ] **Phase 2: Default KB and Ingestion Extensions** - Pre-seeded board game library plus image OCR and XLSX support
 - [ ] **Phase 3: KB Navigation Tools** - Agent tools (ls, tree, read, grep, glob) that query the knowledge base through Supabase
 - [ ] **Phase 4: File Manager UI** - Tree sidebar, folder operations, drag-drop, and file management in the ingestion interface
-- [ ] **Phase 5: Explorer Sub-Agent** - Multi-step KB traversal agent for deep searches, cross-references, and recommendations
+- [x] **Phase 5: Explorer Sub-Agent** - Multi-step KB traversal agent for deep searches, cross-references, and recommendations (completed 2026-04-21)
 - [ ] **Phase 6: Agent Intelligence and Polish** - Token budget management, source routing, scope controls, and sub-agent consistency
 
 ## Phase Details
@@ -132,5 +132,5 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6
 | 2. Default KB and Ingestion Extensions | 3/3 | Complete | - |
 | 3. KB Navigation Tools | 0/3 | Planning | - |
 | 4. File Manager UI | 0/4 | Planning | - |
-| 5. Explorer Sub-Agent | 3/4 | In Progress|  |
+| 5. Explorer Sub-Agent | 4/4 | Complete   | 2026-04-21 |
 | 6. Agent Intelligence and Polish | 0/3 | Not started | - |
