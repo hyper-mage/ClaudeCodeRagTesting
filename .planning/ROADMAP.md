@@ -114,12 +114,11 @@ Plans:
   2. Agent stays within token budget even when many tool results are returned (no context window exhaustion)
   3. User can narrow search scope to specific folders or games via a chat command and see scoped results
   4. Existing sub-agent (from Module 8) works consistently with the new explorer agent and KB tool set
-**Plans**: TBD
+**Plans**: 2 plans
 
 Plans:
-- [ ] 06-01: TBD
-- [ ] 06-02: TBD
-- [ ] 06-03: TBD
+- [ ] 06-01-PLAN.md -- Budget service (token counting, budget tracking, source routing, scope parsing) + config + tests
+- [ ] 06-02-PLAN.md -- Wire budget/routing into chat loop, sub-agent SSE alignment, scope indicator in tool cards
 
 ## Progress
 
@@ -133,4 +132,4 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6
 | 3. KB Navigation Tools | 0/3 | Planning | - |
 | 4. File Manager UI | 0/4 | Planning | - |
 | 5. Explorer Sub-Agent | 4/4 | Complete   | 2026-04-21 |
-| 6. Agent Intelligence and Polish | 0/3 | Not started | - |
+| 6. Agent Intelligence and Polish | 0/2 | Planning | - |
