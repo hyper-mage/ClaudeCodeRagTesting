@@ -34,6 +34,12 @@ The agent can intelligently search and reason across a structured board game kno
 - ✓ Image ingestion with OCR (game board photos, rule cards) — Validated in Phase 2
 - ✓ XLSX ingestion support (score sheets, game trackers) — Validated in Phase 2
 - ✓ Mixed-visibility RLS (public default KB + private user docs) — Validated in Phase 1
+- ✓ Explorer sub-agent for deep KB traversal and analysis — Validated in Phase 5
+- ✓ Explorer sub-agent: folder summarization — Validated in Phase 5
+- ✓ Explorer sub-agent: cross-reference discovery (games with similar mechanics) — Validated in Phase 5
+- ✓ Explorer sub-agent: game recommendations based on context — Validated in Phase 5
+- ✓ Explorer sub-agent: streaming progress in chat UI — Validated in Phase 5
+- ✓ Explorer budget enforcement (iterations, tool calls, summary chars) — Validated in Phase 5
 
 ### Active
 
@@ -47,11 +53,6 @@ The agent can intelligently search and reason across a structured board game kno
 - [ ] KB navigation tools: read (full file or line-range extraction)
 - [ ] KB structure tool: extract tree structure for agent orientation
 - [ ] Transparent tool calls in chat UI (show what agent is doing, like Claude Code)
-- [ ] Explorer sub-agent for deep KB traversal and analysis
-- [ ] Explorer sub-agent: folder summarization
-- [ ] Explorer sub-agent: cross-reference discovery (games with similar mechanics)
-- [ ] Explorer sub-agent: game recommendations based on context
-- [ ] Explorer sub-agent: side-by-side comparison of rules/mechanics
 - [ ] Smart chunking with automatic token budget management
 - [ ] User-controllable search scope (narrow to specific folders/games)
 - [ ] Update existing sub-agent system for consistency with new explorer agent
@@ -95,7 +96,7 @@ The agent can intelligently search and reason across a structured board game kno
 | File manager-style folder UI | Full drag-drop, tree sidebar, right-click menus — richest interaction model for organizing many files | — Pending |
 | Transparent tool calls (like Claude Code) | Users see what the agent is doing — builds trust and understanding | — Pending |
 | All KB tools query Supabase (not filesystem) | Documents already stored in Supabase — tools should use the same data layer | — Pending |
-| Explorer sub-agent for deep traversal | Complex multi-step KB searches need isolated context — mirrors Claude Code's explorer agent pattern | — Pending |
+| Explorer sub-agent for deep traversal | Complex multi-step KB searches need isolated context — mirrors Claude Code's explorer agent pattern | ✓ Phase 5 |
 | Smart chunking + user scope controls | Both needed — automatic budget management plus manual override for power users | — Pending |
 
 ## Evolution
