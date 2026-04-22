@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: verifying
-stopped_at: Phase 6 context gathered
-last_updated: "2026-04-21T18:07:47.336Z"
-last_activity: 2026-04-21
+status: executing
+stopped_at: Completed 06-agent-intelligence-and-polish-01-PLAN.md
+last_updated: "2026-04-22T03:28:25.460Z"
+last_activity: 2026-04-22
 progress:
   total_phases: 6
   completed_phases: 5
-  total_plans: 18
-  completed_plans: 18
+  total_plans: 20
+  completed_plans: 19
   percent: 17
 ---
 
@@ -21,14 +21,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-07)
 
 **Core value:** The agent can intelligently search and reason across a structured board game knowledge base -- finding rules, comparing mechanics, and recommending games -- using the right tool for the job, transparently.
-**Current focus:** Phase 05 — explorer-sub-agent
+**Current focus:** Phase 06 — agent-intelligence-and-polish
 
 ## Current Position
 
-Phase: 6
-Plan: Not started
-Status: Phase complete — ready for verification
-Last activity: 2026-04-21
+Phase: 06 (agent-intelligence-and-polish) — EXECUTING
+Plan: 2 of 2
+Status: Ready to execute
+Last activity: 2026-04-22
 
 Progress: [█░░░░░░░░░] 17%
 
@@ -65,6 +65,7 @@ Progress: [█░░░░░░░░░] 17%
 | Phase 05-explorer-sub-agent P02 | 7 min | 2 tasks | 4 files |
 | Phase 05-explorer-sub-agent P03 | 848 | 3 tasks | 3 files |
 | Phase 05-explorer-sub-agent P04 | 15min | 3 tasks | 3 files |
+| Phase 06-agent-intelligence-and-polish P01 | 10 min | 1 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -102,6 +103,9 @@ Recent decisions affecting current work:
 - [Phase 05-explorer-sub-agent]: is_subagent flag unifies analyze_document and explore_kb tagging in tool_start/tool_result SSE events
 - [Phase 05-explorer-sub-agent]: Integration tests route db.table() by table name to operation-specific stub_db_chain instances for correct mock shapes
 - [Phase 05-explorer-sub-agent]: Hardcoded EXPLORER_MAX_TOOL_CALLS=10 in ToolCallCard; subEvents not persisted to DB (replay on reload shows only final synthesis)
+- [Phase 06-agent-intelligence-and-polish]: Paired truncation via call_id set — add_tool_result_pair records assistant tool_call ids so truncate_oldest_tool_results drops the assistant+tool pair together, avoiding orphaned tool_call_id API errors (Pitfall 3)
+- [Phase 06-agent-intelligence-and-polish]: Source-hint precedence in parse_scope_hint — when user mixes 'my uploads' with folder paths, source_hint wins because it is more explicit and cannot coexist with folder_hint
+- [Phase 06-agent-intelligence-and-polish]: tiktoken cl100k_base + 5% safety margin as cross-model token approximation (D-07) — absorbs 5-15% variance for non-OpenAI models on OpenRouter without exact per-model tokenizers
 
 ### Pending Todos
 
@@ -115,7 +119,7 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-21T18:07:47.330Z
-Stopped at: Phase 6 context gathered
-Resume file: .planning/phases/06-agent-intelligence-and-polish/06-CONTEXT.md
+Last session: 2026-04-22T03:28:25.454Z
+Stopped at: Completed 06-agent-intelligence-and-polish-01-PLAN.md
+Resume file: None
 Next: Phase 02

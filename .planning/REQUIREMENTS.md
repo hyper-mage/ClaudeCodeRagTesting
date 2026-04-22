@@ -31,10 +31,10 @@
 
 ### Agent Intelligence
 
-- [ ] **AGNT-01**: Agent automatically selects appropriate sources (default KB, private docs, or both) based on query intent
-- [ ] **AGNT-02**: Agent manages a token budget when assembling context, preventing context window exhaustion
-- [ ] **AGNT-03**: Token budget tracks usage across system prompt, chat history, tool results, and reserves space for response
-- [ ] **AGNT-04**: User can manually narrow search scope to specific folders or games via the chat interface
+- [x] **AGNT-01**: Agent automatically selects appropriate sources (default KB, private docs, or both) based on query intent
+- [x] **AGNT-02**: Agent manages a token budget when assembling context, preventing context window exhaustion
+- [x] **AGNT-03**: Token budget tracks usage across system prompt, chat history, tool results, and reserves space for response
+- [x] **AGNT-04**: User can manually narrow search scope to specific folders or games via the chat interface
 - [ ] **AGNT-05**: Agent uses the existing sub-agent pattern to update for consistency with new tool set
 
 ### Explorer Sub-Agent
@@ -111,10 +111,10 @@
 | TOOL-06 | Phase 3 | Pending |
 | TOOL-07 | Phase 3 | Pending |
 | TOOL-08 | Phase 3 | Pending |
-| AGNT-01 | Phase 6 | Pending |
-| AGNT-02 | Phase 6 | Pending |
-| AGNT-03 | Phase 6 | Pending |
-| AGNT-04 | Phase 6 | Pending |
+| AGNT-01 | Phase 6 | Complete |
+| AGNT-02 | Phase 6 | Complete |
+| AGNT-03 | Phase 6 | Complete |
+| AGNT-04 | Phase 6 | Complete |
 | AGNT-05 | Phase 6 | Pending |
 | EXPL-01 | Phase 5 | Complete |
 | EXPL-02 | Phase 5 | Complete |
