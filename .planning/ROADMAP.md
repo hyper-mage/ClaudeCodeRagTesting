@@ -129,10 +129,10 @@ Plans:
   1. 03-VERIFICATION.md exists with status=passed and documents evidence for TOOL-01..08
   2. REQUIREMENTS.md traceability marks TOOL-06/07/08 Complete with checkbox [x]
   3. Re-run of /gsd:audit-milestone for v1.0 returns status=passed
-**Plans**: TBD
+**Plans**: 1 plan
 
 Plans:
-- [ ] 03.1-01: TBD
+- [ ] 03.1-01-PLAN.md -- Retroactive verification: write 03-VERIFICATION.md + flip TOOL-06/07/08 traceability
 
 ## Progress
 
