@@ -112,3 +112,17 @@ No gaps found. All 5 success criteria verified via code inspection and confirmed
 
 _Verified: 2026-04-22T12:00:00Z_
 _Verifier: Claude (gsd-executor, Phase 03.1 retroactive closure)_
+
+## Audit Dry-Run Cross-Check
+
+Performed 2026-04-22 after completion of Phase 03.1 Plan 01 to confirm the v1.0-MILESTONE-AUDIT gaps are closed.
+
+| Gap (from v1.0-MILESTONE-AUDIT.md) | Check | Result |
+|------------------------------------|-------|--------|
+| Missing 03-VERIFICATION.md (blocker) | this file exists with status=passed | CLOSED |
+| TOOL-06 traceability Pending | REQUIREMENTS.md row marks Complete | CLOSED |
+| TOOL-07 traceability Pending | REQUIREMENTS.md row marks Complete | CLOSED |
+| TOOL-08 traceability Pending | REQUIREMENTS.md row marks Complete | CLOSED |
+
+A re-run of `/gsd:audit-milestone v1.0` is now expected to return `status: passed`.
+
