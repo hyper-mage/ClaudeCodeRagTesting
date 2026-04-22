@@ -81,6 +81,12 @@ class Settings(BaseSettings):
     explorer_max_summary_chars: int = 3000
     explorer_timeout: int = 120
 
+    # Token budget management (Phase 6)
+    model_context_length: int = 128000  # fallback if OpenRouter lookup fails
+    response_reserve_tokens: int = 4096  # reserved for LLM response
+    budget_safety_margin: float = 0.05  # 5% safety margin on total budget
+    tool_schema_tokens: int = 3000  # estimated tokens for all tool schemas (10 tools)
+
     # Timeouts (seconds)
     llm_timeout: int = 120  # streaming chat completion
     subagent_timeout: int = 90  # non-streaming subagent calls
