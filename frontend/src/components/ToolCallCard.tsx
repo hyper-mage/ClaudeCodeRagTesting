@@ -47,6 +47,31 @@ const EXPLORER_MAX_TOOL_CALLS = 10
 
 export { TOOL_LABELS }
 
+// Parse a leading "scope:<scope>" prefix from args_preview and render a
+// colored badge before the rest of the preview (Phase 6, D-03).
+function renderArgsPreview(preview: string) {
+  const scopeMatch = preview.match(/^scope:(\S+)\s*/)
+  if (!scopeMatch) {
+    return <span className="text-xs font-mono text-gray-400 truncate">{preview}</span>
+  }
+  const scope = scopeMatch[1]
+  const rest = preview.slice(scopeMatch[0].length)
+  const scopeColors: Record<string, string> = {
+    default_kb: 'text-blue-400',
+    private: 'text-green-400',
+    both: 'text-yellow-400',
+  }
+  const colorClass = scopeColors[scope] || 'text-zinc-400'
+  return (
+    <>
+      <span className={`text-xs font-medium ${colorClass} mr-1`}>
+        [{scope.replace('_', ' ')}]
+      </span>
+      <span className="text-xs font-mono text-gray-400 truncate">{rest}</span>
+    </>
+  )
+}
+
 export default function ToolCallCard({ tool, args_preview, output, subagent, status, subEvents }: Props) {
   const [expanded, setExpanded] = useState(false)
   const [subExpanded, setSubExpanded] = useState(false)
@@ -83,8 +108,8 @@ export default function ToolCallCard({ tool, args_preview, output, subagent, sta
           <Icon className={`w-4 h-4 flex-shrink-0 ${iconColor}`} />
           <span className="text-xs font-semibold text-gray-200">{label}</span>
           {args_preview && (
-            <span className="text-xs font-mono text-gray-400 truncate max-w-[200px] ml-1">
-              {args_preview}
+            <span className="ml-1 truncate max-w-[240px] flex items-center">
+              {renderArgsPreview(args_preview)}
             </span>
           )}
           {explorerProgress && (

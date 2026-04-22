@@ -42,9 +42,11 @@ def _make_explore_tool_call_streams():
     """Return a side_effect list: first call yields tool_call, second yields text."""
     call_count = 0
 
-    def _stream(messages, tools=None, tool_guide=None):
+    def _stream(messages, tools=None, tool_guide=None, source_hint=None, scope_hint=None):
         nonlocal call_count
         call_count += 1
+        # Budget tracking in chat.py expects a system_content event first.
+        yield {"type": "system_content", "content": "system"}
         if call_count == 1:
             yield {
                 "type": "tool_call",
