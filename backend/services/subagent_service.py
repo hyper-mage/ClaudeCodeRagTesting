@@ -1,4 +1,6 @@
 import logging
+from typing import Iterator
+
 import openai
 from database import get_supabase
 from services.llm_service import get_llm_client
@@ -49,27 +51,74 @@ def get_full_document_text(user_id: str, document_id: str) -> str:
 
 
 @traceable(name="subagent_document_analysis")
-def run_document_analysis(user_id: str, document_name: str, analysis_query: str) -> dict:
-    """Spawn an isolated sub-agent to analyze a full document."""
+def run_document_analysis(
+    user_id: str, document_name: str, analysis_query: str
+) -> Iterator[dict]:
+    """Spawn an isolated sub-agent to analyze a full document.
+
+    Yields progress events matching the explore_kb SSE contract so the
+    frontend ToolCallCard can render analyze_document and explore_kb
+    consistently (Phase 6, D-10/D-11/D-12):
+
+    - {"type": "sub_iteration", "iteration": N, "description": "..."}
+    - {"type": "sub_tool_start", "tool": "read_document", "args_preview": "..."}
+    - {"type": "sub_tool_result", "tool": "read_document", "output": "..."}
+    - {"type": "result", "result": {...}}   -- final payload
+
+    On any error, yields a final {"type": "result", "result": {"error": "..."}}.
+    """
     settings = get_settings()
 
-    # Resolve document
+    # Stage 1: Resolve document
+    yield {
+        "type": "sub_iteration",
+        "iteration": 1,
+        "description": f"Resolving document: {document_name}",
+    }
     doc = resolve_document(user_id, document_name)
     if doc is None:
-        return {"error": f"Document not found: {document_name}"}
-    if isinstance(doc, dict) and doc.get("multiple"):
-        return {
-            "error": f"Multiple documents match '{document_name}'. Please be more specific.",
-            "matches": doc["matches"],
+        yield {
+            "type": "result",
+            "result": {"error": f"Document not found: {document_name}"},
         }
+        return
+    if isinstance(doc, dict) and doc.get("multiple"):
+        yield {
+            "type": "result",
+            "result": {
+                "error": (
+                    f"Multiple documents match '{document_name}'. "
+                    "Please be more specific."
+                ),
+                "matches": doc["matches"],
+            },
+        }
+        return
 
-    # Get full text
+    # Stage 2: Read full text
+    yield {
+        "type": "sub_tool_start",
+        "tool": "read_document",
+        "args_preview": f'document="{doc["filename"]}"',
+    }
     full_text = get_full_document_text(user_id, doc["id"])
     chunk_count = len(full_text.split("\n\n"))
+    yield {
+        "type": "sub_tool_result",
+        "tool": "read_document",
+        "output": f"{chunk_count} chunks, {len(full_text)} chars",
+    }
 
     if len(full_text) > settings.subagent_max_context_chars:
         full_text = full_text[: settings.subagent_max_context_chars]
         full_text += "\n\n[Document truncated due to size limit]"
+
+    # Stage 3: LLM analysis
+    yield {
+        "type": "sub_iteration",
+        "iteration": 2,
+        "description": f"Analyzing: {analysis_query}",
+    }
 
     # Build sub-agent messages
     messages = [
@@ -95,11 +144,20 @@ def run_document_analysis(user_id: str, document_name: str, analysis_query: str)
         )
     except openai.APITimeoutError:
         logger.warning(f"Document analysis timed out for '{doc['filename']}'")
-        return {"error": "Document analysis timed out. The document may be too large for analysis."}
+        yield {
+            "type": "result",
+            "result": {
+                "error": "Document analysis timed out. The document may be too large for analysis."
+            },
+        }
+        return
 
     analysis = response.choices[0].message.content
-    return {
-        "document": doc["filename"],
-        "chunk_count": chunk_count,
-        "analysis": analysis,
+    yield {
+        "type": "result",
+        "result": {
+            "document": doc["filename"],
+            "chunk_count": chunk_count,
+            "analysis": analysis,
+        },
     }

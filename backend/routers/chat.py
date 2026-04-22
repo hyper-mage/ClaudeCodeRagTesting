@@ -398,15 +398,6 @@ def execute_tool(fn_name: str, fn_args: dict, user_id: str) -> str:
         result = search_web(query=fn_args["query"])
         return json.dumps({"tool": "web_search", **result})
 
-    elif fn_name == "analyze_document":
-        from services.subagent_service import run_document_analysis
-        result = run_document_analysis(
-            user_id=user_id,
-            document_name=fn_args["document_name"],
-            analysis_query=fn_args["query"],
-        )
-        return json.dumps({"tool": "analyze_document", **result})
-
     elif fn_name == "kb_ls":
         try:
             result = kb_ls(user_id=user_id, path=fn_args["path"])
@@ -703,6 +694,52 @@ async def send_message(
                                         "budget_exhausted": True,
                                     }
                                 tool_result = json.dumps({"tool": "explore_kb", **final_result_dict})
+                            elif fn_name == "analyze_document":
+                                # Sub-agent with SSE alignment matching explore_kb (D-10/D-11/D-12).
+                                import asyncio as _asyncio
+                                import queue as _queue
+                                from services.subagent_service import run_document_analysis
+
+                                q2: _queue.Queue = _queue.Queue()
+                                SENTINEL2 = object()
+
+                                def _drive_doc():
+                                    try:
+                                        for ev in run_document_analysis(
+                                            user_id=user_id,
+                                            document_name=fn_args["document_name"],
+                                            analysis_query=fn_args["query"],
+                                        ):
+                                            q2.put(ev)
+                                    except Exception as ex:
+                                        q2.put({"type": "result", "result": {"error": str(ex)}})
+                                    finally:
+                                        q2.put(SENTINEL2)
+
+                                task2 = _asyncio.create_task(_asyncio.to_thread(_drive_doc))
+                                final_result_dict = None
+                                while True:
+                                    sub_ev = await _asyncio.to_thread(q2.get)
+                                    if sub_ev is SENTINEL2:
+                                        break
+                                    if sub_ev.get("type") == "result":
+                                        final_result_dict = sub_ev["result"]
+                                        continue
+                                    # sub_iteration / sub_tool_start / sub_tool_result -> SSE sub_event row
+                                    yield {
+                                        "event": "tool_event",
+                                        "data": json.dumps({
+                                            "tool_event": True,
+                                            "type": "sub_event",
+                                            "subagent": True,
+                                            "parent_call_id": tc["id"],
+                                            "sub_event": sub_ev,
+                                        }),
+                                    }
+                                await task2
+                                if final_result_dict is None:
+                                    final_result_dict = {"error": "Document analysis produced no result."}
+                                tool_result = json.dumps({"tool": "analyze_document", **final_result_dict})
                             else:
                                 tool_result = execute_tool(fn_name, fn_args, user_id)
 
