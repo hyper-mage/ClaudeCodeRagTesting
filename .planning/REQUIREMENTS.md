@@ -108,9 +108,9 @@
 | TOOL-03 | Phase 3 | Complete |
 | TOOL-04 | Phase 3 | Complete |
 | TOOL-05 | Phase 3 | Complete |
-| TOOL-06 | Phase 3 | Pending |
-| TOOL-07 | Phase 3 | Pending |
-| TOOL-08 | Phase 3 | Pending |
+| TOOL-06 | Phase 3 (verified in 03.1) | Pending |
+| TOOL-07 | Phase 3 (verified in 03.1) | Pending |
+| TOOL-08 | Phase 3 (verified in 03.1) | Pending |
 | AGNT-01 | Phase 6 | Complete |
 | AGNT-02 | Phase 6 | Complete |
 | AGNT-03 | Phase 6 | Complete |

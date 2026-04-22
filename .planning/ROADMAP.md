@@ -120,6 +120,20 @@ Plans:
 - [x] 06-01-PLAN.md -- Budget service (token counting, budget tracking, source routing, scope parsing) + config + tests
 - [x] 06-02-PLAN.md -- Wire budget/routing into chat loop, sub-agent SSE alignment, scope indicator in tool cards
 
+### Phase 03.1: Verification Closure (Gap Closure for Phase 03)
+**Goal**: Close verification debt from v1.0 audit — produce 03-VERIFICATION.md and update REQUIREMENTS.md traceability for TOOL-06/07/08
+**Depends on**: Phase 03 (complete)
+**Requirements**: TOOL-06, TOOL-07, TOOL-08 (retroactive verification)
+**Gap Closure**: Closes gaps from .planning/v1.0-MILESTONE-AUDIT.md
+**Success Criteria** (what must be TRUE):
+  1. 03-VERIFICATION.md exists with status=passed and documents evidence for TOOL-01..08
+  2. REQUIREMENTS.md traceability marks TOOL-06/07/08 Complete with checkbox [x]
+  3. Re-run of /gsd:audit-milestone for v1.0 returns status=passed
+**Plans**: TBD
+
+Plans:
+- [ ] 03.1-01: TBD
+
 ## Progress
 
 **Execution Order:**
@@ -133,3 +147,4 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5 -> 6
 | 4. File Manager UI | 0/4 | Planning | - |
 | 5. Explorer Sub-Agent | 4/4 | Complete   | 2026-04-21 |
 | 6. Agent Intelligence and Polish | 0/2 | Planning | - |
+| 03.1. Verification Closure | 0/1 | Planning | - |
