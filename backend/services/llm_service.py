@@ -36,13 +36,19 @@ def stream_chat_completion(
     messages: list[dict],
     tools: list[dict] | None = None,
     tool_guide: str | None = None,
+    source_hint: str | None = None,
+    scope_hint: dict | None = None,
 ) -> Generator[dict, None, None]:
     """Stream a chat completion with optional tool definitions.
 
     Yields dicts:
+      {"type": "system_content", "content": "..."} first event with final system prompt
       {"type": "text_delta", "text": "..."} for text chunks
       {"type": "tool_call", "tool_calls": [...]} when model invokes a tool
       {"type": "done"} when streaming is complete
+
+    `source_hint`: "default_kb" | "private" | "both" | None -- appended as routing guidance.
+    `scope_hint`:  {"folder_hint": "..."} | {"source_hint": "..."} | None -- narrowing guidance.
     """
     settings = get_settings()
     client = get_llm_client()
@@ -50,6 +56,40 @@ def stream_chat_completion(
     system_content = settings.system_prompt
     if tool_guide:
         system_content += "\n\n" + tool_guide
+
+    # Source routing guidance (D-01, D-02) -- a hint, not a filter (Pitfall 4).
+    if source_hint:
+        if source_hint == "default_kb":
+            system_content += (
+                "\n\n## Source Routing\n"
+                "Focus on the default Board Games knowledge base. The user is asking "
+                "about pre-loaded board game content."
+            )
+        elif source_hint == "private":
+            system_content += (
+                "\n\n## Source Routing\n"
+                "Focus on the user's private uploaded documents. Use search_documents "
+                "and analyze_document for their personal files."
+            )
+        else:
+            system_content += (
+                "\n\n## Source Routing\n"
+                "Search both the default Board Games KB and the user's private documents. "
+                "Cast a wide net."
+            )
+
+    # Scope narrowing guidance (D-08, D-09). Source hints on scope are already
+    # handled by the source_hint param above; only fold in folder_hint here.
+    if scope_hint and "folder_hint" in scope_hint:
+        system_content += (
+            f"\n\n## Search Scope\n"
+            f"The user wants to narrow search to: {scope_hint['folder_hint']}. "
+            "When using kb_ls, kb_read, kb_grep, kb_glob, prefer paths containing this scope. "
+            "For search_documents, include this as a topic filter."
+        )
+
+    # Emit the final system content so the caller can track token budget accurately.
+    yield {"type": "system_content", "content": system_content}
 
     # Prepend system prompt
     full_messages = [

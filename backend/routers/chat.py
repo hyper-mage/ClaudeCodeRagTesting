@@ -12,6 +12,12 @@ from services.llm_service import stream_chat_completion
 from services.sql_service import get_queryable_schema, execute_sql
 from services.web_search_service import search_web
 from services.kb_tools_service import kb_ls, kb_tree, kb_read, kb_grep, kb_glob
+from services.budget_service import (
+    TokenBudget,
+    infer_source_scope,
+    parse_scope_hint,
+    fetch_model_context_length,
+)
 
 try:
     from langsmith import traceable
@@ -330,9 +336,25 @@ TOOL_SELECTION_GUIDE = """## Tool Selection Guide
 Always start with kb_tree or kb_ls to orient yourself before reading or searching."""
 
 
-def _build_args_preview(fn_name: str, fn_args: dict) -> str:
-    """Build a human-readable args preview string for tool card display."""
+_SCOPED_TOOLS = (
+    "search_documents",
+    "kb_ls",
+    "kb_tree",
+    "kb_read",
+    "kb_grep",
+    "kb_glob",
+)
+
+
+def _build_args_preview(fn_name: str, fn_args: dict, source_scope: str | None = None) -> str:
+    """Build a human-readable args preview string for tool card display.
+
+    When `source_scope` is provided and the tool is scope-relevant, the preview is
+    prefixed with `scope:<scope>` so the frontend tool card can surface routing.
+    """
     parts = []
+    if source_scope and fn_name in _SCOPED_TOOLS:
+        parts.append(f"scope:{source_scope}")
     for key, value in fn_args.items():
         if isinstance(value, str):
             parts.append(f'{key}="{value}"')
@@ -510,6 +532,32 @@ async def send_message(
             if settings.web_search_enabled:
                 tools.append(WEB_SEARCH_TOOL)
 
+            # --- Source routing + scope parsing (Phase 6) -----------------------
+            user_latest = body.content
+            has_private_docs = bool(doc_check.data)
+            source_scope = infer_source_scope(user_latest, has_private_docs)
+            scope_hint = parse_scope_hint(user_latest)
+            if scope_hint.get("source_hint"):
+                source_scope = scope_hint["source_hint"]
+
+            # --- Token budget (Phase 6) ------------------------------------------
+            budget = TokenBudget(
+                context_length=settings.model_context_length,
+                response_reserve=settings.response_reserve_tokens,
+                safety_margin=settings.budget_safety_margin,
+                tool_schema_tokens=settings.tool_schema_tokens,
+            )
+            # Best-effort dynamic context length lookup (OpenRouter).
+            if settings.llm_base_url and "openrouter" in settings.llm_base_url:
+                dynamic_length = fetch_model_context_length(
+                    settings.llm_model, settings.resolved_llm_api_key
+                )
+                if dynamic_length and dynamic_length > 0:
+                    budget.context_length = dynamic_length
+                    logger.info(
+                        f"Using dynamic context length {dynamic_length} for {settings.llm_model}"
+                    )
+
             # Create assistant message early for incremental tool persistence
             assistant_msg = db.table("messages").insert({
                 "thread_id": thread_id,
@@ -525,7 +573,24 @@ async def send_message(
             while True:
                 tool_call_happened = False
 
-                for event in stream_chat_completion(current_messages, tools=tools, tool_guide=TOOL_SELECTION_GUIDE if tools else None):
+                for event in stream_chat_completion(
+                    current_messages,
+                    tools=tools,
+                    tool_guide=TOOL_SELECTION_GUIDE if tools else None,
+                    source_hint=source_scope,
+                    scope_hint=scope_hint if scope_hint else None,
+                ):
+                    if event["type"] == "system_content":
+                        # Budget bookkeeping before LLM sees the messages.
+                        budget.set_system(event["content"])
+                        budget.set_history(current_messages)
+                        if budget.is_over():
+                            current_messages = budget.truncate_oldest_tool_results(current_messages)
+                            logger.warning(
+                                f"Budget exceeded, truncated oldest tool results. "
+                                f"Remaining: {budget.remaining}"
+                            )
+                        continue
                     if event["type"] == "text_delta":
                         full_content += event["text"]
                         yield {
@@ -545,8 +610,8 @@ async def send_message(
                             fn_name = tc["function"]["name"]
                             fn_args = json.loads(tc["function"]["arguments"])
 
-                            # Build args preview for display
-                            args_preview = _build_args_preview(fn_name, fn_args)
+                            # Build args preview for display (includes scope indicator)
+                            args_preview = _build_args_preview(fn_name, fn_args, source_scope=source_scope)
 
                             # Accumulate tool event for persistence
                             tool_entry = {
@@ -646,6 +711,25 @@ async def send_message(
                                 "tool_call_id": tc["id"],
                                 "content": tool_result,
                             })
+
+                            # Track this tool round-trip in the budget so oldest pairs
+                            # can be truncated first if we exceed the context window.
+                            # The assistant tool_calls message is at current_messages[-2 - offset];
+                            # we locate it by matching tool_call_id.
+                            assistant_tc_msg = None
+                            for m in reversed(current_messages[:-1]):
+                                if m.get("role") == "assistant" and m.get("tool_calls"):
+                                    tc_ids = {
+                                        _tc.get("id")
+                                        for _tc in (m.get("tool_calls") or [])
+                                    }
+                                    if tc["id"] in tc_ids:
+                                        assistant_tc_msg = m
+                                        break
+                            if assistant_tc_msg is not None:
+                                budget.add_tool_result_pair(
+                                    assistant_tc_msg, current_messages[-1]
+                                )
 
                             # Update accumulated tool entry with result
                             tool_output_preview = tool_result[:2000] if len(tool_result) > 2000 else tool_result
