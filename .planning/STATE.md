@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: executing
-stopped_at: Completed 06-agent-intelligence-and-polish-01-PLAN.md
-last_updated: "2026-04-22T03:28:25.460Z"
+status: verifying
+stopped_at: Completed 06-agent-intelligence-and-polish-02-PLAN.md
+last_updated: "2026-04-22T04:08:00.412Z"
 last_activity: 2026-04-22
 progress:
   total_phases: 6
-  completed_phases: 5
+  completed_phases: 6
   total_plans: 20
-  completed_plans: 19
+  completed_plans: 20
   percent: 17
 ---
 
@@ -27,7 +27,7 @@ See: .planning/PROJECT.md (updated 2026-04-07)
 
 Phase: 06 (agent-intelligence-and-polish) — EXECUTING
 Plan: 2 of 2
-Status: Ready to execute
+Status: Phase complete — ready for verification
 Last activity: 2026-04-22
 
 Progress: [█░░░░░░░░░] 17%
@@ -66,6 +66,7 @@ Progress: [█░░░░░░░░░] 17%
 | Phase 05-explorer-sub-agent P03 | 848 | 3 tasks | 3 files |
 | Phase 05-explorer-sub-agent P04 | 15min | 3 tasks | 3 files |
 | Phase 06-agent-intelligence-and-polish P01 | 10 min | 1 tasks | 4 files |
+| Phase 06-agent-intelligence-and-polish P02 | 36 min | 3 tasks | 7 files |
 
 ## Accumulated Context
 
@@ -106,6 +107,9 @@ Recent decisions affecting current work:
 - [Phase 06-agent-intelligence-and-polish]: Paired truncation via call_id set — add_tool_result_pair records assistant tool_call ids so truncate_oldest_tool_results drops the assistant+tool pair together, avoiding orphaned tool_call_id API errors (Pitfall 3)
 - [Phase 06-agent-intelligence-and-polish]: Source-hint precedence in parse_scope_hint — when user mixes 'my uploads' with folder paths, source_hint wins because it is more explicit and cannot coexist with folder_hint
 - [Phase 06-agent-intelligence-and-polish]: tiktoken cl100k_base + 5% safety margin as cross-model token approximation (D-07) — absorbs 5-15% variance for non-OpenAI models on OpenRouter without exact per-model tokenizers
+- [Phase 06-agent-intelligence-and-polish]: stream_chat_completion yields a leading system_content event so token accounting uses the exact post-hint system prompt
+- [Phase 06-agent-intelligence-and-polish]: analyze_document reuses the same asyncio.to_thread + queue.Queue bridge as explore_kb for a single sub-agent execution pattern
+- [Phase 06-agent-intelligence-and-polish]: Scope indicator encoded as args_preview prefix (scope:<scope>) rather than a new SSE field to keep the tool_event contract backwards-compatible
 
 ### Pending Todos
 
@@ -119,7 +123,7 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-22T03:28:25.454Z
-Stopped at: Completed 06-agent-intelligence-and-polish-01-PLAN.md
+Last session: 2026-04-22T04:07:53.257Z
+Stopped at: Completed 06-agent-intelligence-and-polish-02-PLAN.md
 Resume file: None
 Next: Phase 02

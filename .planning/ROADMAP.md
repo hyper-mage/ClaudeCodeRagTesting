@@ -118,7 +118,7 @@ Plans:
 
 Plans:
 - [x] 06-01-PLAN.md -- Budget service (token counting, budget tracking, source routing, scope parsing) + config + tests
-- [ ] 06-02-PLAN.md -- Wire budget/routing into chat loop, sub-agent SSE alignment, scope indicator in tool cards
+- [x] 06-02-PLAN.md -- Wire budget/routing into chat loop, sub-agent SSE alignment, scope indicator in tool cards
 
 ## Progress
 
