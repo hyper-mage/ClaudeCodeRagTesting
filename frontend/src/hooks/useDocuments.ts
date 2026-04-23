@@ -1,6 +1,7 @@
 import { useState, useCallback, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
+import { apiFetch } from '../lib/api'
 
 export interface DocumentMetadata {
   document_type: string
@@ -32,13 +33,10 @@ export function useDocuments() {
     if (!session) return
     setLoading(true)
     try {
-      const res = await fetch('/api/documents', {
-        headers: { Authorization: `Bearer ${session.access_token}` },
-      })
-      if (res.ok) {
-        const data = await res.json()
-        setDocuments(data)
-      }
+      const data = await apiFetch('/api/documents')
+      setDocuments(data)
+    } catch {
+      // Preserve silent-on-error behavior
     } finally {
       setLoading(false)
     }
@@ -50,20 +48,16 @@ export function useDocuments() {
     formData.append('file', file)
     if (folderId) formData.append('folder_id', folderId)
 
-    const res = await fetch('/api/documents/upload', {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${session.access_token}`,
-      },
-      body: formData,
-    })
-
-    if (!res.ok) {
-      const body = await res.text()
-      throw new Error(`Upload failed: ${body}`)
+    let doc
+    try {
+      doc = await apiFetch('/api/documents/upload', {
+        method: 'POST',
+        body: formData,
+      })
+    } catch (e) {
+      throw new Error(`Upload failed: ${(e as Error).message}`)
     }
 
-    const doc = await res.json()
     if (doc.duplicate) {
       return doc  // Don't add to list — it already exists
     }
@@ -73,27 +67,20 @@ export function useDocuments() {
 
   const deleteDocument = useCallback(async (id: string) => {
     if (!session) return
-    await fetch(`/api/documents/${id}`, {
-      method: 'DELETE',
-      headers: { Authorization: `Bearer ${session.access_token}` },
-    })
+    await apiFetch(`/api/documents/${id}`, { method: 'DELETE' })
     setDocuments(prev => prev.filter(d => d.id !== id))
   }, [session])
 
   const bulkDeleteDocuments = useCallback(
     async (ids: string[]) => {
       if (!session || ids.length === 0) return
-      const res = await fetch('/api/documents/bulk-delete', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${session.access_token}`,
-        },
-        body: JSON.stringify({ ids }),
-      })
-      if (!res.ok) {
-        const body = await res.text()
-        throw new Error(`Bulk delete failed: ${body}`)
+      try {
+        await apiFetch('/api/documents/bulk-delete', {
+          method: 'POST',
+          body: JSON.stringify({ ids }),
+        })
+      } catch (e) {
+        throw new Error(`Bulk delete failed: ${(e as Error).message}`)
       }
       setDocuments(prev => prev.filter(d => !ids.includes(d.id)))
     },
@@ -103,17 +90,13 @@ export function useDocuments() {
   const bulkMoveDocuments = useCallback(
     async (ids: string[], folderId: string | null) => {
       if (!session || ids.length === 0) return
-      const res = await fetch('/api/documents/bulk-move', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${session.access_token}`,
-        },
-        body: JSON.stringify({ ids, folder_id: folderId }),
-      })
-      if (!res.ok) {
-        const body = await res.text()
-        throw new Error(`Bulk move failed: ${body}`)
+      try {
+        await apiFetch('/api/documents/bulk-move', {
+          method: 'POST',
+          body: JSON.stringify({ ids, folder_id: folderId }),
+        })
+      } catch (e) {
+        throw new Error(`Bulk move failed: ${(e as Error).message}`)
       }
     },
     [session]

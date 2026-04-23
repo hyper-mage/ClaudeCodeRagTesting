@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef } from 'react'
-import { supabase } from '../lib/supabase'
+import { apiFetch, apiStream } from '../lib/api'
 
 export interface SubEvent {
   type: 'sub_iteration' | 'sub_tool_start' | 'sub_tool_result'
@@ -37,16 +37,14 @@ export function useChat(threadId: string | null) {
       setMessages([])
       return
     }
-    const { data: { session } } = await supabase.auth.getSession()
-    const res = await fetch(`/api/threads/${threadId}`, {
-      headers: { Authorization: `Bearer ${session?.access_token}` },
-    })
-    if (res.ok) {
-      const data = await res.json()
+    try {
+      const data = await apiFetch(`/api/threads/${threadId}`)
       setMessages(data.messages.map((m: Record<string, unknown>) => ({
         ...m,
         toolsUsed: m.tools_used as ToolEvent[] | undefined,
       })))
+    } catch {
+      // Preserve previous silent-on-error behavior (old code had `if (res.ok)`)
     }
   }, [threadId])
 
@@ -73,18 +71,11 @@ export function useChat(threadId: string | null) {
       const controller = new AbortController()
       abortRef.current = controller
 
-      const { data: { session } } = await supabase.auth.getSession()
-      const res = await fetch(`/api/threads/${threadId}/messages`, {
+      const res = await apiStream(`/api/threads/${threadId}/messages`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${session?.access_token}`,
-        },
         body: JSON.stringify({ content }),
         signal: controller.signal,
       })
-
-      if (!res.ok) throw new Error(`API error: ${res.status}`)
 
       const reader = res.body?.getReader()
       if (!reader) throw new Error('No response body')

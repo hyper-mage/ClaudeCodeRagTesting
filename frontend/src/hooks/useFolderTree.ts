@@ -1,5 +1,6 @@
 import { useState, useCallback, useEffect, useMemo } from 'react'
 import { useAuth } from '../contexts/AuthContext'
+import { apiFetch } from '../lib/api'
 import type { Document } from './useDocuments'
 
 export interface FolderRow {
@@ -64,12 +65,11 @@ export function useFolderTree() {
 
   const loadFolders = useCallback(async () => {
     if (!session) return
-    const res = await fetch('/api/folders', {
-      headers: { Authorization: `Bearer ${session.access_token}` },
-    })
-    if (res.ok) {
-      const data: FolderRow[] = await res.json()
+    try {
+      const data: FolderRow[] = await apiFetch('/api/folders')
       setRawFolders(data)
+    } catch {
+      // Preserve silent-on-error behavior
     }
   }, [session])
 
@@ -104,10 +104,7 @@ export function useFolderTree() {
       if (folderId === null || folderId === ROOT_PRIVATE_ID) {
         setLoadingContents(true)
         try {
-          const res = await fetch('/api/documents', {
-            headers: { Authorization: `Bearer ${session.access_token}` },
-          })
-          const docs: Document[] = res.ok ? await res.json() : []
+          const docs: Document[] = await apiFetch('/api/documents').catch(() => [])
           // Root-level documents only (no folder assigned)
           const rootDocs = docs.filter(d => !(d as unknown as { folder_id?: string }).folder_id)
           // Private root subfolders = top-level private folders
@@ -138,11 +135,8 @@ export function useFolderTree() {
       }
       setLoadingContents(true)
       try {
-        const res = await fetch(`/api/folders/${folderId}/contents`, {
-          headers: { Authorization: `Bearer ${session.access_token}` },
-        })
-        if (res.ok) {
-          const data = await res.json()
+        const data = await apiFetch(`/api/folders/${folderId}/contents`).catch(() => null)
+        if (data) {
           setFolderContents({
             folder: data.folder,
             subfolders: (data.subfolders || []).map((f: FolderRow) => ({
@@ -196,17 +190,13 @@ export function useFolderTree() {
         parentId === null || parentId === ROOT_PRIVATE_ID || parentId === ROOT_PUBLIC_ID
           ? null
           : parentId
-      const res = await fetch('/api/folders', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${session.access_token}`,
-        },
-        body: JSON.stringify({ name, parent_id: realParent }),
-      })
-      if (!res.ok) {
-        const body = await res.text()
-        throw new Error(`Create folder failed: ${body}`)
+      try {
+        await apiFetch('/api/folders', {
+          method: 'POST',
+          body: JSON.stringify({ name, parent_id: realParent }),
+        })
+      } catch (e) {
+        throw new Error(`Create folder failed: ${(e as Error).message}`)
       }
       await loadFolders()
       if (selectedFolderId !== null) await loadContents(selectedFolderId)
@@ -217,17 +207,13 @@ export function useFolderTree() {
   const renameFolder = useCallback(
     async (folderId: string, name: string) => {
       if (!session) return
-      const res = await fetch(`/api/folders/${folderId}`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${session.access_token}`,
-        },
-        body: JSON.stringify({ name }),
-      })
-      if (!res.ok) {
-        const body = await res.text()
-        throw new Error(`Rename folder failed: ${body}`)
+      try {
+        await apiFetch(`/api/folders/${folderId}`, {
+          method: 'PATCH',
+          body: JSON.stringify({ name }),
+        })
+      } catch (e) {
+        throw new Error(`Rename folder failed: ${(e as Error).message}`)
       }
       await loadFolders()
       if (selectedFolderId !== null) await loadContents(selectedFolderId)
@@ -238,13 +224,10 @@ export function useFolderTree() {
   const deleteFolder = useCallback(
     async (folderId: string) => {
       if (!session) return
-      const res = await fetch(`/api/folders/${folderId}`, {
-        method: 'DELETE',
-        headers: { Authorization: `Bearer ${session.access_token}` },
-      })
-      if (!res.ok) {
-        const body = await res.text()
-        throw new Error(`Delete folder failed: ${body}`)
+      try {
+        await apiFetch(`/api/folders/${folderId}`, { method: 'DELETE' })
+      } catch (e) {
+        throw new Error(`Delete folder failed: ${(e as Error).message}`)
       }
       if (selectedFolderId === folderId) {
         setSelectedFolderId(null)
@@ -265,17 +248,13 @@ export function useFolderTree() {
         newParentId === ROOT_PRIVATE_ID || newParentId === ROOT_PUBLIC_ID
           ? null
           : newParentId
-      const res = await fetch(`/api/folders/${folderId}/move`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${session.access_token}`,
-        },
-        body: JSON.stringify({ new_parent_id: realParent }),
-      })
-      if (!res.ok) {
-        const body = await res.text()
-        throw new Error(`Move folder failed: ${body}`)
+      try {
+        await apiFetch(`/api/folders/${folderId}/move`, {
+          method: 'PATCH',
+          body: JSON.stringify({ new_parent_id: realParent }),
+        })
+      } catch (e) {
+        throw new Error(`Move folder failed: ${(e as Error).message}`)
       }
       await loadFolders()
       if (selectedFolderId !== null) await loadContents(selectedFolderId)
@@ -288,17 +267,13 @@ export function useFolderTree() {
       if (!session) return
       const realFolder =
         folderId === ROOT_PRIVATE_ID || folderId === ROOT_PUBLIC_ID ? null : folderId
-      const res = await fetch(`/api/documents/${docId}/move`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${session.access_token}`,
-        },
-        body: JSON.stringify({ folder_id: realFolder }),
-      })
-      if (!res.ok) {
-        const body = await res.text()
-        throw new Error(`Move document failed: ${body}`)
+      try {
+        await apiFetch(`/api/documents/${docId}/move`, {
+          method: 'PATCH',
+          body: JSON.stringify({ folder_id: realFolder }),
+        })
+      } catch (e) {
+        throw new Error(`Move document failed: ${(e as Error).message}`)
       }
       if (selectedFolderId !== null) await loadContents(selectedFolderId)
     },
@@ -308,17 +283,13 @@ export function useFolderTree() {
   const renameDocument = useCallback(
     async (docId: string, filename: string) => {
       if (!session) return
-      const res = await fetch(`/api/documents/${docId}`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${session.access_token}`,
-        },
-        body: JSON.stringify({ filename }),
-      })
-      if (!res.ok) {
-        const body = await res.text()
-        throw new Error(`Rename document failed: ${body}`)
+      try {
+        await apiFetch(`/api/documents/${docId}`, {
+          method: 'PATCH',
+          body: JSON.stringify({ filename }),
+        })
+      } catch (e) {
+        throw new Error(`Rename document failed: ${(e as Error).message}`)
       }
       if (selectedFolderId !== null) await loadContents(selectedFolderId)
     },
