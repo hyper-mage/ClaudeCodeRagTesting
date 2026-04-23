@@ -56,7 +56,19 @@ The agent can intelligently search and reason across a structured board game kno
 
 ### Active
 
-(None — next milestone starts with `/gsd:new-milestone`)
+## Current Milestone: v1.1 Portfolio Deployment
+
+**Goal:** Ship Board Game KB RAG as publicly accessible portfolio piece — reachable from any machine via URL.
+
+**Target features:**
+- Backend containerized (Docker) for portable deploy
+- Backend deployed (Fly.io) with Docling native deps
+- Frontend deployed (Vercel/CF Pages) with prod API base URL
+- Supabase prod project (separate from dev) with migrations + seed applied
+- Auth redirect URLs + CORS hardened for prod origin
+- Secrets in host secret stores (no .env leaked)
+- Observability baseline — LangSmith prod project, Sentry frontend, uptime monitor
+- Demo credentials + README + deployed URL for portfolio
 
 ### Out of Scope
 
@@ -125,7 +137,7 @@ This document evolves at phase transitions and milestone boundaries.
 
 **Shipped:** v1.0 KB Navigation & Agentic RAG (2026-04-23) — 7 phases, 21 plans, 39/39 requirements satisfied, full cross-phase integration verified. See [milestones/v1.0-ROADMAP.md](milestones/v1.0-ROADMAP.md).
 
-**Next Milestone:** TBD — run `/gsd:new-milestone` to scope v1.1.
+**Active Milestone:** v1.1 Portfolio Deployment — ship app to public URL on free-tier hosts (Fly.io backend, Vercel frontend, Supabase prod project).
 
 ---
-*Last updated: 2026-04-23 after v1.0 milestone completion*
+*Last updated: 2026-04-22 — v1.1 milestone started*
