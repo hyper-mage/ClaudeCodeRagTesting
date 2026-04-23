@@ -2,7 +2,7 @@
 
 **Milestone:** v1.1 Portfolio Deployment
 **Goal:** Ship Board Game KB RAG as publicly accessible portfolio piece on free-tier hosts (Fly.io backend, Cloudflare Pages frontend, prod Supabase project).
-**Last updated:** 2026-04-22
+**Last updated:** 2026-04-23
 
 ## v1.1 Requirements
 
@@ -66,28 +66,28 @@
 
 | REQ-ID | Phase | Status |
 |--------|-------|--------|
-| DEPLOY-01 | — | Pending |
-| DEPLOY-02 | — | Pending |
-| DEPLOY-03 | — | Pending |
-| DEPLOY-04 | — | Pending |
-| DEPLOY-05 | — | Pending |
-| DEPLOY-06 | — | Pending |
-| DEPLOY-07 | — | Pending |
-| DEPLOY-08 | — | Pending |
-| SEC-01 | — | Pending |
-| SEC-02 | — | Pending |
-| SEC-03 | — | Pending |
-| SEC-04 | — | Pending |
-| SEC-05 | — | Pending |
-| SEC-06 | — | Pending |
-| SEC-07 | — | Pending |
-| OBS-01 | — | Pending |
-| OBS-02 | — | Pending |
-| OBS-03 | — | Pending |
-| OBS-04 | — | Pending |
-| PORT-01 | — | Pending |
-| PORT-02 | — | Pending |
-| PORT-03 | — | Pending |
-| PORT-04 | — | Pending |
+| DEPLOY-01 | Phase 2 | Pending |
+| DEPLOY-02 | Phase 1 | Pending |
+| DEPLOY-03 | Phase 3 | Pending |
+| DEPLOY-04 | Phase 4 | Pending |
+| DEPLOY-05 | Phase 5 | Pending |
+| DEPLOY-06 | Phase 1 | Pending |
+| DEPLOY-07 | Phase 4 | Pending |
+| DEPLOY-08 | Phase 1 | Pending |
+| SEC-01 | Phase 6 | Pending |
+| SEC-02 | Phase 1 | Pending |
+| SEC-03 | Phase 4 | Pending |
+| SEC-04 | Phase 6 | Pending |
+| SEC-05 | Phase 6 | Pending |
+| SEC-06 | Phase 6 | Pending |
+| SEC-07 | Phase 1 | Pending |
+| OBS-01 | Phase 7 | Pending |
+| OBS-02 | Phase 7 | Pending |
+| OBS-03 | Phase 7 | Pending |
+| OBS-04 | Phase 7 | Pending |
+| PORT-01 | Phase 8 | Pending |
+| PORT-02 | Phase 8 | Pending |
+| PORT-03 | Phase 8 | Pending |
+| PORT-04 | Phase 8 | Pending |
 
 *Phase column filled by roadmapper; status updated as phases complete.*
