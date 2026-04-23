@@ -16,6 +16,21 @@ class Settings(BaseSettings):
     langchain_tracing_v2: str = "true"
     langchain_project: str = "rag-masterclass"
 
+    # CORS allowlist (comma-separated origins, e.g. "https://app.pages.dev,http://localhost:5173")
+    cors_allowed_origins: str = ""
+
+    @property
+    def cors_origins_list(self) -> list[str]:
+        """Parse CORS_ALLOWED_ORIGINS env var into a list.
+
+        Comma-separated, whitespace-stripped. When unset (empty string),
+        falls back to ["http://localhost:5173"] so dev-local workflow is unchanged.
+        Per D-01, D-02.
+        """
+        if not self.cors_allowed_origins.strip():
+            return ["http://localhost:5173"]
+        return [o.strip() for o in self.cors_allowed_origins.split(",") if o.strip()]
+
     # Chat LLM (OpenRouter default, works with any OpenAI-compatible API)
     llm_base_url: str = "https://openrouter.ai/api/v1"
     llm_api_key: str = ""
