@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: milestone_complete
-stopped_at: v1.0 shipped 2026-04-23
-last_updated: "2026-04-23T03:00:21.752Z"
+status: completed
+stopped_at: Completed 01-secrets-repo-hygiene-01-PLAN.md
+last_updated: "2026-04-23T23:01:56.132Z"
 last_activity: 2026-04-23
 progress:
-  total_phases: 7
+  total_phases: 8
   completed_phases: 7
   total_plans: 21
-  completed_plans: 21
+  completed_plans: 22
   percent: 17
 ---
 
@@ -66,6 +66,7 @@ Progress: [█░░░░░░░░░] 17%
 | Phase 05-explorer-sub-agent P04 | 15min | 3 tasks | 3 files |
 | Phase 06-agent-intelligence-and-polish P01 | 10 min | 1 tasks | 4 files |
 | Phase 06-agent-intelligence-and-polish P02 | 36 min | 3 tasks | 7 files |
+| Phase 01-secrets-repo-hygiene P01 | 15 min | 3 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -109,6 +110,7 @@ Recent decisions affecting current work:
 - [Phase 06-agent-intelligence-and-polish]: stream_chat_completion yields a leading system_content event so token accounting uses the exact post-hint system prompt
 - [Phase 06-agent-intelligence-and-polish]: analyze_document reuses the same asyncio.to_thread + queue.Queue bridge as explore_kb for a single sub-agent execution pattern
 - [Phase 06-agent-intelligence-and-polish]: Scope indicator encoded as args_preview prefix (scope:<scope>) rather than a new SSE field to keep the tool_event contract backwards-compatible
+- [Phase 01-secrets-repo-hygiene]: CORS allowlist parsed from comma-separated CORS_ALLOWED_ORIGINS with localhost:5173 dev fallback
 
 ### Pending Todos
 
@@ -122,7 +124,7 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-22T04:07:53.257Z
-Stopped at: Completed 06-agent-intelligence-and-polish-02-PLAN.md
+Last session: 2026-04-23T23:01:56.009Z
+Stopped at: Completed 01-secrets-repo-hygiene-01-PLAN.md
 Resume file: None
 Next: Phase 02
