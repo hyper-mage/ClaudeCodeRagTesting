@@ -1,237 +1,429 @@
-# Pitfalls Research
+# Pitfalls Research — v1.1 Portfolio Deployment
 
-**Domain:** Board game knowledge base RAG with hierarchical KB management, Claude Code-style agent tools, and mixed-visibility content
-**Researched:** 2026-04-07
-**Confidence:** HIGH
+**Domain:** Deploying FastAPI+Docling+Supabase+Vite SPA to Fly.io + Vercel + Supabase prod
+**Researched:** 2026-04-22
+**Confidence:** HIGH (most pitfalls verified against current code in this repo; a few deployment-platform specifics are MEDIUM)
+
+Scope: mistakes made when adding deployment to *this specific* codebase. Each pitfall is tied to observed code/config in the repo where relevant, and mapped to a v1.1 deployment phase.
+
+Assumed v1.1 phase skeleton (used below for mapping — roadmap agent may rename):
+
+- **P1 Secrets & Repo Hygiene** — secret audit, `.dockerignore`, `.gitignore`, env var plan
+- **P2 Dockerize Backend** — Dockerfile with Docling native deps, local smoke test
+- **P3 Supabase Prod Project** — migrations, extensions, storage policies, seed
+- **P4 Fly.io Backend Deploy** — secrets, machines, scale, health checks
+- **P5 Vercel Frontend Deploy** — env vars, API base URL, SPA rewrites
+- **P6 CORS, Auth, Streaming Hardening** — origins, redirect URLs, SSE proxy behavior
+- **P7 Observability & Rate Limiting** — LangSmith prod project, Sentry, rate limit, uptime
+- **P8 Demo Hardening** — demo creds, README, final smoke test
 
 ## Critical Pitfalls
 
-### Pitfall 1: RLS Policy Collision Between Default KB and Private Documents
+### Pitfall 1: VITE_* env vars leak secret keys into the frontend bundle
 
 **What goes wrong:**
-The existing codebase uses `service_role_key` to bypass RLS entirely (see `database.py`), with RLS policies that filter by `user_id`. Adding a default KB (shared, no `user_id`) alongside private user documents creates a fundamental visibility conflict. The current `search_documents` function passes `user_id` as a filter -- default KB rows with a different or null `user_id` would be invisible to users. Developers typically either (a) bypass RLS for default content and accidentally expose private data, or (b) enforce strict user scoping and make the default KB invisible.
+A developer adds `VITE_SUPABASE_SERVICE_ROLE_KEY=...` or `VITE_OPENAI_API_KEY=...` to Vercel env vars thinking it's "just for the frontend." Vite inlines any `VITE_*` variable into the production bundle, so the key ships in plaintext JS served to every visitor.
 
 **Why it happens:**
-The existing RLS model is binary: "users only see their own data." Adding a third visibility tier (shared/default) requires restructuring this assumption. Supabase evaluates multiple RLS policies with OR logic, which is counterintuitive -- a "public read" policy combined with a "user's own data" policy means BOTH apply, potentially over-exposing data if not carefully scoped.
+- `backend/config.py` already mixes concerns: `vite_supabase_url` and `vite_supabase_anon_key` are declared on the backend `Settings` class. Someone copying that pattern adds `vite_supabase_service_role_key` "for parity" and wires it into the frontend build.
+- `.env` at the repo root is loaded by both frontend (`envDir: '..'`) and backend, so there's no physical separation of which keys are safe to expose.
+- Vercel's UI doesn't warn when a `VITE_*` variable name looks like a secret.
 
 **How to avoid:**
-- Add a `visibility` column (`'default'` | `'private'`) to `documents` and `document_chunks` tables
-- Use a dedicated "system" user_id (e.g., a UUID constant like `00000000-0000-0000-0000-000000000000`) for all default KB content
-- Write RLS policies as: `(user_id = auth.uid()) OR (visibility = 'default')` for SELECT
-- Write INSERT/UPDATE/DELETE policies as: `user_id = auth.uid()` only (prevent users from modifying default KB)
-- Update ALL existing RPC functions (`match_document_chunks`, `keyword_search_chunks`) to accept an optional visibility filter parameter
-- Test: verify a user can search across both default and private, but cannot delete/modify default KB entries
+- Only two `VITE_*` vars are ever allowed: `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, plus `VITE_API_BASE_URL` for the Fly backend. Document this explicitly in README and Vercel project.
+- Add a pre-build guard: a tiny script in `frontend/scripts/check-env.cjs` that fails `npm run build` if any `VITE_*` var name matches `/SERVICE_ROLE|SECRET|PRIVATE|OPENAI|OPENROUTER|LANGSMITH|TAVILY|RERANK|JWT/i`.
+- After deploy, grep the built assets for prefixes of known secret keys (`sk-`, `sb_secret_`, `eyJ...` longer than anon) before promoting.
 
 **Warning signs:**
-- Default KB content not appearing in search results
-- Users seeing other users' private documents after adding the "public read" policy
-- Search results mixing default and private content inconsistently depending on search mode (vector vs keyword)
+- `curl https://<vercel>/assets/index-*.js | grep -Ei 'service_role|sk-proj|sk-or-'` returns matches.
+- Supabase dashboard shows writes/reads bypassing RLS from frontend IPs.
+- Usage dashboards spike from anonymous traffic.
 
-**Phase to address:**
-Phase 1 (Default KB + Folder Structure) -- must be the foundation before any tools or agents are built on top.
+**Phase to address:** P1 (define allowed VITE_* vars), P5 (Vercel env setup + post-build grep), P8 (final audit)
 
 ---
 
-### Pitfall 2: Storage Path and Database Folder Hierarchy Desynchronization
+### Pitfall 2: Service role key used from the frontend (RLS bypass)
 
 **What goes wrong:**
-Supabase Storage uses flat object paths (e.g., `board-games/catan/rules.pdf`) -- there are no real "folders," just path prefixes. The project needs a parallel folder hierarchy in the database for the agent tools (`ls`, `tree`) to query. These two representations drift apart: a file is moved in storage but the DB record's `folder_path` is not updated (or vice versa), breaking tool outputs. The `ls` tool returns files that do not exist, or storage has files the tools cannot find.
+To "fix" a 401/RLS error quickly, a dev swaps the frontend's Supabase client from anon key to service role, or proxies a service-role-authenticated call through a public API endpoint with no auth. All RLS — including the public/private KB split built in Phase 1 — is bypassed. Any visitor can read or modify every user's documents.
 
 **Why it happens:**
-Supabase Storage has no concept of folder metadata, parent IDs, or hierarchy -- it is purely path-based. Developers must maintain a separate `folders` table in Postgres. Every storage operation (upload, move, rename, delete) must update BOTH storage AND the database atomically. Without a transaction boundary across storage + DB, partial failures leave the system inconsistent.
+- The backend uses the service role key by design (`supabase_service_role_key` in `Settings`), so the pattern is already in the codebase.
+- `frontend/src/lib/supabase.ts` uses the anon key today, but nothing structurally prevents someone from creating a second client with a different key.
+- The app's RLS model is "mixed-visibility" (see migration 020) — a single misuse reveals both private docs and lets anonymous users mutate the default KB.
 
 **How to avoid:**
-- Make the database the source of truth for hierarchy, not storage paths
-- Store the folder path in a `folders` table with `id`, `name`, `parent_id`, `user_id`, `visibility` columns
-- Use a materialized path column (e.g., `/board-games/catan/`) for efficient prefix queries
-- Wrap all file operations in a service function that updates DB first, then storage -- if storage fails, roll back the DB change
-- Agent tools (`ls`, `tree`, `glob`) query ONLY the database, never storage directly
-- Add a consistency check endpoint or script that reconciles storage vs DB on demand
+- Hard rule: service role key exists only in Fly secrets and in local `.env` (never in Vercel, never in frontend code).
+- Add an ESLint rule or a grep guard in CI: fail if `frontend/` contains `service_role`, `SERVICE_ROLE`, or `createClient(.*SERVICE`.
+- Every backend endpoint that uses the service-role client MUST also call `get_user_id()` dependency and filter by `user_id` in SQL — do not rely on RLS when using service role. Verify this is true for all existing routers before deploy (spot-check `threads.py`, `chat.py`, `documents.py`, `folders.py`).
+- Write one RLS smoke test against prod: sign in as `ragtest1`, try to read another user's doc by ID, expect 404/403.
 
 **Warning signs:**
-- `ls` tool returns empty for a folder that visibly has files in the frontend
-- Moving a file in the file manager UI does not update what the agent sees
-- Orphaned storage objects with no corresponding DB record accumulating over time
+- Any reference to `service_role` in a file under `frontend/`.
+- Network tab shows requests to `*.supabase.co/rest/v1/...` from the browser with an `Authorization: Bearer` token that is not a short-lived JWT (service role is a long static JWT with `role: service_role` claim — decode at jwt.io).
+- Any user can see another user's private documents in the UI.
 
-**Phase to address:**
-Phase 1 (Folder Structure) -- the data model must be right before building tools or the file manager UI.
+**Phase to address:** P1 (CI guard), P6 (auth hardening + RLS smoke test), P8 (final audit)
 
 ---
 
-### Pitfall 3: Agent Tool Overuse Blowing Context Window
+### Pitfall 3: `.env` committed or leaked into Docker image
 
 **What goes wrong:**
-With 5+ KB navigation tools available, the LLM agent calls tools excessively for simple queries. A question like "What are the rules of Catan?" triggers: `tree` (to see the structure), `ls /board-games/catan/` (to list files), `read catan-rules.md` (to get content), `grep "victory points" catan-rules.md` (for specifics) -- consuming 4 tool calls and potentially 50K+ tokens of context before even generating an answer. The current architecture stores full tool outputs in `current_messages` (see `chat.py` line 287-290), meaning each tool result stays in context for ALL subsequent LLM calls in the loop.
+Either `.env` gets committed to git (history poisoned, rotation required), or — more subtly — it gets `COPY . .`'d into the Docker image even though it's gitignored. The image is public (Fly builders, registry) and now contains prod secrets.
 
 **Why it happens:**
-LLMs with many tools tend to "explore" rather than act decisively. The existing tool-use loop (`while True` in `chat.py`) keeps looping until no more tool calls are made, with no token budget enforcement. Each tool output is appended to `current_messages` in full, with no truncation or summarization. Board game manuals can be 50+ pages, and `read` on a full document could inject 100K+ characters into context.
+- No `.dockerignore` present in the repo today. `Dockerfile` with `COPY . /app` will pull in `.env`, `backend/venv/`, `frontend/node_modules/`, `.planning/`, `.agent/`, and `.git/`.
+- `backend/config.py` does `load_dotenv(os.path.join(os.path.dirname(__file__), "..", ".env"))`, so the app functions fine when `.env` is baked into the image — masks the mistake.
+- Developers sometimes re-run `git add -A` after `.gitignore` changes and accidentally stage files that had already been tracked.
 
 **How to avoid:**
-- Implement a **token budget tracker** that counts approximate tokens across `current_messages` and refuses/truncates tool outputs when budget is exceeded
-- Use the **Memory Pointer Pattern**: store large tool outputs (especially `read` results) in a side-channel dict, and inject only a summary + reference into the LLM context. Full content is available if the agent asks for more detail
-- Cap `read` tool output to a configurable max (e.g., 8K tokens) with line-range support so the agent can request specific sections
-- Set a **max tool iterations** limit (e.g., 5 per turn) to prevent infinite exploration loops
-- Make tool descriptions explicitly guide the agent: "Use `search_documents` for most queries. Only use `ls`/`tree` when the user asks about KB structure. Use `read` only for specific files."
-- Consider observation masking: after a tool result is consumed by the next LLM call, replace it with a short summary in the message history
+- Create `.dockerignore` in P1 with at minimum: `.env`, `.env.*`, `.git`, `.gitignore`, `backend/venv/`, `backend/__pycache__/`, `**/__pycache__/`, `frontend/node_modules/`, `frontend/dist/`, `.planning/`, `.agent/`, `.claude/`, `*.md`, `tests/`, `backend/tests/`.
+- In the Dockerfile, prefer `COPY backend/requirements.txt .` then `COPY backend/ /app/` (explicit, not `COPY . .`).
+- Remove `load_dotenv(...)` call when `ENV == "production"`, or guard it so it only runs if the file exists. Fly injects env vars directly; relying on `.env` in prod is a smell.
+- Add a CI check that `git ls-files | grep -E '^\.env$'` returns nothing and that the repo's git history doesn't contain `.env` (`git log --all --full-history -- .env`).
+- After building the image locally: `docker run --rm <image> sh -c 'ls -la /app /app/.. ; env | grep -i key'` to confirm no secret material is baked in.
 
 **Warning signs:**
-- Single user messages triggering 6+ tool calls
-- LLM responses becoming incoherent or ignoring early tool results (context rot -- attention degrades in the middle of long contexts)
-- API costs spiking disproportionately to query volume
-- Chat responses taking 15+ seconds for simple questions
+- `docker image inspect` shows layer sizes much larger than expected.
+- `.env` appears in `git status` as tracked.
+- Fly deploy works even when you "forget" to set secrets — that means the image has them.
 
-**Phase to address:**
-Phase 2 (KB Navigation Tools) for basic limits; Phase 3 (Explorer Sub-Agent) for memory pointer pattern and observation masking.
+**Phase to address:** P1 (dockerignore + git history audit), P2 (Dockerfile review + image inspection)
 
 ---
 
-### Pitfall 4: Explorer Sub-Agent Context Isolation Failure
+### Pitfall 4: Docker image bloat from Docling pushes past free-tier disk limits
 
 **What goes wrong:**
-The explorer sub-agent is designed for deep multi-step KB traversal, but its results must flow back to the parent agent's context. Two failure modes: (a) the sub-agent returns too much data, overwhelming the parent context, or (b) the sub-agent's isolated context lacks enough information about the user's question, causing it to explore irrelevant paths. The existing `subagent_service.py` already has a `subagent_max_context_chars` limit (100K), but this is applied to the INPUT document, not the OUTPUT -- nothing limits how much the sub-agent returns.
+Docling (unpinned in `requirements.txt`) pulls in `easyocr`, `torch`, `transformers`, model weights, and native libs. A naive `python:3.11` base image with `pip install -r requirements.txt` produces a 6–10+ GB image. Fly.io free-tier machines have limited rootfs (default ~8 GB), push times balloon to 20+ minutes, and cold-start pulls time out. Vercel is unaffected (frontend only).
 
 **Why it happens:**
-The current sub-agent pattern (`run_document_analysis`) does a single non-streaming LLM call with the full document text. The new explorer sub-agent needs multiple tool calls (ls, tree, read, grep) in its own tool loop -- it is an agent within an agent. Without output budgets, a "compare Catan vs Ticket to Ride" query could have the explorer reading both full rulebooks and returning a 10K+ token comparison, which then gets injected into the parent's already-growing context.
+- `docling` in `requirements.txt` has no pin — `pip install docling` grabs the full easyocr+torch dependency set even if you only use PDF text extraction.
+- `python:3.11` (not `-slim`) base ships with compilers and dev headers.
+- `pip` caches wheels in `/root/.cache/pip` — not cleaned between layers.
+- Docling also downloads ML models on first use; if they're cached into the image, that adds gigabytes.
 
 **How to avoid:**
-- Set a hard `max_output_tokens` on the explorer sub-agent's final response (e.g., 2K tokens)
-- Give the explorer its own independent tool loop with its own token budget tracker
-- Pass a focused task description from the parent agent, not the full conversation history
-- Return structured results (not free-form text) -- e.g., `{"summary": "...", "key_findings": [...], "sources": [...]}` -- so the parent agent can selectively use parts
-- Stream sub-agent tool events to the frontend for transparency, but do NOT add them to the parent's LLM context
+- Use multi-stage Docker build: stage 1 `python:3.11-slim` with `build-essential` to compile wheels, stage 2 `python:3.11-slim` copying only the site-packages.
+- Clean aggressively: `pip install --no-cache-dir`, `apt-get clean && rm -rf /var/lib/apt/lists/*`.
+- Pin `docling` to a known version and audit its extras. If only PDF/DOCX are needed, check whether `docling-core` + specific backends can replace full `docling` — current code uses `DocumentConverter` so likely needs full package, but verify.
+- Pre-download Docling models during build into a known path, then set `HF_HOME`/`TORCH_HOME` to that path so prod cold starts don't hit the network. Keep models out of the image only if you can tolerate first-request latency.
+- Target <2 GB image. Check with `docker images` after build.
 
 **Warning signs:**
-- Explorer sub-agent calls exceeding 30 seconds consistently
-- Parent agent ignoring or contradicting explorer results (sign of context overload)
-- Explorer exploring folders unrelated to the query (insufficient task scoping)
+- `fly deploy` upload > 5 minutes.
+- `Docker image size: X GB` in Fly logs with X > 4.
+- Cold starts fail because image pull exceeds machine timeout.
+- `pip install` logs show `torch-2.x-cu...whl (800 MB)` being downloaded.
 
-**Phase to address:**
-Phase 3 (Explorer Sub-Agent) -- must be designed with budget constraints from the start.
+**Phase to address:** P2 (Dockerfile multi-stage, size budget)
 
 ---
 
-### Pitfall 5: Image OCR Producing Unsearchable Garbage for Board Game Content
+### Pitfall 5: Docling missing system libs in slim image (runtime failures, not build failures)
 
 **What goes wrong:**
-Board game content includes photos of game boards, cards with stylized fonts, rule cards with complex layouts (multi-column, sidebars, icons), and scoring reference sheets. Docling's OCR (EasyOCR/Tesseract) produces garbled text from these inputs -- stylized fonts are misread, icons are interpreted as random characters, multi-column layouts merge columns, and game-specific terminology gets mangled. This garbage text gets embedded and pollutes search results, causing irrelevant or confusing retrieval.
+Build succeeds, container starts, `/api/health` returns 200 — but the first PDF upload fails with `OSError: cannot load libGL.so.1` or `libmagic not found` or `tesseract: command not found`. Error only surfaces when `DocumentConverter` is actually invoked, so CI and health checks pass.
 
 **Why it happens:**
-Docling's OCR is optimized for standard document layouts (single-column, standard fonts). Board game materials are designed for visual appeal, not machine readability. Additionally, Docling does not generate image descriptions for images -- it only extracts OCR text, meaning game board photos with minimal text produce nearly empty chunks.
+- `python:3.11-slim` omits system libraries. Docling (via easyocr/OpenCV/pdfium) needs `libgl1`, `libglib2.0-0`, `libsm6`, `libxext6`, `libxrender1`. If OCR on images (Phase 2 validated feature) is used, `tesseract-ocr` and `libtesseract-dev` are needed. `libmagic1` is needed if any code path does MIME sniffing.
+- Existing `backend/services/parsing_service.py` uses a lazy `_get_converter()` singleton — the failure doesn't happen at import time, it happens on first conversion.
 
 **How to avoid:**
-- Add a **quality gate** after OCR: check character-level confidence scores, reject chunks below a threshold
-- For image-heavy content, offer a "manual description" field in the upload UI where users can add their own text description of what the image shows
-- Consider a separate vision-model pipeline for images (e.g., GPT-4o vision to describe board game images) rather than relying on OCR alone
-- Mark image-sourced chunks with `source_type: "ocr"` metadata so the agent can weight them lower in retrieval
-- Set user expectations in the UI: "Image uploads work best with clear text. Photos of game boards may have limited searchability."
+- In the Dockerfile runtime stage, install: `apt-get install -y --no-install-recommends libgl1 libglib2.0-0 libsm6 libxext6 libxrender1 libmagic1 poppler-utils tesseract-ocr tesseract-ocr-eng && rm -rf /var/lib/apt/lists/*`.
+- Add a post-deploy smoke test that uploads a real PDF, a real image (OCR path), and a real XLSX to the live backend before calling the deploy done.
+- Consider `python:3.11-bookworm` (full Debian) instead of slim — costs ~100 MB but eliminates the "which system lib is missing" game. Tradeoff: bigger image.
 
 **Warning signs:**
-- Search results returning chunks of garbled characters
-- Users uploading images and getting no useful results from them
-- Embedding similarity scores being unexpectedly low for image-derived chunks
+- `/api/health` is green but `POST /api/documents` returns 500 with `libGL.so.1` or `ImportError` in Fly logs.
+- Docling works locally (on macOS/Windows with full system) but fails in container.
+- Ingestion status in UI gets stuck at `processing` or flips to `failed` with a cryptic error.
 
-**Phase to address:**
-Phase 1 or 2 (when adding image ingestion support) -- quality gate must exist before users start uploading images.
+**Phase to address:** P2 (Dockerfile system deps), P8 (real-file smoke test before demo)
 
 ---
 
-### Pitfall 6: XLSX Parsing Losing Structural Context
+### Pitfall 6: Fly free-tier cold starts kill SSE streams and Realtime reconnects
 
 **What goes wrong:**
-Board game score sheets and trackers are heavily structured -- column headers define meaning (Player, Score, Round), and cell values are meaningless without their headers. Docling converts XLSX to markdown tables, but chunking then splits tables across chunk boundaries, producing chunks like `| 42 | 38 | 15 |` with no column headers. These chunks are useless for retrieval and confusing to the LLM.
+Fly free-tier apps can auto-stop machines when idle. First request after idle cold-starts the machine — taking 5–30+ seconds with this image size (Docling, torch). Symptoms: user clicks "Send" in chat, SSE connection times out before first token. Supabase Realtime channel for ingestion reconnects mid-upload and status never updates. Frontend shows a spinner forever.
 
 **Why it happens:**
-Standard text chunking (split by character count with overlap) does not understand table structure. A 100-row spreadsheet converted to markdown might be 5K tokens, which gets split into 5 chunks. Only the first chunk has the header row.
+- `auto_stop_machines = true` is the Fly default for cost savings.
+- Cold start has to load Docling's DocumentConverter and torch on first import if `parsing_service.py` is hit (current code is lazy, so chat-only cold start is faster — good).
+- Frontend `apiFetch` likely doesn't have retry or user-visible "server waking up" UX.
+- EventSource and `fetch`-based SSE both have ~30s idle timeouts on many proxies.
 
 **How to avoid:**
-- Implement **table-aware chunking**: detect markdown table blocks and keep each table as a single chunk (or chunk by row groups, always prepending the header row)
-- Add the filename and sheet name as metadata prefix to every chunk: `"From score_tracker.xlsx, Sheet 'Game Log': | Player | Score | Round | ..."`
-- Set a higher chunk size limit for table content specifically
-- If a table exceeds the chunk size, split by row groups but always include the header row in each chunk
+- Set `min_machines_running = 1` in `fly.toml` for the portfolio demo — trades a few dollars/month for reliability. If truly free-tier is mandatory: keep `auto_stop_machines = true` but add `auto_start_machines = true` and pre-warm on page load.
+- Add a lightweight `/api/health` ping from the frontend on app mount to trigger cold start before the user sends their first chat.
+- In the chat UI, show a "Waking up server..." state if the first SSE token takes > 3s.
+- For the Docling code path, pre-import in `main.py` at startup so the model load cost is paid once, during the health-check-passing window.
+- Tune Fly `[[services.http_checks]]` grace period to > image pull + startup time.
 
 **Warning signs:**
-- XLSX search results returning rows of numbers with no context
-- Agent responses saying "I found some data but I'm not sure what the columns represent"
-- Users uploading spreadsheets and getting no useful answers
+- First chat after idle returns a 502 or hangs.
+- `fly logs` shows "Starting instance..." right when user reports the timeout.
+- Ingestion UI stays on "Processing" after the page is refreshed.
 
-**Phase to address:**
-Phase 1 (XLSX ingestion support) -- chunking strategy must handle tables before users upload spreadsheets.
+**Phase to address:** P4 (Fly config + min_machines), P6 (frontend warmup ping)
 
 ---
 
-### Pitfall 7: File Manager UI State Desync with Backend
+### Pitfall 7: CORS misconfigured — `allow_origins=["*"]` + `allow_credentials=True` is invalid and will be silently rejected by browsers
 
 **What goes wrong:**
-The drag-drop file manager shows a folder tree that is out of sync with the actual database state. User drags a file to a new folder, the UI updates optimistically, but the backend call fails (e.g., RLS violation, network error). Now the UI shows the file in the new location while the DB still has it in the old location. The agent's `ls` and `tree` tools report the old state, contradicting what the user sees.
+Current `backend/main.py` has:
+```python
+allow_origins=["*"],
+allow_credentials=True,
+```
+Browsers reject `Access-Control-Allow-Origin: *` combined with `Access-Control-Allow-Credentials: true` — the spec disallows it. Locally this might work because no auth cookies are sent, but in prod with Supabase auth or when the frontend tries to include credentials, the browser blocks the response and the user sees network errors with no useful console message.
 
 **Why it happens:**
-Drag-drop UIs almost always use optimistic updates for responsiveness. But folder operations involve multiple backend calls (update folder_id on document, move file in storage, update chunk paths). Any partial failure leaves an inconsistent state. React state management for trees is notoriously complex -- nested state updates, maintaining expansion state, handling concurrent moves.
+- "Set it to `*` for now" is a common dev shortcut that gets left in.
+- Current auth model uses `Authorization: Bearer <jwt>` header (not cookies), so `allow_credentials` isn't actually required — but it's enabled anyway.
+- The bug is latent: chat may work while the actual CORS failure hides behind `net::ERR_FAILED`.
 
 **How to avoid:**
-- Do NOT use optimistic updates for move/rename/delete operations. Show a loading spinner instead. These operations are infrequent enough that a 200ms delay is acceptable
-- Use Supabase Realtime subscriptions on the `documents` and `folders` tables to push server state to the frontend -- the UI always reflects confirmed DB state
-- Wrap multi-step operations (move file = update DB + move storage) in a single backend endpoint that handles rollback on partial failure
-- Use a dedicated tree state library (react-complex-tree) rather than building custom nested state management
-- Disable drag-drop during pending operations to prevent race conditions
+- Set `allow_origins` to an explicit list from an env var: `["https://<project>.vercel.app", "https://<custom-domain>"]` (and localhost for dev).
+- Set `allow_credentials=False` unless cookies are actually in use (they aren't in this codebase).
+- `allow_methods` and `allow_headers` can stay broad but prefer explicit: `["GET","POST","DELETE","OPTIONS"]`, `["Authorization","Content-Type","Accept"]`.
+- Test CORS from the deployed Vercel origin before demo: open browser devtools, hit chat endpoint, confirm preflight OPTIONS returns `Access-Control-Allow-Origin: https://<vercel>` (not `*`).
 
 **Warning signs:**
-- Files appearing in two folders simultaneously
-- "File not found" errors when the agent tries to read a file that the UI shows as present
-- Frontend console errors about invalid tree state after drag operations
+- Browser console: `Access-Control-Allow-Origin` header contains `*` and credentials mode is `include` — spec violation.
+- Chat requests fail with `TypeError: Failed to fetch` from Vercel but work from `localhost`.
+- Preflight OPTIONS returns 200 but the follow-up POST is blocked.
 
-**Phase to address:**
-Phase 4 (File Manager UI) -- must be built with pessimistic updates and realtime sync from the start.
+**Phase to address:** P6 (CORS tightening — explicit allowlist, drop credentials)
 
 ---
 
-### Pitfall 8: Default KB Seed Script Fragility
+### Pitfall 8: SSE broken by proxy buffering (Fly edge, Cloudflare, Vercel rewrites)
 
 **What goes wrong:**
-The seed script that pre-loads 10 board games runs once on deploy. If it fails partway through (e.g., network timeout on game 6), the KB is partially seeded. Re-running the script either duplicates games 1-5 or fails on constraint violations. There is no way to know which games were successfully seeded without manual inspection.
+Backend streams tokens via `sse-starlette`. Everything works locally. On Fly, the edge proxy buffers the response until a size or time threshold, so the user sees nothing for 5–20 seconds, then the entire response dumps at once. Or worse, if the frontend proxies `/api/*` through Vercel rewrites to the Fly backend, Vercel's edge buffers the SSE and streaming is effectively dead.
 
 **Why it happens:**
-Seed scripts are treated as one-off throw-away code. Developers do not build idempotency, progress tracking, or partial-failure recovery into them. The existing `record_manager.py` has content-addressed deduplication, but the seed script may bypass this if it uses a different ingestion path.
+- Default HTTP proxies buffer for performance.
+- `sse-starlette` sends correct headers, but some proxies only disable buffering when they also see `X-Accel-Buffering: no` (nginx convention) or when the response has `Content-Type: text/event-stream` AND no `Content-Length`.
+- Vercel's `vercel.json` rewrites to external origins don't reliably stream — the recommended pattern is to call Fly directly from the browser, not proxy through Vercel.
 
 **How to avoid:**
-- Make the seed script idempotent: check for existing documents by content hash before inserting
-- Use the existing ingestion pipeline (not raw SQL inserts) so content hashing, chunking, embedding, and metadata extraction all run properly
-- Add a `source` metadata field (`'default_kb'`) to distinguish seeded content from user uploads
-- Track seed progress in a simple status table or file: which games have been seeded, their document IDs, completion status
-- Provide a `--force` flag to re-seed a specific game (delete + re-ingest) without affecting others
-- Test the seed script in CI by running it twice and verifying no duplicates
+- Set `VITE_API_BASE_URL=https://<fly-app>.fly.dev` in Vercel and call the backend directly from the browser (crosses origins — CORS from Pitfall 7 must be correct). Do NOT rewrite `/api/*` through Vercel for SSE endpoints.
+- In the chat route, explicitly add headers: `X-Accel-Buffering: no`, `Cache-Control: no-cache, no-transform`, `Connection: keep-alive`. `sse-starlette.EventSourceResponse` already sets most but not `X-Accel-Buffering`.
+- On Fly, confirm no additional reverse proxy with buffering sits in front. Fly-proxy should stream by default for `text/event-stream`.
+- Smoke test with `curl -N https://<fly>.fly.dev/api/chat/... ` and watch for tokens arriving one-by-one, not in a burst at the end.
 
 **Warning signs:**
-- Some default games appearing in search but not others
-- Duplicate chunks for the same game inflating search results
-- Seed script taking 30+ minutes (suggests it is re-processing already-seeded content)
+- Local dev streams character-by-character; prod streams one big chunk after a long pause.
+- `curl -N` shows identical behavior.
+- `fetch` on frontend hits `ReadableStream` reader but `read()` resolves only once, with the full message.
 
-**Phase to address:**
-Phase 1 (Default KB) -- the seed script is the first thing built and must be robust.
+**Phase to address:** P5 (direct frontend→Fly calls, no Vercel SSE rewrite), P6 (response headers + curl smoke test)
 
 ---
 
-### Pitfall 9: Agent Source Selection Confusion
+### Pitfall 9: Supabase Auth redirect URLs not updated — email verification dead in prod
 
 **What goes wrong:**
-The agent must decide whether to search the default KB, the user's private docs, or both. Without explicit scoping, the agent guesses wrong: a user asks "What are Catan's rules?" and the agent searches only the user's private docs (which do not have Catan), returning "I couldn't find anything." Or a user asks about their private game notes but gets results from the default KB instead.
+User signs up on the Vercel URL, clicks the verification email, lands on `http://localhost:5173/#access_token=...` (the dev redirect), confirmation fails, account stays unverified, user blocked. Same issue breaks password reset flows.
 
 **Why it happens:**
-The current `search_documents` tool has no source scoping parameter. The agent relies on the system prompt to decide, which is unreliable. Metadata filters exist (`document_type`, `topic`) but nothing for source/visibility. Without explicit tooling, the LLM cannot reliably distinguish between "search everything" vs "search only my docs" vs "search only the default KB."
+- Supabase sends auth emails using the redirect URL configured on the project. A fresh prod project defaults to `http://localhost:3000` or whatever was set during dev.
+- The redirect is set per-Supabase-project, so the new prod project needs its own configuration — copying the dev one doesn't happen automatically.
+- This is NOT a code change — it's a dashboard config that's easy to forget.
 
 **How to avoid:**
-- Add a `scope` parameter to the search tool: `"all"` (default), `"default_kb"`, `"private"`
-- Include the user's document list and the default KB game list in the system prompt context so the agent knows what exists where
-- Use the `tree` tool output to orient the agent: default KB lives under `/default/` and private docs under `/my-docs/`
-- Add a "scope" UI control that users can set to narrow searches, which gets passed as context to the agent
-- In the system prompt, explicitly instruct: "When the user asks about a well-known board game, search the default KB first. When they reference 'my' documents or specific uploads, search private docs."
+- During P3 (Supabase prod setup), explicitly configure:
+  - **Site URL:** `https://<project>.vercel.app`
+  - **Additional Redirect URLs:** include both `https://<project>.vercel.app` and `https://<project>.vercel.app/login` and `http://localhost:5173` for local dev against prod.
+- If using `emailRedirectTo` on the frontend signup call, make sure it points to a valid configured URL.
+- Add to demo-hardening checklist: "Create brand new account from a clean browser, verify email, log in, upload a doc" — end-to-end dry run.
 
 **Warning signs:**
-- Agent consistently returning "I don't have information about that" for games that ARE in the default KB
-- Users confused about whether the agent is searching their docs or the shared KB
-- Agent mixing default KB and private doc results without indicating which is which
+- Verification email link redirects to localhost.
+- User reports "clicked the link but still can't log in."
+- Supabase dashboard → Auth → Users shows users with `email_confirmed_at = null` despite having clicked the link.
 
-**Phase to address:**
-Phase 2 (KB Navigation Tools + Search Integration) -- must be addressed when tools are connected to the dual-source architecture.
+**Phase to address:** P3 (prod project config), P8 (E2E signup dry run)
+
+---
+
+### Pitfall 10: pgvector / ltree / pg_trgm extensions not enabled on the prod Supabase project
+
+**What goes wrong:**
+Migrations are applied in order, but one of them (`004_enable_pgvector.sql`, `016_enable_ltree.sql`) fails because the extension wasn't enabled at the project level, OR the migration silently succeeds but RPC functions that use operators fail at runtime with `operator does not exist: vector <=> vector`. The app deploys, chat works for non-RAG messages, but every `search_documents` call 500s.
+
+**Why it happens:**
+- Supabase projects have a default set of enabled extensions, but `vector`, `ltree`, and sometimes `pg_trgm` (used for fuzzy search in keyword_search) require explicit enabling via Dashboard → Database → Extensions or `create extension if not exists`.
+- `004_enable_pgvector.sql` does `create extension`, but it needs the right ROLE — running via Supabase Studio works, running via external migration tool may not.
+- Some extensions create types in specific schemas (`extensions.vector`); if RLS policies or RPCs reference an unqualified type, they fail.
+
+**How to avoid:**
+- In P3, run migrations in order 001 → 024 via `supabase db push` connected to the prod project. Do not copy SQL into Studio ad-hoc — use the migration runner.
+- After migrations, run a verification query: `SELECT extname, extversion FROM pg_extension WHERE extname IN ('vector','ltree','pg_trgm')`. All three must be present.
+- Run end-to-end search smoke test: seed one default KB document, call `POST /api/chat/...` with a query that forces `search_documents`, confirm results return (not a 500).
+- Check each RPC exists: `match_document_chunks`, `keyword_search_chunks`, `execute_readonly_query`, `kb_grep_regex`, `kb_glob`. A `SELECT proname FROM pg_proc WHERE proname LIKE 'kb_%' OR proname LIKE '%search%'` confirms them.
+
+**Warning signs:**
+- Chat works but "search your documents" queries return no results or 500.
+- `fly logs` shows `operator does not exist: public.vector <=> public.vector`.
+- Ingestion succeeds but vector column in `document_chunks` is all nulls or errors.
+
+**Phase to address:** P3 (migrations + extension verification), P8 (search smoke test)
+
+---
+
+### Pitfall 11: Migrations run in wrong order on prod (or run partially)
+
+**What goes wrong:**
+Someone runs migrations out of order — e.g., 020 (RLS update) before 019 (add visibility + folder), because they grabbed only "the RLS one" to re-apply. Now the `documents` table lacks the `visibility` column but has RLS policies that reference it. Every query throws `column "visibility" does not exist`.
+
+**Why it happens:**
+- 25 migration files, many interdependent. `migration 019_add_visibility_and_folder.sql` is a precondition for `020_update_rls_policies.sql` and `021_update_search_rpcs.sql`.
+- Dev used Supabase Studio directly for some earlier migrations; prod needs them all applied programmatically and in order.
+- A `run_all_module2.sql` exists — ambiguous whether it's idempotent or re-runnable.
+
+**How to avoid:**
+- Use `supabase db push` or `supabase migration up` against the prod project, with the migrations directory as source of truth.
+- Before deploy, run `supabase db diff` against prod to confirm no drift.
+- Verify ordering: migrations are numbered; `ls supabase/migrations/*.sql | sort` should produce the correct execution order. Check `run_all_module2.sql` and either delete it or confirm it's not re-applied on top.
+- Write a one-off verification SQL: checks all expected columns exist in `documents`, `document_chunks`, `folders`, `threads`, `messages`, `users`. Fail loudly on mismatch.
+
+**Warning signs:**
+- `relation "folders" does not exist` or `column "visibility" does not exist` in Fly logs.
+- Ingestion fails with schema errors.
+- RLS allows or blocks the wrong rows.
+
+**Phase to address:** P3 (migration runner + post-migration schema check)
+
+---
+
+### Pitfall 12: Supabase Storage bucket + policies not created in prod
+
+**What goes wrong:**
+Migrations create the `documents` bucket via SQL (`007_create_storage_bucket.sql`), but storage policies are managed separately (either in SQL via `storage.objects` policies or in the dashboard). If `storage.objects` policies aren't applied to prod, uploads either fail with "row violates row-level security" or worse, succeed but let any user download any other user's originals.
+
+**Why it happens:**
+- Storage policies live in the `storage.objects` table, which Supabase Studio shows under a separate "Storage" UI — easy to miss when copying "Database" migrations.
+- The bucket itself may or may not be public — a dev-friendly "public bucket" setting in dev might be different in prod.
+
+**How to avoid:**
+- In P3, after migrations, verify:
+  1. `SELECT id, name, public FROM storage.buckets WHERE name = 'documents'` — expect the right `public` flag.
+  2. `SELECT policyname, qual, with_check FROM pg_policies WHERE tablename = 'objects' AND schemaname = 'storage'` — expect user-scoped policies for `documents` bucket.
+- If policies live in migration SQL, great — confirm they're in the migrations dir. If they live only in Studio, export them as SQL and add to migrations (reproducibility).
+- Smoke test: sign in as user A, upload file, get storage URL. Sign in as user B, attempt to fetch user A's URL — must 403.
+
+**Warning signs:**
+- Uploads fail with `new row violates row-level security policy for table "objects"`.
+- Signed URLs return 403 even for the owning user.
+- User B can fetch user A's original PDFs.
+
+**Phase to address:** P3 (storage bucket + policy verification + cross-user test)
+
+---
+
+### Pitfall 13: No rate limiting on `/api/chat` — scraper drains the LLM budget overnight
+
+**What goes wrong:**
+A bot finds the public chat endpoint, scripts 10k requests, and by morning the OpenRouter/OpenAI account is out of credits. Or a single bad actor authenticated with the demo account (`ragtest1`) loops the tool-use agent to rack up charges.
+
+**Why it happens:**
+- No rate limiting currently in `backend/main.py` or any router.
+- Demo credentials are documented in `CLAUDE.md` and will be in README — shared wide.
+- The agentic tool loop can multiply a single request into many LLM calls (retrieval + rerank + answer + optional subagent); one bad request is expensive.
+
+**How to avoid:**
+- Add per-IP rate limit on `/api/chat` (e.g., `slowapi` or simple in-memory token bucket) — target 10 req/min per IP, 100/day per user.
+- Add per-user daily cap on total LLM spend — track tokens per user_id per day in a new `usage_daily` table, reject over threshold.
+- Cap tool-loop iterations (already constrained for explorer at `explorer_max_iterations=6`, but verify main chat loop has similar). Check `routers/chat.py` while-loop has a max-iterations break.
+- Put LLM API key in Fly secrets with a dollar-limit set at the provider (OpenRouter has org-level limits; OpenAI has usage caps). Belt + suspenders.
+- Use an OpenRouter key that's distinct from personal/dev, with a low monthly cap for this demo.
+
+**Warning signs:**
+- LangSmith traces spike overnight.
+- OpenRouter dashboard shows unusual model calls from a single IP.
+- Fly logs show sustained POST /api/chat traffic without corresponding user activity.
+
+**Phase to address:** P7 (rate limit + provider-level cap + usage tracking)
+
+---
+
+### Pitfall 14: LangSmith free tier flooded with noisy traces
+
+**What goes wrong:**
+Every chat request + every tool call + every sub-agent invocation creates LangSmith traces. Free tier (5k traces/month as of 2026 — confirm current limits) hits the cap within days of demo traffic, traces stop recording, observability goes dark right when you need it for debugging prod.
+
+**Why it happens:**
+- `setup_tracing()` in `main.py` is unconditional — traces every request, including health checks if they're wrapped.
+- `langchain_project: "rag-masterclass"` reuses the dev project — dev noise commingles with prod.
+- The tool-use loop produces many child runs per request, each a trace.
+
+**How to avoid:**
+- Create a distinct LangSmith project: `langchain_project = "rag-masterclass-prod"`. Set via Fly secret.
+- Sample traces: only enable `LANGCHAIN_TRACING_V2=true` for a percentage of requests, or disable for health check paths. `langsmith` SDK supports `@traceable(run_type=..., sample_rate=...)`.
+- Add a kill switch: env var `LANGSMITH_ENABLED=false` that short-circuits `setup_tracing()`. Flip it off in a pinch without redeploying.
+- Use LangSmith dashboard to set up alerts at 75% of quota.
+
+**Warning signs:**
+- LangSmith dashboard shows "quota exceeded" banner.
+- New traces stop appearing mid-session.
+- Dev and prod traces intermixed in the same project.
+
+**Phase to address:** P7 (LangSmith prod project + sampling/kill switch)
+
+---
+
+### Pitfall 15: Timezone assumptions break when Fly host runs UTC
+
+**What goes wrong:**
+Dev machine is local TZ (e.g., America/Los_Angeles). Fly containers default to UTC. Code that uses `datetime.now()` without tz, or formats timestamps without timezone, silently shows times 7–8 hours off in the UI, or sorts messages wrong, or expires tokens at the wrong moment.
+
+**Why it happens:**
+- `datetime.now()` without `tz=timezone.utc` returns naive local time.
+- Supabase stores `timestamptz` correctly, but Python code comparing retrieved rows to `datetime.now()` (naive) will error or give wrong results.
+- JWT expiry comparisons assume UTC; a naive datetime comparison can skew by hours.
+
+**How to avoid:**
+- Audit backend for `datetime.now()` without `tz=` — grep for `datetime.now()` and `datetime.utcnow()` (deprecated in 3.12+). Replace with `datetime.now(timezone.utc)`.
+- Set `TZ=UTC` explicitly in Dockerfile (`ENV TZ=UTC`) so behavior is predictable even if a base image changes.
+- Frontend converts to user's local TZ for display only — backend stays in UTC.
+- Test: create a thread at 11pm Pacific, confirm the `created_at` is stored in UTC and renders correctly as "11pm PT" in the UI, not "6am next day."
+
+**Warning signs:**
+- Thread timestamps in the UI are 7–12 hours off.
+- JWT verification fails unpredictably ("token expired" when it shouldn't be).
+- Sorts by `created_at` flip order compared to local dev.
+
+**Phase to address:** P2 (Dockerfile TZ=UTC), P4 (post-deploy timestamp smoke test)
+
+---
+
+### Pitfall 16: SSE + CORS preflight edge cases (Accept: text/event-stream + credentials)
+
+**What goes wrong:**
+Frontend uses `fetch` (not `EventSource`) for SSE because the auth flow needs `Authorization` header (EventSource doesn't support custom headers). `fetch` with non-simple headers triggers a preflight OPTIONS. If the preflight's `Access-Control-Allow-Headers` doesn't include `Authorization` and `Content-Type`, the actual POST never happens. Chat silently fails on the Vercel origin.
+
+**Why it happens:**
+- EventSource limitation → fetch+ReadableStream pattern is standard for authed SSE.
+- `Authorization`, `Content-Type: application/json`, and sometimes `Accept: text/event-stream` all make the request "non-simple" → preflight required.
+- Current CORS config uses `allow_headers=["*"]` which *should* work, but some combinations of `allow_credentials=True` + wildcard headers are also spec-invalid.
+
+**How to avoid:**
+- Confirm `allow_credentials=False` (from Pitfall 7) — then `allow_headers=["*"]` is valid.
+- If `allow_credentials` must be True (future cookie auth), switch to explicit `allow_headers=["Authorization","Content-Type","Accept"]`.
+- Test preflight explicitly: `curl -X OPTIONS https://<fly>/api/chat/... -H "Origin: https://<vercel>" -H "Access-Control-Request-Method: POST" -H "Access-Control-Request-Headers: authorization,content-type" -i`. Expect 200 + appropriate `Access-Control-Allow-*` headers.
+
+**Warning signs:**
+- Chat button click shows OPTIONS 200 then nothing in Network tab.
+- Browser console: `Request header field authorization is not allowed by Access-Control-Allow-Headers in preflight response`.
+
+**Phase to address:** P6 (CORS hardening + preflight curl test)
 
 ---
 
@@ -239,105 +431,130 @@ Phase 2 (KB Navigation Tools + Search Integration) -- must be addressed when too
 
 | Shortcut | Immediate Benefit | Long-term Cost | When Acceptable |
 |----------|-------------------|----------------|-----------------|
-| Using service_role_key for all backend DB calls (bypassing RLS) | Simple -- no need to pass user JWTs to backend | RLS policies are never exercised by backend, bugs in policies go undetected until frontend tries direct DB access | During initial development only; migrate to per-user JWT-scoped clients for tool operations before launch |
-| Storing folder hierarchy only in storage paths (no DB table) | One less table to manage | Tools cannot efficiently query folder structure; `ls` requires listing storage objects with prefix filtering which is slow | Never -- DB folder table is required for agent tools |
-| Embedding full tool outputs in chat messages without truncation | Simple implementation, agent sees everything | Context window exhaustion on complex queries, increasing API costs per message | Acceptable for MVP with simple queries; must add truncation before explorer sub-agent is built |
-| Hardcoding 10 default games in seed script | Quick to ship | Adding/updating default games requires code changes and redeployment | Acceptable for initial release; add a config-driven approach if the game list needs to change frequently |
-| Using `subagent_max_context_chars` as the only budget control | One setting to configure | Does not account for tool result sizes, multiple tool calls, or the difference between input and output budgets | Never sufficient once the explorer sub-agent has its own tool loop |
+| Using a single `.env` at repo root for both frontend + backend | Works across workspaces | Can't tell which vars are safe to expose; `VITE_*` leakage risk | Dev only — prod must split (Fly secrets vs Vercel env) |
+| `allow_origins=["*"]` in dev | No CORS friction locally | Invalid + broken with credentials in prod | Dev only — must be explicit allowlist in prod |
+| `min_machines_running = 0` (Fly free tier) | $0/month | Cold starts break first-use demos | Demo never | Acceptable for cost-sensitive side projects, with UX for "server waking" |
+| Running migrations via Supabase Studio paste-and-run | Visual, forgiving | Order drift, untracked changes between dev and prod | Never for prod — always `supabase db push` |
+| Keeping `docling` unpinned | Gets latest features | Reproducibility broken; image size changes silently | Never in prod — pin before P2 |
+| Using demo `ragtest1@gmail.com` creds as public login | Easy portfolio demo | Shared account = rate limit / abuse vector | Acceptable if combined with per-IP rate limiting |
+| No rate limiting | Ship faster | LLM budget drain by a single scraper | Never for public-exposed LLM endpoints |
 
 ## Integration Gotchas
 
 | Integration | Common Mistake | Correct Approach |
 |-------------|----------------|------------------|
-| Supabase Storage + DB | Moving a file in storage without updating the DB `folder_path` | Always update DB first, then storage. Single backend endpoint handles both atomically |
-| Supabase Realtime + File Manager | Subscribing to entire `documents` table changes | Subscribe only to the user's documents with RLS-filtered channel. Otherwise Realtime broadcasts all changes to all clients |
-| Docling XLSX conversion | Assuming XLSX produces clean markdown automatically | Pre-process: strip empty rows/columns, detect header rows, tag sheets. Post-process: validate markdown table structure before chunking |
-| OpenRouter + tool calling | Assuming all OpenRouter models support tool_calls equally | Some models return malformed tool call JSON or ignore tools entirely. Pin to a model known to support structured tool output (e.g., GPT-4o, Claude 3.5+) and test tool calling specifically |
-| Supabase RPC functions | Adding a `visibility` parameter to RPC but forgetting to update the function's SECURITY DEFINER context | RPC functions with SECURITY DEFINER run as the function creator, bypassing RLS. If the function accepts user input for filtering, it MUST validate inputs to prevent injection |
+| Fly.io ↔ FastAPI | Using `127.0.0.1` as host — Fly health checks fail | Bind to `0.0.0.0` in uvicorn command; Fly injects `PORT` env var — respect it |
+| Fly.io ↔ SSE | Relying on default idle timeouts | Configure `[[services]] grace_period`, `soft_limit`, send keep-alive SSE comments every 15s |
+| Vercel ↔ SPA routing | 404 on deep-linked routes (e.g., `/documents`) | Add `vercel.json` rewrite: `{ "source": "/(.*)", "destination": "/index.html" }` |
+| Vercel ↔ Fly (API) | Proxying SSE through Vercel rewrites | Call Fly directly via `VITE_API_BASE_URL`; don't rewrite `/api/*` |
+| Supabase prod ↔ Migrations | Hand-editing Studio and calling it done | `supabase db push` from CLI; commit migrations; verify with `supabase db diff` |
+| Supabase Auth ↔ Frontend | `Site URL` left at localhost | Update Site URL + Redirect URLs after Vercel domain is known |
+| OpenRouter ↔ Embeddings | Using the same base URL for chat and embeddings | Keep embeddings pointed at OpenAI (`embedding_base_url`) — OpenRouter doesn't guarantee embedding endpoints |
+| Supabase Storage ↔ RLS | Creating bucket in dashboard, skipping policies | Create bucket + policies in migration SQL; verify `storage.objects` policies exist |
+| Supabase Realtime ↔ Fly cold start | Ingestion status channel dies during cold start | Client-side reconnect with backoff; or use polling fallback after N failed realtime reconnects |
+| LangSmith ↔ SDK | Tracing enabled by default → quota exhaustion | Separate prod project, sample rate, kill switch env var |
+| Docling ↔ Alpine/slim images | Missing libGL, libmagic, tesseract at runtime | Use Debian slim + install native deps; smoke test with real files |
 
 ## Performance Traps
 
 | Trap | Symptoms | Prevention | When It Breaks |
 |------|----------|------------|----------------|
-| Unindexed `folder_path` queries | `ls` and `tree` tool calls taking 500ms+ | Add a GIN index on the materialized path column and a B-tree index on `parent_id` | 1000+ documents across 50+ folders |
-| Full document reassembly for `read` tool | `get_full_document_text` loads ALL chunks for a document into memory | Add pagination to chunk retrieval; support line-range reads that map to chunk ranges | Documents with 200+ chunks (50+ page manuals) |
-| RLS policy joins on every query | Adding folder-based RLS that JOINs `folders` table on every `document_chunks` query | Cache the user's accessible folder IDs in a session-scoped temporary table, or use a denormalized `visibility` column directly on `document_chunks` | 10K+ chunks across 100+ documents |
-| Embedding generation during seed | Seeding 10 games synchronously blocks deployment for 10+ minutes | Run seed as a background job; or pre-compute embeddings and store them in the seed data | Always -- 10 full game manuals = thousands of chunks to embed |
-| Frontend tree rendering with large hierarchies | File manager becomes sluggish with 100+ visible nodes | Use virtualized tree rendering (react-complex-tree supports this). Lazy-load folder contents on expand | 200+ files/folders visible simultaneously |
+| Fly auto-stop cold start on every demo visit | 5–30s first-load latency | `min_machines_running = 1` for demo, warmup ping on frontend mount | Any traffic pattern with gaps > idle timeout |
+| Docling model load on first request | First ingestion takes 30s+ | Pre-warm by importing in `main.py` startup | Any cold start touching parsing_service |
+| LLM tool loop without cap | Runaway agent iterations cost $ and time | Enforce max_iterations in main chat loop (explorer already has this) | A single malicious or broken query |
+| Embedding every chunk on re-upload | Slow re-uploads, duplicate embedding cost | `record_manager.py` diffs chunks by hash — ensure it's active in prod path | Once library has >100 docs being re-uploaded |
+| SSE without keep-alive comments | Proxies close idle connections mid-stream | Send `: keepalive\n\n` every 15s during long LLM calls | LLM takes >30s to produce first token |
+| No pagination on `/api/documents` | Page load grinds when user has 500+ docs | Already in DB but verify API has limit+offset | ~200+ docs |
+| Supabase Realtime subscribing to all rows | Traffic scales with total users, not just user's docs | Filter subscription to `user_id=eq.<current>` | 10+ concurrent users |
 
 ## Security Mistakes
 
 | Mistake | Risk | Prevention |
 |---------|------|------------|
-| Default KB modification via API | Users could potentially update/delete default KB content if RLS policies have INSERT/UPDATE/DELETE for the "public read" visibility tier | Ensure write policies ONLY match `user_id = auth.uid()` and the system user_id is never a valid auth user |
-| Folder traversal in agent tools | Agent `read` tool could be manipulated via prompt injection to read files outside the user's scope | All tool implementations must filter by `user_id` (and `visibility = 'default'`). Never construct file paths from user/LLM input without validation |
-| SQL injection via text-to-SQL + new tables | Adding `folders` and new columns to the queryable schema exposes them to the existing `query_database` tool. Malicious SQL could probe folder structures | Ensure the SQL tool's RLS policies cover all new tables. Audit `get_queryable_schema()` to only expose safe columns |
-| Storage bucket permissions for default KB | Default KB files in a public bucket could be downloaded directly without authentication | Use a separate private bucket for default KB content. Serve files through authenticated API endpoints only |
+| Service role key in frontend bundle | Full DB access for any visitor | CI grep guard in `frontend/`; Pitfall 2 |
+| `.env` in Docker image | Secrets in public registry | `.dockerignore`; Pitfall 3 |
+| `allow_origins=["*"]` in prod | Any site can make authed requests | Explicit allowlist; Pitfall 7 |
+| No rate limit on LLM endpoint | Budget drain + DoS | Per-IP rate limit + per-user daily cap; Pitfall 13 |
+| Demo credentials with no per-account cap | Abuse via shared demo login | Daily token cap per user_id; provider-level cap |
+| JWT verification skipped on any endpoint | RLS assumes user context | Audit all routers require `Depends(get_user_id)` — spot check for any endpoint without it |
+| Unsigned Supabase Storage URLs for private docs | Anyone with URL can download | Use signed URLs with short expiry for private docs; never return raw public URLs |
+| Logging user queries with PII to LangSmith | Data exposure if LangSmith leaks | Review what's traced; consider redaction for prompt content |
+| `execute_readonly_query` RPC exposing schema | Attacker enumerates tables via text-to-SQL tool | Verify RPC blocks dangerous keywords (migration 015 claims this — audit) |
 
 ## UX Pitfalls
 
 | Pitfall | User Impact | Better Approach |
 |---------|-------------|-----------------|
-| No visual distinction between default KB and private docs | Users confused about what they uploaded vs what came pre-loaded | Use different icons/colors for default vs private content. Label default KB games clearly as "Included" |
-| Tool call transparency showing raw tool names | Users see "Calling ls..." or "Calling grep..." which means nothing to non-developers | Translate tool calls to human language: "Browsing the knowledge base...", "Searching for relevant rules...", "Reading the Catan rulebook..." |
-| Explorer sub-agent with no progress indication | Sub-agent takes 10-20 seconds with no feedback, users think it is frozen | Stream sub-agent tool events to the UI in real-time, similar to the existing `tool_event` SSE pattern. Show a step-by-step progress list |
-| Scope controls hidden or absent | Users cannot tell what the agent is searching, leading to frustration when results come from unexpected sources | Add a visible "Search scope" indicator/toggle in the chat input area: "Searching: All / Default KB / My Documents" |
-| Drag-drop with no undo | User accidentally drags a file to the wrong folder, no way to reverse it | Add an undo toast notification after move operations (store the previous location and offer a 5-second undo window) |
+| Cold-start hang with no feedback | User thinks app is broken, bounces | "Server waking up (~15s)..." state after 3s of no response |
+| Silent CORS failure | Chat button does nothing, no error message | Catch `TypeError: Failed to fetch`, show explicit "Connection issue" banner |
+| Email verification link broken | User can't complete signup | Dry-run signup flow before demo; keep "Resend verification" accessible |
+| Realtime disconnect during upload | Status frozen at "Processing" forever | Polling fallback: after 3 missed realtime events, poll `/api/documents/:id` every 5s |
+| Vercel SPA deep link 404 | Shared link to `/documents` returns Vercel 404 | `vercel.json` SPA rewrite |
+| Demo credentials already "in use" elsewhere | Two visitors interfere with each other's data | Seed defaults + instruct visitors to sign up with their own email (rate-limited) OR wipe demo account on a cron |
 
 ## "Looks Done But Isn't" Checklist
 
-- [ ] **Folder hierarchy:** Often missing recursive delete -- deleting a folder must delete all children (sub-folders, documents, chunks, storage objects)
-- [ ] **Default KB seed:** Often missing embedding generation -- seed script inserts documents but skips the chunking/embedding pipeline, making them unsearchable
-- [ ] **RLS on new tables:** Often missing policies on the new `folders` table -- it gets created but only `documents` and `document_chunks` have RLS
-- [ ] **Agent tool definitions:** Often missing error handling in tool JSON schemas -- the agent sends malformed arguments and the tool crashes instead of returning an error message
-- [ ] **Search with scope:** Often missing the update to BOTH vector search AND keyword search RPCs -- hybrid search breaks because only one RPC was updated with visibility filtering
-- [ ] **Tree tool:** Often missing depth limiting -- `tree` on the root folder of a 500-document KB returns a massive string that blows context
-- [ ] **File manager:** Often missing loading states for folder expansion -- folder contents load asynchronously but the UI shows empty folders briefly, confusing users
-- [ ] **Explorer sub-agent:** Often missing timeout -- sub-agent enters an infinite tool loop with no maximum iteration or time limit
+- [ ] **Dockerfile:** Builds locally — but also verify `docker run` starts the server, `/api/health` is 200, AND a real PDF uploads + gets parsed inside the container. Docling system-lib failures don't show up in health checks.
+- [ ] **CORS:** Local dev works — but test from the deployed Vercel origin, not localhost, and run a preflight OPTIONS curl.
+- [ ] **Secrets:** Fly secrets set — but also grep the image (`docker history`, `docker run ... env`) and the frontend bundle for secret-shaped strings.
+- [ ] **Migrations:** Applied — but verify each extension (`vector`, `ltree`, `pg_trgm`) exists AND run a search query end-to-end.
+- [ ] **Storage:** Bucket created — but verify policies in `pg_policies WHERE schemaname='storage'` AND cross-user access test.
+- [ ] **Auth:** Login works — but complete a fresh signup + email verification flow on the prod URL, not just "sign in with existing account."
+- [ ] **SSE:** Streams in dev — but `curl -N` against prod URL and confirm tokens arrive incrementally, not as one burst.
+- [ ] **Rate limit:** Added — but script 100 requests in a loop against `/api/chat` and confirm you get 429s.
+- [ ] **Realtime:** Subscribes — but simulate a cold-start disconnect (kill and restart Fly machine mid-upload) and verify UI recovers.
+- [ ] **Observability:** LangSmith traces appearing — but confirm the `langchain_project` is the prod project, not dev, AND that noise traces (health checks) are excluded.
+- [ ] **Demo walk-through:** You've used it — but have a non-developer friend do the signup + chat + upload flow from a phone with no coaching.
 
 ## Recovery Strategies
 
 | Pitfall | Recovery Cost | Recovery Steps |
 |---------|---------------|----------------|
-| RLS policy collision (data leak) | HIGH | Audit all exposed data, fix policies, notify affected users, re-test with integration tests covering all visibility scenarios |
-| Storage/DB desync | MEDIUM | Run reconciliation script: list all storage objects, compare with DB records, flag orphans and missing entries for manual review |
-| Context window blowout | LOW | Add token budget middleware, truncate existing tool results in message history, tune `max_tool_iterations` config |
-| Explorer infinite loop | LOW | Add `max_iterations` and `timeout_seconds` config. Kill stuck requests. No data loss -- just wasted tokens |
-| Garbled OCR chunks in search index | MEDIUM | Identify OCR-sourced chunks by metadata, delete low-quality ones, re-process with improved pipeline or manual descriptions |
-| Partial seed failure | LOW | Re-run idempotent seed script. If not idempotent, manually identify missing games and seed individually |
-| File manager state desync | LOW | Force refresh from server state. Add "Refresh" button to file manager. Implement Realtime subscription for auto-sync |
+| Secret committed to git | HIGH | Rotate the secret at the provider immediately; `git filter-repo` or BFG to purge from history; force-push; notify any collaborators. Cost scales with how public the repo is. |
+| Service role key in frontend bundle | HIGH | Rotate service role key in Supabase (Project Settings → API → Reset); redeploy backend + frontend; audit logs for suspicious writes during exposure window |
+| Docker image bloat | LOW | Refactor Dockerfile to multi-stage; tighter `.dockerignore`; redeploy |
+| Docling runtime missing libs | LOW | Add `apt-get install` line; redeploy; no data loss |
+| CORS misconfig | LOW | Update `CORS_ORIGINS` env var; redeploy backend; no data impact |
+| SSE buffering | MEDIUM | Diagnose proxy layer; add `X-Accel-Buffering: no`; switch Vercel rewrite → direct origin; may require small frontend change |
+| Auth redirect URLs wrong | LOW | Update in Supabase dashboard; no redeploy needed; existing un-verified users may need manual re-verification email |
+| Migrations out of order | MEDIUM-HIGH | If data already written: may need a new migration to fix drift. If empty: drop prod DB and re-run from scratch — only possible before users exist |
+| LLM budget drained | MEDIUM | Add rate limiting retroactively; rotate API key if compromised; top up provider; communicate outage |
+| Cold start breaking demo | LOW | Bump `min_machines_running` to 1; add frontend warmup ping |
+| LangSmith quota exhausted | LOW | Flip kill-switch env var; reduce sampling; wait for monthly reset or upgrade |
+| Timezone bugs in stored data | HIGH | If `timestamptz` used in Supabase, data is correct — only display logic needs fixing. If naive datetimes stored, may need backfill migration |
 
 ## Pitfall-to-Phase Mapping
 
 | Pitfall | Prevention Phase | Verification |
 |---------|------------------|--------------|
-| RLS policy collision | Phase 1 (Default KB + Data Model) | Integration test: user A sees default + own docs, not user B's docs |
-| Storage/DB desync | Phase 1 (Folder Structure) | Move a file via API, verify both storage path and DB record updated. Kill backend mid-operation, verify rollback |
-| Agent tool overuse | Phase 2 (KB Navigation Tools) | Send 10 diverse queries, verify average tool calls per query is under 4 |
-| Explorer context isolation | Phase 3 (Explorer Sub-Agent) | Run a "compare two games" query, verify parent context stays under budget |
-| OCR quality | Phase 1 or 2 (Image Ingestion) | Upload 5 board game photos, verify extracted text is meaningful or quality gate rejects them |
-| XLSX structural context | Phase 1 (XLSX Support) | Upload a score sheet, search for a player name, verify the result includes column headers |
-| File manager desync | Phase 4 (File Manager UI) | Simulate a failed move operation, verify UI reverts to server state |
-| Seed script fragility | Phase 1 (Default KB) | Run seed script twice, verify no duplicates. Kill script mid-run, re-run, verify completion |
-| Agent source selection | Phase 2 (Tool Integration) | Ask about a default KB game without uploading it, verify the agent finds it |
+| 1. VITE_* secret leakage | P1 (define allowlist), P5 (Vercel env), P8 | Grep built bundle for secret prefixes |
+| 2. Service role in frontend | P1 (CI guard), P6, P8 | CI fails on `service_role` in `frontend/`; RLS smoke test |
+| 3. `.env` leaks into image/git | P1 | `.dockerignore` exists; `git log -- .env` empty; `docker run` env inspection |
+| 4. Docker image bloat | P2 | `docker images` < 2 GB; build time < 5 min |
+| 5. Docling missing system libs | P2, P8 | Real PDF + image + XLSX upload succeeds in container |
+| 6. Fly cold start kills SSE | P4, P6 | First request after 10 min idle completes within 20s OR warmup path confirmed |
+| 7. CORS wildcard + credentials | P6 | Explicit origin in preflight response; `curl -i OPTIONS` check |
+| 8. SSE proxy buffering | P5, P6 | `curl -N` shows incremental tokens in prod |
+| 9. Auth redirect URLs stale | P3, P8 | Fresh signup + email verification E2E passes |
+| 10. pgvector/ltree extensions | P3, P8 | `pg_extension` query confirms all 3; search E2E returns results |
+| 11. Migrations out of order | P3 | `supabase db diff` clean; schema verification query passes |
+| 12. Storage policies missing | P3 | `pg_policies` query confirms; cross-user access test 403s |
+| 13. No rate limit / LLM drain | P7 | 100-req loop returns 429s; provider-level cap set |
+| 14. LangSmith noise flood | P7 | Prod project distinct; sampling configured; kill switch tested |
+| 15. Timezone bugs | P2 (TZ=UTC), P4 | UI timestamps match expected local TZ rendering |
+| 16. SSE + CORS preflight | P6 | Authenticated SSE request from Vercel origin completes end-to-end |
 
 ## Sources
 
-- [Supabase RLS Documentation](https://supabase.com/docs/guides/database/postgres/row-level-security)
-- [Supabase Storage Hierarchical RLS Challenges](https://supabase.com/docs/guides/troubleshooting/supabase-storage-inefficient-folder-operations-and-hierarchical-rls-challenges-b05a4d)
-- [Supabase Storage Access Control](https://supabase.com/docs/guides/storage/security/access-control)
-- [Context Window Overflow in AI Agents (arxiv)](https://arxiv.org/html/2511.22729v1)
-- [Effective Context Engineering for AI Agents - Anthropic](https://www.anthropic.com/engineering/effective-context-engineering-for-ai-agents)
-- [JetBrains Research: Context Management for LLM Agents](https://blog.jetbrains.com/research/2025/12/efficient-context-management/)
-- [Redis: Context Window Overflow](https://redis.io/blog/context-window-overflow/)
-- [RAG Best Practices: Lessons from 100+ Teams](https://www.kapa.ai/blog/rag-best-practices)
-- [Docling GitHub Issues: Image OCR Limitations](https://github.com/docling-project/docling/issues/2446)
-- [Sub-Agent Spawning Patterns](https://www.agentic-patterns.com/patterns/sub-agent-spawning/)
-- [React Complex Tree Library](https://github.com/lukasbach/react-complex-tree)
-- [Supabase RLS Best Practices for Multi-Tenant Apps](https://makerkit.dev/blog/tutorials/supabase-rls-best-practices)
-- [Supabase API Keys Documentation](https://supabase.com/docs/guides/api/api-keys)
-- Codebase analysis: `backend/database.py`, `backend/routers/chat.py`, `backend/services/subagent_service.py`, `backend/services/retrieval_service.py`, `backend/config.py`
+- Current repo code: `backend/main.py` (CORS config with `allow_origins=["*"]` + `allow_credentials=True` — confirmed invalid per MDN CORS spec), `backend/config.py` (single `.env` pattern), `backend/requirements.txt` (`docling` unpinned).
+- Migration file listing confirms extension + RLS ordering dependencies.
+- MDN / Fetch spec on CORS credentials + wildcard origin incompatibility (HIGH confidence — long-standing browser spec).
+- Fly.io docs on auto-stop machines and SSE / streaming proxy behavior (MEDIUM — platform-specific, verify current free-tier limits at deploy time).
+- Vercel docs on SPA rewrites and streaming through rewrites (MEDIUM — Vercel's edge streaming support has evolved; confirm current behavior for Node/SSE from external origins before finalizing P5).
+- Supabase docs on Auth redirect URL configuration and Storage RLS policies (HIGH — well-documented).
+- Docling GitHub issues on system library requirements for PDF/OCR paths (MEDIUM — verify current docling version's dep list at pin time).
+- LangSmith pricing page for current free-tier trace quota (LOW — confirm current limits at deploy time; quota numbers change).
 
 ---
-*Pitfalls research for: Board Game KB RAG with hierarchical management, agent tools, and mixed visibility*
-*Researched: 2026-04-07*
+*Pitfalls research for: v1.1 Portfolio Deployment*
+*Researched: 2026-04-22*

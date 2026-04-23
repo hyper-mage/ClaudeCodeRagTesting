@@ -1,468 +1,374 @@
-# Architecture Research
+# Architecture Research — v1.1 Portfolio Deployment
 
-**Domain:** Board Game Knowledge Base with Claude Code-style Agent Tooling
-**Researched:** 2026-04-07
-**Confidence:** HIGH
+**Domain:** Public deployment of existing FastAPI + Vite + Supabase RAG app
+**Researched:** 2026-04-22
+**Confidence:** HIGH (integration shape), MEDIUM (exact Docling system package list, Fly.io body-size behavior — verify at build time)
 
-## System Overview
+---
 
-```
-+================================================================+
-|                        FRONTEND (React)                         |
-|  +------------+  +-------------+  +------------+  +----------+ |
-|  | ChatUI     |  | ToolEvents  |  | FileManager|  | Explorer | |
-|  | (existing) |  | (existing)  |  | (new)      |  | Panel    | |
-|  +-----+------+  +------+------+  +-----+------+  +----+-----+ |
-|        |                |               |              |        |
-+========|================|===============|==============|========+
-         |   SSE stream   |   REST        |   REST       |
-+========|================|===============|==============|========+
-|                      BACKEND (FastAPI)                          |
-|                                                                 |
-|  +-----------------------------------------------------------+ |
-|  |              TOOL ROUTER (chat.py - extended)              | |
-|  |  Dispatches: search_documents, query_database, web_search, | |
-|  |  analyze_document, kb_ls, kb_tree, kb_grep, kb_glob,      | |
-|  |  kb_read, explore_kb                                       | |
-|  +-----+----+----+----+----+----+----+----+----+----+--------+ |
-|        |    |    |    |    |    |    |    |    |    |           |
-|  +-----+--+ | +-+--+ | +-+--+ | +-+--+ | +-+----+ +-+------+ |
-|  |retrieve | | |sql | | |web | | |sub | | |kb_svc| |explorer| |
-|  |_service | | |_svc| | |_svc| | |agt | | |(new) | |_agent  | |
-|  |(exist.) | | |(ex)| | |(ex)| | |(ex)| | |      | |(new)   | |
-|  +----+----+ | +---+  | +---+  | +---+  | +--+---+ +---+----+ |
-|       |      |   |     |  |     |  |     |    |         |      |
-|  +----+------+---+-----+--+-----+--+-----+----+---------+----+ |
-|  |              SOURCE ROUTER (new)                           | |
-|  |  Decides: default_kb | private_docs | both | web           | |
-|  +----+---------------------------------------------------+---+ |
-|       |                                                   |     |
-+===================================================================+
-         |                                                   |
-+========|===================================================|====+
-|                       SUPABASE                                   |
-|  +-------------+  +----------------+  +-------------------+      |
-|  | documents   |  | document_chunks|  | folders (new)     |      |
-|  | + folder_id |  | + source_type  |  | id, parent_id,    |      |
-|  | + source    |  | + folder_path  |  | name, path,       |      |
-|  |   _type     |  |                |  | user_id, source   |      |
-|  +-------------+  +----------------+  +-------------------+      |
-|                                                                  |
-|  +-------------------+  +-------------------+                    |
-|  | Storage Bucket    |  | default_kb_config |                    |
-|  | documents/        |  | (seed metadata)   |                    |
-|  | + user/{id}/...   |  |                   |                    |
-|  | + default_kb/...  |  |                   |                    |
-|  +-------------------+  +-------------------+                    |
-+==================================================================+
-```
+## Standard Architecture (Target State)
 
-## Component Responsibilities
-
-| Component | Responsibility | Existing/New |
-|-----------|----------------|--------------|
-| **Tool Router** (chat.py) | Dispatches tool calls from LLM to service functions. Currently handles 4 tools, will grow to ~10. | Extend |
-| **KB Navigation Service** | Implements ls, tree, grep, glob, read against Supabase tables. Stateless functions querying `documents`, `document_chunks`, and `folders`. | **New** |
-| **Explorer Sub-Agent** | Multi-step KB traversal in isolated context. Receives a goal, uses KB tools iteratively, returns synthesized answer. Same pattern as existing `subagent_service`. | **New** |
-| **Source Router** | Classifies queries to determine source scope: default KB, private docs, both, or web. Runs before tool execution. | **New** |
-| **Folder Service** | CRUD for folder hierarchy. Creates, moves, lists folders. Used by both API endpoints and KB tools. | **New** |
-| **Seed Script** | One-time script to populate default KB with 10 board games. Runs on deploy. | **New** |
-| **FileManager UI** | Tree sidebar + file grid for organizing documents into folders. | **New** |
-| **Retrieval Service** | Hybrid search with RRF + reranking. Needs scope parameter (default_kb / private / both). | Extend |
-| **Ingestion Service** | Document processing pipeline. Needs folder assignment + source_type tagging. | Extend |
-
-## Recommended Project Structure
-
-New and modified files only:
+### System Overview
 
 ```
-backend/
-  services/
-    kb_service.py            # ls, tree, grep, glob, read implementations
-    explorer_service.py      # Explorer sub-agent (multi-step KB traversal)
-    source_router.py         # Query classification -> source scope
-    folder_service.py        # Folder CRUD operations
-  routers/
-    folders.py               # REST endpoints for folder management
-    chat.py                  # Extended with new tool definitions
-  scripts/
-    seed_default_kb.py       # Populate default board game KB
-
-frontend/src/
-  components/
-    FileManager/
-      FolderTree.tsx         # Sidebar tree navigation
-      FileGrid.tsx           # File listing in selected folder
-      FolderActions.tsx       # Create, rename, move, delete
-    ExplorerPanel.tsx         # Shows explorer agent progress
-    ToolCallDisplay.tsx       # Enhanced tool event rendering
-
-supabase/migrations/
-  016_create_folders.sql      # folders table + RLS
-  017_add_folder_to_documents.sql   # folder_id FK on documents
-  018_add_source_type.sql     # source_type enum on documents + chunks
-  019_default_kb_rls.sql      # RLS policies for shared default KB
-  020_kb_navigation_rpcs.sql  # Postgres functions for efficient KB queries
+┌──────────────────────────────────────────────────────────────────────┐
+│                         Browser (any machine)                         │
+│                                                                       │
+│   ┌─────────────────────────────────────────────────────────────┐    │
+│   │                    Frontend SPA (Vite build)                 │    │
+│   │  - AuthContext (Supabase JS, anon key)                       │    │
+│   │  - useChat / useDocuments hooks                              │    │
+│   │  - apiFetch(`${API_BASE}/api/...`)  ← NEW: absolute URL      │    │
+│   │  - Sentry browser SDK              ← NEW                     │    │
+│   └─────────────────────────────────────────────────────────────┘    │
+└──────────────────┬────────────────────────┬──────────────────────────┘
+                   │                        │
+              HTTPS│ REST + SSE             │ HTTPS (auth, realtime)
+                   ▼                        ▼
+┌──────────────────────────────┐   ┌──────────────────────────────────┐
+│  Vercel (frontend static)    │   │  Supabase PROD project           │
+│  - SPA rewrite → index.html  │   │  - Postgres + pgvector           │
+│  - Env: VITE_API_BASE_URL    │   │  - Auth (JWT, redirect allowlist)│
+│  - Env: VITE_SUPABASE_URL    │   │  - Storage (documents bucket)    │
+│  - Env: VITE_SUPABASE_ANON   │   │  - Realtime (ingestion status)   │
+│  - Env: VITE_SENTRY_DSN      │   │  - RLS policies                  │
+└──────────────────────────────┘   └──────────────┬───────────────────┘
+                                                  │ service-role key
+                                                  │ (server-side only)
+┌──────────────────────────────────────────────────┼───────────────────┐
+│  Fly.io machine (backend)                        │                   │
+│  ┌─────────────────────────────────────────────┐ │                   │
+│  │  Docker image (multi-stage)                 │ │                   │
+│  │  Stage 1: builder — pip install deps        │ │                   │
+│  │  Stage 2: runtime — slim python + OS pkgs   │ │                   │
+│  │    - poppler-utils, tesseract-ocr,          │ │                   │
+│  │      libgl1 (or opencv-headless only),      │ │                   │
+│  │      libglib2.0-0, fonts                    │ │                   │
+│  │  uvicorn main:app --host 0.0.0.0 --port 8080│─┘                   │
+│  │  - CORSMiddleware: allow Vercel origin ONLY │                     │
+│  │  - /api/health                              │                     │
+│  │  - Sentry python SDK  ← NEW                 │                     │
+│  └─────────────────────────────────────────────┘                     │
+│  Secrets: flyctl secrets set (no .env in image)                      │
+│  fly.toml: http_service, concurrency, health_check                   │
+└──────────────────────────────────────────────────────────────────────┘
+         │
+         ▼
+┌──────────────────────────────────────────────────────────────────────┐
+│  Observability                                                        │
+│  - LangSmith prod project (LANGCHAIN_PROJECT=rag-prod)                │
+│  - Sentry (frontend + backend DSNs, separate projects)                │
+│  - UptimeRobot / BetterStack → GET /api/health every 5 min            │
+└──────────────────────────────────────────────────────────────────────┘
 ```
 
-### Structure Rationale
+### Component Responsibilities
 
-- **kb_service.py**: Single module for all 5 KB navigation tools. They share the same data access patterns (querying folders/documents/chunks by path) so co-location reduces import sprawl.
-- **explorer_service.py**: Separate from kb_service because the explorer is an agent loop (LLM calls + tool execution), not a data query. Same isolation pattern as existing `subagent_service.py`.
-- **source_router.py**: Lightweight classifier that runs once per user message. Kept separate because it may use LLM classification or heuristics -- implementation can change without touching tool dispatch.
-- **folder_service.py**: Decoupled from KB tools because the folder CRUD is also used by REST endpoints for the FileManager UI.
+| Component | Responsibility | Implementation |
+|-----------|----------------|----------------|
+| Vercel | Static host for SPA, SPA rewrite, env var injection at build | `vercel.json` + dashboard env vars |
+| Fly.io machine | FastAPI + Docling runtime, persistent process | Dockerfile + `fly.toml` |
+| Supabase prod | DB, auth, storage, realtime for production data | Separate project from dev |
+| LangSmith prod project | LLM trace isolation per env | `LANGCHAIN_PROJECT` env var |
+| Sentry | Error aggregation, source-mapped stack traces | `@sentry/react` + `sentry-sdk` |
+| Uptime monitor | External liveness ping, alerting | UptimeRobot free tier → `/api/health` |
 
-## Architectural Patterns
+---
 
-### Pattern 1: KB Tools as Thin Wrappers over Supabase RPCs
+## Integration Points (How Deploy Layer Connects to Existing App)
 
-**What:** Each KB tool (ls, tree, grep, glob, read) is a Python function that calls a Supabase RPC (Postgres function), formats the result, and returns a string. The heavy lifting happens in Postgres.
+### 1. Env Config — dev vs prod separation
 
-**When to use:** Always for KB navigation. The data lives in Postgres; doing joins/filters in Python means pulling too much data over the wire.
+**Current state:** Single `.env` at repo root, loaded by both `backend/config.py` (via `python-dotenv`) and Vite (via `envDir: '..'`). Single Supabase project for everything.
 
-**Trade-offs:** Postgres functions are harder to debug than Python, but much faster for hierarchical queries. Since the folder tree is a classic adjacency list, recursive CTEs in Postgres are the natural fit.
+**Target state:** Two-axis split.
 
-**Example:**
+| Axis | Dev | Prod |
+|------|-----|------|
+| **Source of secrets** | `.env` file at repo root (gitignored) | Host secret stores: `flyctl secrets` for backend, Vercel dashboard for frontend |
+| **Supabase project** | `rag-dev` (current) | `rag-prod` (new — fresh migrations + seed) |
+| **LangSmith project** | `rag-masterclass` (current default) | `rag-prod` (env-switched via `LANGCHAIN_PROJECT`) |
+| **CORS origin** | `*` (current) | `https://<portfolio>.vercel.app` only |
+| **API base URL (frontend)** | relative `/api/...` via Vite proxy | absolute `https://<app>.fly.dev/api/...` via `VITE_API_BASE_URL` |
+
+**Change to `backend/config.py`:** None required — `pydantic-settings` already reads from the process env, which is how Fly.io injects secrets. The `load_dotenv()` call at top of file is harmless on Fly (no `.env` in image → no-op). **Keep it** for dev parity.
+
+**Change to frontend:** `apiFetch` in `frontend/src/lib/api.ts` must prefix paths with `import.meta.env.VITE_API_BASE_URL ?? ''`. Empty string in dev preserves the Vite proxy path; absolute URL in prod hits Fly directly.
+
+### 2. CORS for SSE
+
+**Current (`backend/main.py`):**
 ```python
-# kb_service.py
-def kb_ls(user_id: str, path: str, source_scope: str) -> str:
-    db = get_supabase()
-    result = db.rpc("kb_list_path", {
-        "target_path": path,
-        "filter_user_id": user_id,
-        "source_scope": source_scope,  # 'default' | 'private' | 'all'
-    }).execute()
-    # Format as file listing
-    lines = []
-    for item in result.data:
-        icon = "DIR" if item["is_folder"] else item["mime_type"]
-        lines.append(f"  {icon}  {item['name']}")
-    return "\n".join(lines) or "(empty)"
+allow_origins=["*"],
+allow_credentials=True,   # ← INVALID with "*" per CORS spec
 ```
 
-### Pattern 2: Explorer Agent as Tool-Using Loop (Existing Pattern)
+Browsers reject this combo silently for credentialed requests; SSE `EventSource` with `withCredentials: true` will break. Even without credentials, `*` is unsafe for a public backend with service-role secrets.
 
-**What:** The explorer sub-agent gets its own system prompt, message history, and tool definitions. It runs a while-loop calling the LLM until it produces a final text response (no more tool calls). This is identical to how the main chat loop works but scoped to KB tools only.
-
-**When to use:** When the user's question requires multiple navigation steps -- e.g., "Compare the setup rules for Catan and Ticket to Ride."
-
-**Trade-offs:** Each explorer invocation burns tokens (its own system prompt + accumulated tool results). Must enforce a max iteration count and token budget to prevent runaway loops.
-
-**Example:**
+**Target:**
 ```python
-# explorer_service.py
-def run_exploration(user_id: str, goal: str, source_scope: str) -> dict:
-    """Multi-step KB traversal to answer a complex question."""
-    KB_TOOLS = [KB_LS_TOOL, KB_TREE_TOOL, KB_GREP_TOOL, KB_GLOB_TOOL, KB_READ_TOOL]
-    messages = [
-        {"role": "system", "content": EXPLORER_SYSTEM_PROMPT},
-        {"role": "user", "content": goal},
-    ]
-    for _ in range(MAX_EXPLORER_STEPS):
-        response = client.chat.completions.create(
-            model=settings.llm_model,
-            messages=messages,
-            tools=KB_TOOLS,
-        )
-        if response.choices[0].finish_reason == "stop":
-            return {"result": response.choices[0].message.content}
-        # Execute tool calls, append results, continue loop
-        ...
-    return {"result": "Explorer reached step limit", "partial": True}
+allowed = [o.strip() for o in settings.cors_allowed_origins.split(",") if o.strip()]
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=allowed,            # e.g. ["https://bgkb.vercel.app", "http://localhost:5173"]
+    allow_credentials=True,
+    allow_methods=["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type"],
+    expose_headers=["Content-Type"],
+)
 ```
 
-### Pattern 3: Source Routing via Intent Classification
+Add `cors_allowed_origins: str = "http://localhost:5173"` to `Settings`. On Fly: `flyctl secrets set CORS_ALLOWED_ORIGINS="https://bgkb.vercel.app"`. Preview deploys (Vercel PR URLs) require either wildcard pattern support (not in stdlib CORSMiddleware — would need `allow_origin_regex`) or omitting preview from backend reach.
 
-**What:** Before the main agent selects tools, a lightweight classification step determines which data sources are relevant. This sets the `source_scope` parameter that all KB tools and retrieval use.
+**SSE-specific:** No special CORS knobs needed beyond the above. SSE is just a long-lived GET; `sse-starlette` streams as `text/event-stream` and CORSMiddleware handles the preflight correctly when `Authorization` is in `allow_headers`.
 
-**When to use:** Every chat message. The classification can be a simple heuristic (keyword matching) initially, upgraded to LLM classification later.
+### 3. Frontend API Base URL
 
-**Trade-offs:** Adds latency if using LLM classification (~200ms). Heuristic approach is faster but less accurate. Recommendation: start with heuristics, add LLM fallback for ambiguous queries.
+**Pattern — "empty-string default" preserves both modes:**
 
-**Implementation approach:**
-```python
-# source_router.py
-def classify_source(query: str, user_has_private_docs: bool) -> str:
-    """Returns 'default' | 'private' | 'both' | 'web'"""
-    # Phase 1: Heuristic
-    query_lower = query.lower()
-    # Explicit scope mentions
-    if "my documents" in query_lower or "my files" in query_lower:
-        return "private"
-    if any(game in query_lower for game in DEFAULT_GAME_NAMES):
-        return "default" if not user_has_private_docs else "both"
-    # Default: search both
-    return "both"
+```ts
+// frontend/src/lib/api.ts
+const API_BASE = import.meta.env.VITE_API_BASE_URL ?? ''
+
+export async function apiFetch(path: string, options: RequestInit = {}) {
+  // path is always "/api/..."; API_BASE is "" in dev, absolute in prod
+  const url = `${API_BASE}${path}`
+  // ... rest unchanged
+}
 ```
 
-### Pattern 4: Materialized Path for Folder Hierarchy
+Same pattern must be applied to the SSE `EventSource` construction in `useChat` (wherever `/api/chat/stream` or similar is opened). `EventSource` does not send `Authorization` headers — if the current flow relies on cookies or query-param tokens, that behavior is unchanged; just prefix the URL.
 
-**What:** Each folder stores its full path as a text column (e.g., `/Board Games/Catan/Rules`). This is in addition to the `parent_id` adjacency list. The path column enables fast prefix matching for tree operations without recursive queries.
+**Dev:** `VITE_API_BASE_URL` unset → empty string → `/api/...` → Vite proxy → localhost:8000.
+**Prod:** Vercel env `VITE_API_BASE_URL=https://bgkb-api.fly.dev` → absolute URL → Fly.io → CORS check passes.
 
-**When to use:** Always. The dual representation (parent_id for structural integrity, path for fast queries) is the standard approach for hierarchies that need both mutation and fast reads.
+### 4. Supabase Auth Redirect URLs
 
-**Trade-offs:** Path must be updated on folder rename/move (cascading update to all descendants). This is acceptable because folder mutations are rare compared to reads.
+Supabase Auth rejects OAuth / magic-link / email-confirmation redirects not in the project allowlist. For v1.1 (email+password), this matters for **email confirmation** and **password reset** flows.
 
-```sql
--- 016_create_folders.sql
-CREATE TABLE folders (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id UUID REFERENCES auth.users(id),  -- NULL for default KB
-    parent_id UUID REFERENCES folders(id) ON DELETE CASCADE,
-    name TEXT NOT NULL,
-    path TEXT NOT NULL,  -- materialized path: '/Games/Catan/Rules'
-    source_type TEXT NOT NULL DEFAULT 'private'
-        CHECK (source_type IN ('default', 'private')),
-    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
-);
+- Dev Supabase project: `http://localhost:5173/**` allowlisted (already working).
+- Prod Supabase project (new): allowlist `https://<portfolio>.vercel.app/**` AND `http://localhost:5173/**` if the same prod project is ever hit from dev (not recommended — keep projects isolated).
+- Set `Site URL` on prod project to the Vercel production URL.
+- Vercel preview deploys get unique URLs; either add `https://*.vercel.app` (wildcard allowed) or accept that confirmations only work from the stable prod URL.
 
-CREATE INDEX idx_folders_path ON folders USING btree (path text_pattern_ops);
-CREATE INDEX idx_folders_user_source ON folders (user_id, source_type);
+### 5. Docker Image for Docling
+
+**Strategy:** Multi-stage build; `python:3.12-slim` runtime; pre-download Docling models in builder to avoid cold-start downloads.
+
+**System packages (runtime stage):**
+- `poppler-utils` — PDF rendering for page images
+- `tesseract-ocr` + `tesseract-ocr-eng` — OCR engine (EasyOCR also works but downloads ~100MB models)
+- `libglib2.0-0`, `libsm6`, `libxext6`, `libxrender1` — image libs
+- `libgl1` — **only if** using `opencv-python`; prefer `opencv-python-headless` and skip `libgl1` (reduces image ~200MB)
+- `fonts-dejavu-core` — font fallback for rendered PDFs
+
+**Dockerfile skeleton:**
+```dockerfile
+# syntax=docker/dockerfile:1.7
+FROM python:3.12-slim AS builder
+WORKDIR /app
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential && rm -rf /var/lib/apt/lists/*
+COPY backend/requirements.txt .
+RUN pip install --user --no-cache-dir -r requirements.txt
+# Pre-download Docling models (optional — trades image size for cold-start speed)
+RUN python -c "from docling.document_converter import DocumentConverter; DocumentConverter()"
+
+FROM python:3.12-slim AS runtime
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    poppler-utils tesseract-ocr tesseract-ocr-eng \
+    libglib2.0-0 libsm6 libxext6 libxrender1 fonts-dejavu-core \
+    && rm -rf /var/lib/apt/lists/*
+COPY --from=builder /root/.local /root/.local
+COPY --from=builder /root/.cache/docling /root/.cache/docling
+ENV PATH=/root/.local/bin:$PATH PYTHONUNBUFFERED=1
+WORKDIR /app
+COPY backend/ ./
+EXPOSE 8080
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8080"]
 ```
 
-## Data Flow
+**Size target:** ~1.2–1.8 GB with pre-downloaded Docling models. Without model pre-download: ~700–900 MB but first ingestion is slow. **Recommendation:** pre-download; Fly.io scratch pull is fast, user-facing latency matters more.
 
-### Chat with KB Tools (Primary Flow)
+### 6. File Upload Size Limits
 
+Fly.io proxy itself does not impose a strict request-body cap in current docs (community reports historic ~3MB issues were usually uvicorn/stdlib defaults, not the proxy). Real constraints:
+
+- **uvicorn**: no default body cap; accepts what ASGI receives.
+- **FastAPI `UploadFile`**: streams to disk via `SpooledTemporaryFile` (default 1MB spool → then disk). No hard cap.
+- **Supabase Storage**: 50MB per file on free tier (enforced server-side).
+- **Recommendation:** enforce `MAX_UPLOAD_MB = 25` in the documents router (read `content-length` header, 413 early). Matches a reasonable board-game rulebook ceiling and leaves headroom under Supabase's 50MB.
+
+**SSE timeouts:** Fly.io's default request timeout is generous (hours for long-running connections), but chat streams should complete in < 2 min. The existing `llm_timeout: int = 120` in `Settings` is the binding constraint. No Fly-specific tweak needed.
+
+### 7. Health Check
+
+`backend/main.py` **already has** `GET /api/health` returning `{"status": "ok"}` — sufficient for:
+- Fly.io `[[http_service.checks]]` in `fly.toml` (liveness for zero-downtime deploys)
+- UptimeRobot external monitor (5-min interval, free tier)
+
+**Enhancement (optional):** a `/api/health/deep` that checks Supabase reachability and LLM API key presence, returning 503 on failure. Keep the simple `/api/health` for Fly (fast, no external deps) to avoid flapping during Supabase blips.
+
+### 8. Deploy Flow
+
+**Recommended: manual first, automated second.**
+
+Phase A (first deploy — manual, catch surprises):
+1. `flyctl launch` → edits `fly.toml`, `flyctl deploy`
+2. `vercel deploy --prod`
+3. Verify end-to-end, then snapshot working state.
+
+Phase B (automation — only after Phase A is green):
+- GitHub Actions on push to `main`:
+  - Backend job: `flyctl deploy --remote-only` (uses `FLY_API_TOKEN` secret)
+  - Frontend job: Vercel's native GitHub integration (no workflow needed — Vercel auto-builds on push)
+- Preview deploys: Vercel preview for every PR; backend stays pinned to prod Fly machine (no ephemeral backends).
+
+**Why manual first:** Docling native deps, CORS origin, Supabase redirect URLs, and Fly secrets all have silent-failure modes that are faster to debug interactively than through CI logs.
+
+---
+
+## New Components (Files/Artifacts Introduced by v1.1)
+
+| File / Artifact | Purpose | Location |
+|---|---|---|
+| `backend/Dockerfile` | Multi-stage image with Docling system deps | repo root of backend context |
+| `backend/.dockerignore` | Exclude `venv/`, `tests/`, `__pycache__`, `.env` | backend dir |
+| `fly.toml` | App name, region, http_service, health_check, concurrency | repo root (or `backend/`) |
+| `frontend/vercel.json` | SPA rewrite (`/(.*)` → `/index.html`), optional headers | `frontend/` |
+| `backend/services/sentry_init.py` (or inline in `main.py`) | `sentry_sdk.init(dsn=..., traces_sample_rate=0.1)` | backend services |
+| `frontend/src/lib/sentry.ts` | `Sentry.init({ dsn: VITE_SENTRY_DSN, integrations: [browserTracingIntegration()] })` | frontend lib |
+| `.github/workflows/deploy-backend.yml` (Phase B) | CI deploy to Fly.io | repo |
+| Supabase prod project | Separate project; run all migrations in `supabase/migrations/` + seed | hosted |
+| `scripts/seed-prod-kb.py` (if not already idempotent) | Seed 10 default board games into prod project | repo |
+| `DEPLOY.md` or README section | Demo creds, deployed URL, env var checklist | repo |
+
+## Modified Components
+
+| File | Change |
+|---|---|
+| `backend/main.py` | Replace `allow_origins=["*"]` with env-driven allowlist; optional Sentry init |
+| `backend/config.py` | Add `cors_allowed_origins`, `sentry_dsn`, `environment` ("dev"/"prod") fields |
+| `frontend/src/lib/api.ts` | Prefix paths with `VITE_API_BASE_URL` (empty-string default) |
+| `frontend/src/lib/supabase.ts` | No change (already env-driven via `VITE_*`) |
+| `frontend/vite.config.ts` | No change — dev proxy stays; prod build uses env var |
+| `useChat` hook (SSE `EventSource` construction) | Same API-base prefix pattern |
+| `.env.example` | Add `CORS_ALLOWED_ORIGINS`, `VITE_API_BASE_URL`, `VITE_SENTRY_DSN`, `SENTRY_DSN` |
+
+---
+
+## Data Flow Changes (Dev vs Prod)
+
+### Dev (unchanged)
 ```
-User sends message
-    |
-    v
-POST /api/threads/{id}/messages
-    |
-    v
-Load message history from Supabase
-    |
-    v
-Source Router classifies query -> source_scope
-    |
-    v
-Build tool list (include KB tools + search + existing tools)
-    |
-    v
-stream_chat_completion() with tools
-    |
-    +---> LLM returns text_delta -> SSE to frontend
-    |
-    +---> LLM calls kb_ls/tree/grep/glob/read
-    |         |
-    |         v
-    |     kb_service dispatches to Supabase RPC
-    |     (passes source_scope to filter default/private/both)
-    |         |
-    |         v
-    |     Result appended to messages, loop continues
-    |
-    +---> LLM calls explore_kb (complex multi-step question)
-    |         |
-    |         v
-    |     explorer_service.run_exploration()
-    |         |
-    |         +---> Inner tool loop (kb_ls, kb_grep, kb_read...)
-    |         |     Each step: LLM decides next tool -> execute -> append
-    |         |
-    |         v
-    |     Synthesized answer returned to main agent
-    |
-    +---> LLM produces final response -> SSE to frontend
-    |
-    v
-Store assistant message in Supabase
-```
-
-### Document Upload with Folder Assignment
-
-```
-User uploads file (via FileManager UI or existing upload)
-    |
-    v
-POST /api/documents/upload  (extended with folder_id param)
-    |
-    v
-Deduplication check (existing)
-    |
-    v
-Upload to Supabase Storage: {user_id}/{folder_path}/{filename}
-    |
-    v
-Create document record (with folder_id, source_type='private')
-    |
-    v
-Ingestion pipeline (existing: parse -> chunk -> embed -> store)
-    |
-    v
-Each chunk gets: folder_path, source_type in metadata
-    |
-    v
-Realtime status update (existing)
-```
-
-### Default KB Seeding
-
-```
-seed_default_kb.py (run once on deploy)
-    |
-    v
-For each of 10 games:
-    |
-    +---> Create folder: /Board Games/{Game Name}/
-    |     Create subfolders: /Rules, /Reference, etc.
-    |
-    +---> Upload markdown files to Supabase Storage
-    |     Path: default_kb/{game}/{filename}
-    |
-    +---> Create document records
-    |     source_type='default', user_id=NULL (or system user)
-    |
-    +---> Run ingestion pipeline
-          Chunks tagged with source_type='default'
+Browser → http://localhost:5173/api/chat  (Vite proxy)
+       → http://localhost:8000/api/chat   (FastAPI)
+       → Supabase rag-dev
+       → LangSmith "rag-masterclass"
 ```
 
-### Key Data Flows
-
-1. **Source-scoped search:** All retrieval and KB tool queries accept a `source_scope` parameter. Supabase RPCs filter by `source_type` column. Default KB has `user_id=NULL` and `source_type='default'`; RLS policies grant SELECT to all authenticated users on default rows.
-
-2. **Token budget management:** The explorer agent tracks cumulative token count of tool results. When approaching budget limit, it switches from `kb_read` (full content) to `kb_grep` (targeted excerpts). The budget is configurable via `Settings.explorer_max_context_tokens`.
-
-3. **Folder path resolution:** KB tools accept human-readable paths (e.g., `/Catan/Rules`). The `kb_service` resolves these against the `folders.path` column using prefix matching. Ambiguous paths return disambiguation options.
-
-## Scaling Considerations
-
-| Scale | Architecture Adjustments |
-|-------|--------------------------|
-| 0-100 users | Current architecture is fine. Default KB shared across all users. Single Supabase instance handles everything. |
-| 100-1k users | Index optimization: ensure `folders.path` and `document_chunks.source_type` are indexed. Consider caching default KB tree structure (it rarely changes). |
-| 1k+ users | Cache frequently accessed default KB chunks in Redis/memory. Explorer agent results for common questions (e.g., "Catan rules") could be cached. |
-
-### Scaling Priorities
-
-1. **First bottleneck:** Explorer agent token costs. Each exploration is 3-8 LLM calls. Mitigation: cache results for identical goals against default KB, enforce step limits.
-2. **Second bottleneck:** Supabase RPC latency for tree operations on large folder hierarchies. Mitigation: materialized path index makes this O(log n) not O(n).
-
-## Anti-Patterns
-
-### Anti-Pattern 1: KB Tools Querying Storage Bucket Directly
-
-**What people do:** Implement `kb_ls` by listing files in Supabase Storage bucket.
-**Why it's wrong:** Storage bucket listings don't have metadata, source_type filtering, or RLS integration. You'd need separate queries for folder structure anyway. Two sources of truth = drift.
-**Do this instead:** All KB tools query the `folders` and `documents` tables. Storage bucket is only for raw file retrieval during ingestion.
-
-### Anti-Pattern 2: Explorer Agent with Unlimited Steps
-
-**What people do:** Let the explorer loop until it produces a final answer.
-**Why it's wrong:** Complex queries can cause infinite loops or consume entire context window. A "compare all 10 games" query would pull every document.
-**Do this instead:** Hard limit of 8-10 steps. Token budget cap. Explorer must synthesize partial results if it hits the limit.
-
-### Anti-Pattern 3: Separate Tool Definitions for Default vs Private KB
-
-**What people do:** Create `kb_ls_default` and `kb_ls_private` as separate tools.
-**Why it's wrong:** Doubles the tool count, confuses the LLM, and prevents the agent from naturally searching across both scopes. The source router should handle scoping transparently.
-**Do this instead:** Single `kb_ls` tool. Source scope is determined by the source router and passed as a parameter, invisible to the LLM's tool choice.
-
-### Anti-Pattern 4: Storing Folder Hierarchy Only in Storage Paths
-
-**What people do:** Rely on Supabase Storage path conventions (e.g., `user_id/folder/subfolder/file`) without a `folders` table.
-**Why it's wrong:** No way to have empty folders, folder metadata, or efficient tree queries. Listing children requires string parsing on every document record.
-**Do this instead:** Explicit `folders` table with `parent_id` and materialized `path`. Documents reference `folder_id`. Storage paths are a convenience, not the source of truth.
-
-## Integration Points
-
-### External Services
-
-| Service | Integration Pattern | Notes |
-|---------|---------------------|-------|
-| OpenRouter LLM | OpenAI-compatible SDK (existing) | Explorer agent uses same client, may want different model for cost control |
-| Supabase | Python client + RPCs (existing) | New RPCs needed for KB navigation queries |
-| LangSmith | Tracing wrapper (existing) | Add `@traceable` to explorer loops for debugging multi-step traversals |
-
-### Internal Boundaries
-
-| Boundary | Communication | Notes |
-|----------|---------------|-------|
-| Tool Router -> KB Service | Direct function call | Same process, no serialization overhead |
-| Tool Router -> Explorer Agent | Direct function call (blocking) | Explorer runs synchronously; SSE stream pauses during exploration. Emit `tool_event` with status updates. |
-| Source Router -> Tool Router | Function return value | Source router returns scope string; tool router passes it through to every KB/retrieval call |
-| Frontend -> Folder API | REST (CRUD) | Standard REST endpoints for folder management |
-| Frontend -> Chat SSE | SSE stream (existing) | Extended with new tool event types for KB tools and explorer progress |
-| Seed Script -> Ingestion Pipeline | Reuses existing ingestion functions | Seed script calls `process_document()` directly, same as upload endpoint |
-
-## Build Order (Dependencies)
-
-The components have clear dependencies that dictate build order:
-
+### Prod
 ```
-Phase 1: Data Foundation
-    folders table + RLS + source_type columns
-    (everything else depends on the schema)
-        |
-        v
-Phase 2: Folder Management
-    folder_service.py + REST API + FileManager UI
-    (users need to organize docs before KB tools make sense)
-        |
-        v
-Phase 3: Default KB Seeding
-    seed script + default KB content
-    (needs folders table; provides data for KB tools to navigate)
-        |
-        v
-Phase 4: KB Navigation Tools
-    kb_service.py (ls, tree, grep, glob, read)
-    Supabase RPCs for efficient queries
-    Tool definitions in chat.py
-    (needs folders + documents + default KB data to test against)
-        |
-        v
-Phase 5: Source Routing
-    source_router.py + integration into chat flow
-    (needs KB tools working to be meaningful)
-        |
-        v
-Phase 6: Explorer Sub-Agent
-    explorer_service.py with tool loop + token budget
-    (needs KB tools as its toolkit; most complex component)
-        |
-        v
-Phase 7: Polish
-    Enhanced tool event UI, smart chunking refinement, scope controls
+Browser (any) → https://bgkb.vercel.app           (static assets)
+             → https://bgkb-api.fly.dev/api/chat  (absolute, CORS-checked)
+                 → Supabase rag-prod (service role)
+                 → LangSmith "rag-prod"
+                 → Sentry on error
 ```
 
-**Rationale:** Each phase produces a testable increment. The schema comes first because it is a hard dependency. Folder management is next because it provides the UI for organizing content that the KB tools will navigate. Default KB seeding can happen in parallel with folder UI polish since it only depends on the schema. KB tools are the core new capability. Source routing and the explorer agent build on top.
+**Key change:** API base URL is now **read at build time** on the frontend (baked into the JS bundle by Vite) and **read at process-start time** on the backend (from Fly secrets). Neither is runtime-configurable in the browser — a change to `VITE_API_BASE_URL` requires a Vercel rebuild.
 
-## RLS Strategy for Default KB
+---
 
-The default KB requires a departure from the current "users only see their own data" RLS model. Recommended approach:
+## Suggested Build Order (dependency-respecting)
 
-```sql
--- Default KB rows have user_id = NULL and source_type = 'default'
--- All authenticated users can SELECT default rows
--- Only service role can INSERT/UPDATE/DELETE default rows
+1. **Supabase prod project** — create, run migrations, seed default KB, verify auth works via SQL editor. *(Blocks everything downstream — no point deploying backend until it can point at a real DB.)*
+2. **Env split in code** — add `cors_allowed_origins`, `environment`, Sentry fields to `backend/config.py`; update `backend/main.py` CORS; update `frontend/src/lib/api.ts` and SSE call sites to use `VITE_API_BASE_URL`. *Validate locally by setting `VITE_API_BASE_URL=http://localhost:8000` and running frontend without Vite proxy.*
+3. **Dockerize backend** — write Dockerfile + `.dockerignore`, build locally (`docker build`), run locally (`docker run -p 8080:8080 --env-file .env`), confirm `/api/health` and one ingestion + one chat request work against **dev Supabase**.
+4. **Deploy backend to Fly.io** — `flyctl launch`, set secrets (incl. `SUPABASE_URL` pointing at **prod** project now), deploy, verify `/api/health` externally, verify one chat from curl with CORS origin header.
+5. **Deploy frontend to Vercel** — `vercel.json` rewrite, env vars (`VITE_API_BASE_URL=https://<fly-url>`, `VITE_SUPABASE_*` for prod), deploy, end-to-end smoke test.
+6. **Harden CORS & Supabase redirects** — narrow `CORS_ALLOWED_ORIGINS` to the exact Vercel prod URL; add Vercel URL to Supabase Auth allowlist + Site URL.
+7. **Observability** — LangSmith prod project env switch, Sentry frontend + backend init, UptimeRobot monitor on `/api/health`.
+8. **CI (optional)** — GitHub Action for backend deploy; Vercel auto-deploys frontend on push.
+9. **Docs** — README deployed URL, demo credentials, env var checklist, architecture diagram.
 
--- documents table
-CREATE POLICY "Users can see default KB"
-    ON documents FOR SELECT
-    USING (source_type = 'default' OR auth.uid() = user_id);
+**Rationale:**
+- Env split (step 2) must land **before** Dockerize (step 3) because the image will bake in the new config shape.
+- Dockerize (step 3) must land **before** Fly deploy (step 4) — Fly needs an image.
+- Backend deploy (step 4) must land **before** frontend deploy (step 5) — frontend needs an API URL to bake into its bundle.
+- CORS hardening (step 6) comes **after** both are live so you can set the exact Vercel URL, not a guess.
 
--- document_chunks table
-CREATE POLICY "Users can see default KB chunks"
-    ON document_chunks FOR SELECT
-    USING (source_type = 'default' OR auth.uid() = user_id);
+---
 
--- folders table
-CREATE POLICY "Users can see default KB folders"
-    ON folders FOR SELECT
-    USING (source_type = 'default' OR auth.uid() = user_id);
-```
+## Anti-Patterns to Avoid
 
-This keeps existing RLS intact for private docs while opening default KB to all authenticated users. The seed script runs with the service role key, bypassing RLS for inserts.
+### AP1: Shared Supabase project across dev and prod
+**What people do:** Save the $0 of a second project, use one DB for both.
+**Why it's wrong:** Test data pollutes prod; RLS bugs in dev leak real user data; migrations become irreversible; auth redirect allowlists conflict.
+**Instead:** Two projects. Supabase free tier allows two. The only shared asset is the migration SQL files.
+
+### AP2: `CORS allow_origins=["*"]` with `allow_credentials=True`
+**What people do:** Keep the dev-convenient wildcard.
+**Why it's wrong:** Browsers silently drop credentialed responses; spec-violating; any site can hit your backend API.
+**Instead:** Explicit origin list from env var. `*` is only tolerable for non-credentialed public APIs.
+
+### AP3: `.env` file baked into the Docker image
+**What people do:** `COPY .env .` in Dockerfile for convenience.
+**Why it's wrong:** Secrets in the image registry; every layer push leaks them; rotation requires rebuild.
+**Instead:** `.dockerignore` excludes `.env`; secrets injected by `flyctl secrets set` at deploy time; `pydantic-settings` reads from process env — zero code change needed.
+
+### AP4: Hardcoded prod API URL in frontend source
+**What people do:** `const API = 'https://bgkb-api.fly.dev'` in a constants file.
+**Why it's wrong:** Breaks dev proxy; forces source edits to change deploy target; hostile to preview environments.
+**Instead:** `import.meta.env.VITE_API_BASE_URL` with empty-string fallback. Preserves dev proxy path, parameterizes prod.
+
+### AP5: Running Docling model downloads on first request
+**What people do:** Skip pre-download to save image size.
+**Why it's wrong:** First user to upload a PDF waits 30–120s for model downloads; Fly.io machine may hit memory/disk limits during concurrent downloads; cold starts look broken.
+**Instead:** Pre-download in Dockerfile builder stage and `COPY` the cache into runtime stage. Accept the ~500MB image size cost.
+
+### AP6: Deploying before migrations are applied
+**What people do:** Push backend code, then remember to run migrations.
+**Why it's wrong:** First requests hit missing tables, 500s flood LangSmith/Sentry, false alerts.
+**Instead:** Apply migrations to prod Supabase **first** (Step 1 above), verify schema with a SQL probe, then deploy backend. Add a startup check in `main.py` that queries one known table and logs a fatal error on failure.
+
+---
+
+## Scaling Considerations (portfolio scope)
+
+| Scale | Adjustment |
+|-------|-----------|
+| 0–10 users (portfolio demo) | Single Fly.io shared-cpu-1x 256MB machine; Supabase free tier; no Redis/queue needed |
+| 10–100 users (unexpected traffic) | Scale Fly machine to 1x 512MB; set `auto_stop_machines=false`; enable Fly metrics; watch Supabase connection pool |
+| 100+ users | Not in v1.1 scope — would need: Fly machines plural + sticky sessions for SSE, Supabase Pro for connection pooler, rate limiting, background worker for Docling ingestion |
+
+**First bottleneck in portfolio scope:** Docling CPU on concurrent uploads (single-threaded per machine). Mitigation: document limit per user, `MAX_UPLOAD_MB`, surface ingestion queue status via existing Realtime channel.
+
+---
+
+## Open Questions / Flags
+
+- **Docling exact `apt` list** (MEDIUM confidence): verify at first `docker build` — the list above is standard across reference Dockerfiles but Docling's dep tree can shift across releases. Pin `docling==<ver>` in `requirements.txt` before prod deploy.
+- **Fly.io body-size cap** (MEDIUM): community reports historic issues, docs are quiet. Test a 25MB upload against a staging Fly machine before committing to the limit. If 413 appears from Fly (not uvicorn), lower the app-side cap.
+- **Vercel preview CORS** (LOW urgency): if preview deploys are needed, either switch CORS to `allow_origin_regex=r"https://.*\.vercel\.app$"` or document that previews hit prod backend anyway (RLS keeps it safe but auth redirects won't work from preview URLs unless Supabase allowlist uses `https://*.vercel.app`).
+- **SSE reconnection semantics**: `EventSource` auto-reconnects; verify backend tolerates mid-stream CORS preflight on reconnect (stdlib CORSMiddleware handles this fine; just flagging for validation).
+
+---
 
 ## Sources
 
-- Existing codebase analysis (chat.py tool loop, subagent_service.py pattern, retrieval_service.py, database schema)
-- Supabase documentation on RLS policies and RPC functions
-- Materialized path pattern for hierarchical data in relational databases (standard pattern, well-documented in PostgreSQL literature)
-- Claude Code tool design patterns (ls, tree, grep, glob, read tool set)
+- [Fly.io FastAPI docs](https://fly.io/docs/python/frameworks/fastapi/) — deploy pattern, fly.toml shape
+- [Fly.io app configuration reference](https://fly.io/docs/reference/configuration/) — http_service, checks, concurrency
+- [Fly.io request body size community thread](https://community.fly.io/t/http-request-size-limits/12698) — known historic upload issues
+- [Vercel Vite framework guide](https://vercel.com/docs/frameworks/frontend/vite) — SPA rewrite, env vars
+- [Vercel vercel.json reference](https://vercel.com/docs/project-configuration/vercel-json) — rewrites config
+- [Docling installation docs](https://docling-project.github.io/docling/getting_started/installation/) — system deps
+- [Docling FAQ — libGL issue](https://docling-project.github.io/docling/faq/) — opencv-headless vs opencv-python
+- [docling-serve container images](https://deepwiki.com/docling-project/docling-serve/6.1-container-images) — multi-stage reference, model pre-download pattern
+- [FastAPI CORSMiddleware docs](https://fastapi.tiangolo.com/tutorial/cors/) — `allow_credentials` + origin list requirement
+- [Supabase Auth redirect URL docs](https://supabase.com/docs/guides/auth/concepts/redirect-urls) — Site URL + allowlist pattern
+- Existing repo files: `backend/main.py`, `backend/config.py`, `frontend/vite.config.ts`, `frontend/src/lib/api.ts`, `frontend/src/lib/supabase.ts`, `.planning/PROJECT.md`
 
 ---
-*Architecture research for: Board Game Knowledge Base with Agent Tooling*
-*Researched: 2026-04-07*
+*Architecture research for: v1.1 Portfolio Deployment integration*
+*Researched: 2026-04-22*

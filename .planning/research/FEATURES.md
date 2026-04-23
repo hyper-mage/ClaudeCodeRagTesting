@@ -1,190 +1,234 @@
 # Feature Research
 
-**Domain:** Board Game Knowledge Base with Claude Code-style Agent Tooling
-**Researched:** 2026-04-07
-**Confidence:** MEDIUM-HIGH
+**Domain:** Public portfolio deployment of a feature-complete agentic RAG app (solo, free-tier hosts)
+**Researched:** 2026-04-22
+**Confidence:** MEDIUM (training data + widely-documented community norms; host specifics verified against PROJECT.md: Fly.io backend, Vercel frontend, Supabase prod)
+
+## Scope Note
+
+This milestone (v1.1) deploys an already feature-complete app. "Features" here means **deployment-layer features** — things a portfolio RAG needs beyond "the code runs on a server." App features (chat, ingestion, agent tools, hybrid search, sub-agents) are already shipped in v1.0 and are treated as dependencies, not new work.
+
+Primary consumer of this doc: roadmap phase planning for v1.1. Categories reflect realistic solo portfolio scope, not SaaS production scope.
 
 ## Feature Landscape
 
 ### Table Stakes (Users Expect These)
 
-Features users assume exist. Missing these = product feels incomplete.
+Features a visitor to a portfolio AI app assumes exist. Missing any of these makes the portfolio piece feel broken, unsafe to demo, or financially reckless.
 
 | Feature | Why Expected | Complexity | Notes |
 |---------|--------------|------------|-------|
-| Default board game KB (10 games pre-seeded) | Ludomentor, Boardside, Rulepop all ship with game content ready to query. Empty KB on first login = "why would I use this?" | MEDIUM | Requires seed script, folder structure in Supabase Storage + DB, and RLS allowing all users to read default KB. 10 games is the right number: enough variety without bloating storage. Pick classics with freely-available rulebooks (Catan, Ticket to Ride, Pandemic, Codenames, Azul, 7 Wonders, Wingspan, Splendor, Carcassonne, Dominion). |
-| Folder hierarchy for documents | Every file manager and document app uses folders. Users with 20+ game rulebooks need organization. Rulepop organizes by game with linked sub-rules. | MEDIUM | Needs `folders` table with parent_id self-reference, path field for Supabase Storage mapping, and document FK. Must handle default KB folders (read-only) vs user folders (read-write). |
-| File manager UI | Users expect drag-drop, breadcrumb navigation, create/rename/delete folders. This is a solved UX pattern -- anything less feels broken. | HIGH | Most complex frontend feature. Tree sidebar + main content area + context menus. Libraries like react-arborist or dnd-kit for tree/drag-drop. Must distinguish default KB (read-only, visually distinct) from user uploads. |
-| Transparent tool calls in chat | Claude Code, ChatGPT, Perplexity all show "Searching...", "Reading file..." indicators. Users expect to see what the agent is doing, not just wait for a response. Already partially built (Module 7 tool event streaming). | LOW | Extend existing tool event streaming. Add tool-specific icons and labels (magnifying glass for grep, folder for ls, tree icon for tree). Show tool arguments and brief results. |
-| Context-aware source selection | When a user asks "How does Catan trading work?", the agent should search the default KB. When they ask "What's in my uploaded files?", it should search private docs. Forcing manual scope selection is friction. | MEDIUM | Agent decides based on query intent using system prompt instructions. Needs a `list_sources` or `describe_kb` tool so the agent knows what's available. Fall back to searching both when ambiguous. |
-| Image OCR for game content | Board game enthusiasts photograph rule cards, reference sheets, and game boards. Ludomentor supports built-in PDF viewing. Not supporting images means users must manually transcribe. | MEDIUM | Docling supports image extraction from PDFs already. For standalone images (PNG/JPG), use Tesseract via pytesseract or a vision model API. Store extracted text as chunks like any other document. |
-| XLSX ingestion | Score sheets, game trackers, comparison spreadsheets are common in the board game community. Already have multi-format support; XLSX is a gap. | LOW | Docling handles XLSX. Add MIME type to allowed uploads, ensure parsing_service routes to Docling correctly. Table data should be converted to markdown tables for chunking. |
-| Smart chunking with token budget | Board game manuals are 20-50 pages. Without budget management, a single query can consume the entire context window. Research shows quality degrades past ~2,500 assembled context tokens, with 8K as practical ceiling. | MEDIUM | Track token count per chunk. When assembling context for the LLM, enforce a budget (e.g., 6-8K tokens). Prioritize by relevance score. Existing retrieval_service needs a token accumulator that stops adding chunks when budget is hit. |
+| Public HTTPS URL with custom-ish domain | "Live demo" link in README must resolve over TLS. `*.vercel.app` / `*.fly.dev` is acceptable for portfolio; custom domain is a nice-to-have. | LOW | Vercel + Fly both give free TLS on their subdomains. |
+| Demo credentials in README | Reviewers will not sign up. A working `demo@ / demo123` (or one-click demo login button) is the single biggest conversion lever for portfolio pieces. | LOW | Dependency: existing Supabase Auth. Seed user via migration/script. Optionally wire a "Login as demo" button on `/login`. |
+| Deployed URL + screenshots in README | GitHub-first reviewers scan README before clicking. Needs hero screenshot, live URL badge, short architecture note. | LOW | Pure docs. Add badges for Vercel/Fly deploy status if available. |
+| Sentry (or equivalent) on frontend | When a recruiter hits a blank screen, you need to know. Free tier covers portfolio traffic easily. | LOW | Dependency: React app. `@sentry/react` + DSN env var. Source maps upload in Vite build. |
+| LangSmith prod project separate from dev | Mixing dev + prod traces pollutes both. Every trace from the deployed app should be tagged prod. | LOW | Dependency: existing LangSmith integration in `backend/services/tracing.py`. Add `LANGSMITH_PROJECT` env for prod host. |
+| Per-user rate limiting on chat endpoint | One curious visitor with a loop can burn your OpenRouter budget in minutes. This is the single most important cost-control feature. | MEDIUM | Dependency: FastAPI middleware + Supabase user_id. Simple in-memory or Supabase-table counter (requests/minute, tokens/day). SlowAPI lib works for FastAPI. |
+| Hard monthly spend cap alerts | OpenRouter, OpenAI, and Tavily all support usage alerts. Missing this has burned portfolio devs publicly. | LOW | Provider dashboard config, not code. Set alerts at 50% / 80% / 100% of a chosen monthly cap. |
+| CORS + auth redirect URLs locked to prod origin | Wildcard CORS or localhost-only redirect URLs are both visible footguns in a portfolio. | LOW | Dependency: existing FastAPI CORS middleware + Supabase Auth URL allowlist. Config change only. |
+| Secrets in host secret stores (not `.env` committed) | `.env` in repo disqualifies a portfolio piece instantly for any reviewer who checks. | LOW | Fly secrets, Vercel env vars, Supabase dashboard. Already signaled in PROJECT.md. |
+| Graceful error UI when LLM/provider fails | 502s, 429s, and timeouts are normal on free tiers. A blank chat box is a portfolio killer; a toast saying "Model provider rate-limited, try again" is not. | LOW-MEDIUM | Dependency: existing SSE stream handler. Catch `httpx` errors in `llm_service.py`, surface as SSE `error` event with friendly text. |
+| Basic uptime / health check endpoint | Fly.io will kill and restart containers; it needs `/health` to know if a boot succeeded. Without it you get silent 5-minute cold starts. | LOW | FastAPI route returning `{"status": "ok"}`. Fly `http_checks` config. |
 
 ### Differentiators (Competitive Advantage)
 
-Features that set the product apart. Not required, but valuable.
+For a portfolio piece, "competitive advantage" means **things that make a reviewer remember the project**. These go beyond "it runs" and signal production-minded engineering.
 
 | Feature | Value Proposition | Complexity | Notes |
 |---------|-------------------|------------|-------|
-| KB navigation tools (ls, tree, grep, glob, read) | No board game app or RAG product gives the agent filesystem-like tools to navigate a knowledge base. This is the core differentiator -- the agent can explore structure, not just do vector search. Mirrors Claude Code's approach where the right tool is picked for the task. | HIGH | 5 distinct tools, each querying Supabase. `ls`: list folder contents (query folders + documents table). `tree`: recursive folder structure (recursive CTE or app-side recursion). `grep`: regex search across chunk content (pg `~` operator or app-side). `glob`: pattern match on file paths/names. `read`: fetch full document or line range from chunks. Each needs tool schema for the LLM and backend endpoint. |
-| Explorer sub-agent | Dedicated agent for deep multi-step KB traversal. Can summarize folders, discover cross-references between games (e.g., "games with worker placement"), and do side-by-side comparisons. Runs in its own context, keeping the main chat clean. | HIGH | Build on existing subagent_service. Explorer gets read-only tools (ls, tree, grep, glob, read). Needs its own system prompt optimized for exploration. Must return structured results to parent agent. Key differentiator over Ludomentor/Boardside which are single-turn Q&A. |
-| Cross-reference discovery | "Find all games with deck-building mechanics" or "Which games support 2 players?" -- queries that span the entire KB. No competitor does this well because they lack structured metadata + full-text search combined. | MEDIUM | Leverages existing text-to-SQL (Module 7) for metadata queries + grep/vector search for content queries. Explorer sub-agent orchestrates multi-step searches. Depends on good metadata extraction during ingestion. |
-| User-controllable search scope | Power users want to narrow searches: "Search only in Catan folder" or "Only my uploaded games". Manual override for when the agent's automatic selection isn't what you want. | LOW | Add optional `scope` parameter to search tools. UI: folder picker or dropdown in chat input. Backend: filter queries by folder_id or source (default/user). |
-| Game comparison and recommendations | "Compare Catan vs Ticket to Ride for beginners" or "Recommend a game like Wingspan for 4 players". Goes beyond rules lookup into reasoning across the KB. | MEDIUM | Mostly prompt engineering + explorer sub-agent. Agent retrieves relevant chunks from multiple games, then reasons. No special infrastructure needed beyond the tools and sub-agent. |
-| Folder summarization | "What's in the Strategy Games folder?" -- agent reads folder contents and generates a summary. Useful for orientation in large KBs. | LOW | Explorer sub-agent uses `ls` + `read` on key files, then summarizes. Primarily a prompt/tool-use pattern, not new infrastructure. |
+| One-click demo login button | Removes the single biggest friction point. Recruiter clicks → chat in 3 seconds. Outperforms "here are credentials, copy-paste." | LOW | Frontend-only: button on `/login` that calls `supabase.auth.signInWithPassword` with hardcoded demo creds. |
+| Nightly demo-data reset (cron) | Prevents demo account from being polluted with junk uploads by prior visitors. Visitor N+1 sees a clean slate. Also bounds storage costs. | MEDIUM | Fly.io cron or Supabase scheduled function (pg_cron). Deletes `documents` + `document_chunks` + storage objects for `user_id = demo_user_id`. Preserves default KB (visibility='public'). |
+| Public status page / health badge in README | Shields.io badge pinging `/health`. Tiny touch, signals ops awareness. | LOW | Shields.io endpoint badge or UptimeRobot public status page (free tier). |
+| Uptime monitoring (UptimeRobot / BetterStack free tier) | Catches Fly.io cold starts failing, Supabase outages, expired keys. Free tiers give 5-min interval + email alerts. | LOW | External service. Point at `/health`. Email to owner. |
+| Keep-warm ping to avoid cold starts | Fly.io free machines auto-stop after idle. First-visitor cold start is ~10-30s on a Python+Docling image. A cron-pinged `/health` every 4 minutes keeps it warm. | LOW | Trade-off: burns free-tier machine-hours. Acceptable for portfolio traffic. Alternative: Fly `auto_stop_machines = false` + `min_machines_running = 1`. |
+| Landing page / about route | Most portfolio RAGs drop visitors straight into chat. A 1-screen landing with "what this is / try demo / how it works / tech stack" converts better and gives context before the chat UI confuses non-technical viewers. | MEDIUM | New route `/` → landing, existing chat moves to `/chat`. Content-only page, no backend. |
+| Token/cost usage dashboard for owner | Private `/admin` route showing requests, tokens, cost-to-date per user. Answers "is the demo being abused right now?" at a glance. | MEDIUM | Dependency: LangSmith traces already capture this. Either link to LangSmith dashboard (free) or build a thin admin page reading from a `usage_events` table. LangSmith link is the 10x cheaper option. |
+| Abuse protection on signup (email verify + hCaptcha) | Public Supabase signup without verification = spam account farm. Supabase has built-in email confirmation and captcha hooks. | LOW-MEDIUM | Supabase Auth setting: require email confirmation. hCaptcha integration via Supabase Auth is config-only (dashboard) + anon key flow. |
+| Per-IP rate limit on unauthenticated routes | `/signup`, `/login`, `/api/health` need IP-level throttling (auth'd rate limits don't apply). Prevents credential stuffing and signup floods. | MEDIUM | SlowAPI or custom middleware keyed on `X-Forwarded-For` (Fly passes real IP in this header). |
+| README architecture diagram | A simple mermaid diagram (Vercel → Fly → Supabase → OpenRouter) in README signals systems thinking. Takes 20 minutes. | LOW | Mermaid renders in GitHub natively. |
+| Graceful degradation when web search / rerank unavailable | Tavily, Cohere rerank, OpenRouter each have independent outages. App should fall back (skip rerank, skip web search tool) rather than 500. | LOW-MEDIUM | Dependency: existing `retrieval_service.py`, `rerank_service.py`, `web_search_service.py`. Wrap each external call in try/except and omit from tool list or fall back to vector-only. |
+| Structured logs (JSON) with request IDs | Fly.io log viewer is 10x more useful with JSON logs and a request ID to correlate frontend → backend → LangSmith. | LOW | Python `logging` + JSON formatter (e.g., `python-json-logger`). Frontend sends `X-Request-Id`. |
 
 ### Anti-Features (Commonly Requested, Often Problematic)
 
-Features that seem good but create problems.
+Things that feel obvious for a "deployed app" but that are traps for a solo portfolio piece on free tiers.
 
 | Feature | Why Requested | Why Problematic | Alternative |
 |---------|---------------|-----------------|-------------|
-| Automated web scraping of board game rules | "Just pull rules from BGG/publisher sites automatically" | Copyright issues, scraping fragility, inconsistent formatting, violates project constraint (manual upload only). Ludomentor and Boardside only use licensed/official content. | Pre-seed a curated default KB with freely-available rulebooks. Let users upload their own purchased PDFs. |
-| Real-time collaborative KB editing | "Multiple users editing the same KB" | Massive complexity (OT/CRDT), not the core value prop, turns a knowledge base into Google Docs. | Single-user KB with read-only default content. Share via export if needed later. |
-| Game state tracking / scoring | "Track my Catan game score while playing" | Completely different product (game manager vs knowledge base). Each game has unique scoring rules. Enormous surface area. | Stay focused on knowledge retrieval. Link out to dedicated scoring apps if asked. |
-| Natural language folder creation | "Organize my games by player count automatically" | AI-driven organization is unreliable and surprising. Users want control over their folder structure. | Let users create folders manually. Agent can suggest organization but not execute it autonomously. |
-| Full-text indexing of every chunk for grep | "Make grep search the raw text of every chunk in real-time" | Postgres full-text search on large chunk tables is slow without proper indexing. Regex across millions of rows is expensive. | Use existing hybrid search (vector + keyword) for most queries. Reserve grep for targeted folder-scoped searches with LIMIT. Add GIN/GiST indexes. |
-| Admin UI for managing default KB | Seems necessary for maintaining game content | Adds an entire RBAC layer, admin routes, admin frontend. Seed script is sufficient for a pre-defined set of 10 games. | Use a seed script (Python or SQL) that runs on deploy. Update by modifying seed data and re-running. |
-| Chat-based file management | "Delete my Catan folder" via chat | Destructive operations via natural language are dangerous. Misinterpretation = data loss. | File management only through the file manager UI with explicit confirmation dialogs. Agent is read-only for KB structure. |
+| Fully anonymous guest mode (no login at all) | "Lowest friction for reviewers." | Every unauthenticated request is unattributable to a Supabase user → RLS breaks, rate limits can only key on IP (easy to rotate), and your OpenRouter budget has no owner to blame. Anonymous public LLM endpoints have been abused into four-figure bills repeatedly. | Shared demo login with hard rate limits + nightly reset. Same friction, real attribution. |
+| Full custom admin UI for usage/costs | "Founder needs visibility." | 2-3 days of work for something LangSmith + OpenRouter + Supabase dashboards already give you for free. | Link to LangSmith dashboard from README. Owner-only. |
+| Multi-region deploy | "Global audience." | Free-tier portfolio traffic is 5 reviewers in one region. Multi-region on Fly doubles cold-start headaches and complicates Supabase connection pooling. | Single region closest to you. Add regions only if latency becomes a real complaint. |
+| Dedicated CI/CD pipeline with staging env | "Real deploys have staging." | Staging + prod on free tiers = 2x secrets to rotate, 2x cold starts, 2x points of divergence. For a one-person portfolio, `main` → prod with manual rollback is enough. | Vercel preview deploys (automatic per-PR, free) cover the staging need for frontend. Fly deploys via `fly deploy` from local or GitHub Action. |
+| Aggressive bot detection / WAF | "Protect from DDoS." | Cloudflare WAF / Turnstile is overkill for portfolio traffic. Adds latency and false positives for legit reviewers on VPNs. | Rate limiting per user + per IP is enough. Fly.io sits behind anycast already. |
+| User-facing billing / usage meter | "Show users their quota." | Implies users care about quota. They don't — they're reviewers clicking once. Adds UI, backend counters, and expectation of accuracy. | Silent server-side rate limit. Return 429 with friendly message only when hit. |
+| Feature flag system | "Toggle features per user." | Zero payoff at solo-portfolio scale. Env vars are fine. | `settings.WEB_SEARCH_ENABLED` etc. via pydantic-settings (already the pattern). |
+| SSO / OAuth providers (Google, GitHub login) | "Reviewers want to log in with GitHub." | Every OAuth provider adds a new redirect URL to maintain, a new consent screen to test, and no reviewer will actually use it when `demo@ / demo123` is right there. Also complicates the demo-reset cron (can't delete a Google-linked account as easily). | Email/password only. Demo login button on login page. |
+| Separate "production" reranker / embedding model | "Prod should use the best model." | Embeddings are content-addressed in `document_chunks`. Switching embedding models on deploy day invalidates the entire seeded KB. | Same model as dev. Pin it in config. Lock it until v1.2. |
+| Aggressive caching layer (Redis in front of LLM) | "Save money on repeat queries." | Chat queries are highly unique; cache hit rate on free-form RAG queries is <5%. Redis adds a service, a connection string, a memory budget, and a cache-invalidation bug surface for negligible savings at portfolio volume. | Rate limiting is a 10x better cost lever than caching for this workload. |
+| Real-time leaderboard / public activity feed | "Show the app is alive." | Exposes other visitors' queries/uploads; privacy/RLS nightmare. | Usage counter in owner-only admin view. |
+| Custom auth flow replacing Supabase Auth | "More control." | Throws away email verification, captcha hooks, password reset, session management — all free from Supabase. | Use Supabase Auth. Every time. |
 
 ## Feature Dependencies
 
 ```
-[Folder hierarchy (DB + Storage)]
-    +--requires--> [File manager UI]
-    +--requires--> [KB navigation tools (ls, tree, glob)]
-    +--requires--> [Default board game KB seeding]
-    +--requires--> [User-controllable search scope]
+[Demo login button]
+    └──requires──> [Demo user seeded in Supabase]
+                       └──requires──> [Supabase prod project migrations+seed applied]
 
-[KB navigation tools (ls, tree, grep, glob, read)]
-    +--requires--> [Explorer sub-agent]
-    +--requires--> [Context-aware source selection]
+[Nightly demo reset cron]
+    └──requires──> [Demo user seeded + stable user_id]
+    └──requires──> [Fly.io scheduled job OR Supabase pg_cron]
 
-[Default board game KB]
-    +--requires--> [Context-aware source selection]
-    +--requires--> [Cross-reference discovery]
+[Per-user rate limiting]
+    └──requires──> [Existing Supabase Auth user_id dependency (already in place)]
+    └──enhances──> [Hard monthly spend cap] (defense in depth)
 
-[Smart chunking / token budget]
-    +--enhances--> [KB navigation tools (read)]
-    +--enhances--> [Explorer sub-agent]
+[LangSmith prod project]
+    └──requires──> [LANGSMITH_PROJECT env var in Fly secrets]
+    └──enables───> [Owner usage dashboard] (link-out, not build)
 
-[Image OCR]
-    +--independent-- (extends existing ingestion pipeline)
+[Sentry frontend]
+    └──requires──> [Vite source map upload in build step]
 
-[XLSX support]
-    +--independent-- (extends existing ingestion pipeline)
+[Uptime monitor]
+    └──requires──> [/health endpoint on backend]
+    └──enables───> [Status badge in README]
 
-[Transparent tool calls]
-    +--enhances--> [KB navigation tools]
-    +--enhances--> [Explorer sub-agent]
-    (extends existing Module 7 tool event streaming)
+[Keep-warm ping]
+    └──requires──> [/health endpoint]
+    └──conflicts─> [Fly auto_stop_machines=true] (pick one strategy)
 
-[Explorer sub-agent]
-    +--requires--> [KB navigation tools]
-    +--enhances--> [Cross-reference discovery]
-    +--enhances--> [Game comparison / recommendations]
-    +--enhances--> [Folder summarization]
+[Graceful degradation (rerank/web/LLM)]
+    └──requires──> [Existing service wrappers in backend/services/*]
+    └──enhances──> [All chat flows]
+
+[CAPTCHA on signup]
+    └──requires──> [Supabase Auth captcha provider config]
+    └──enhances──> [Per-IP rate limit] (belt-and-suspenders against bot signups)
+
+[Landing page]
+    └──requires──> [React Router restructure: / → landing, /chat → existing chat]
+    └──enhances──> [Demo login button placement]
 ```
 
 ### Dependency Notes
 
-- **Folder hierarchy is the foundation:** Almost everything depends on folders existing in the DB. This must be built first. Without it, ls/tree/glob have nothing to navigate, the file manager has nothing to display, and the default KB has nowhere to live.
-- **KB tools before explorer sub-agent:** The explorer agent needs tools to work with. Build the 5 tools first, then wire them into a sub-agent.
-- **Default KB seeding depends on folder hierarchy:** The seed script needs the folder structure to exist so it can place games in the right folders.
-- **Image OCR and XLSX are independent:** These extend the existing ingestion pipeline and can be built in parallel with other work. No dependencies on new features.
-- **Transparent tool calls extend existing infrastructure:** Module 7 already streams tool events. New tools just need to emit the same event format.
-- **Smart chunking enhances but doesn't block:** The system works without it (just less efficiently). Can be added as an optimization pass.
+- **Demo reset cron requires stable demo user_id:** Seed the demo user in a migration (or a one-shot script stored in `supabase/seed/`) so the cron deletes the right rows. Do NOT hardcode the uuid; read it from an env var `DEMO_USER_ID` set after seed.
+- **Per-user rate limiting + hard spend cap are complementary, not redundant:** Rate limiting protects against one chatty user. Spend cap protects against a thousand of them, or against a bug in your own loop. Both are table stakes.
+- **Keep-warm conflicts with auto-stop:** Pick one. For a portfolio, `min_machines_running = 1` on Fly is simpler than cron-pinging; it also uses less total compute than a 4-min ping loop.
+- **Graceful degradation depends on existing service abstractions:** Already in place (`retrieval_service`, `rerank_service`, `web_search_service` are separate modules) — this is a wrap-in-try/except change, not an architecture change.
+- **Landing page enhances demo login:** If `/` is the chat UI, the demo login button has nowhere to live except the login page. A landing page is where "Try the demo" naturally lives.
 
 ## MVP Definition
 
-### Launch With (v1)
+### Launch With (v1.1)
 
-Minimum viable product -- what's needed to validate the "board game KB with agent tools" concept.
+Must ship for the URL to be shareable as a portfolio piece without embarrassment or financial risk.
 
-- [ ] Folder hierarchy in DB and Supabase Storage -- foundation for everything
-- [ ] Default board game KB (10 games seeded) -- immediate value without uploads
-- [ ] KB navigation tools: ls, tree, read -- minimum tool set for structured navigation
-- [ ] Context-aware source selection -- agent picks default KB vs user docs
-- [ ] Transparent tool calls in chat UI -- users see what the agent does
-- [ ] Smart chunking with token budget -- prevents context window blowout on long manuals
-- [ ] File manager UI (basic: tree view, breadcrumbs, upload to folder) -- users need to see and organize their docs
+- [ ] Public HTTPS URL (Vercel + Fly defaults) — portfolio pointer
+- [ ] Demo credentials in README + seeded demo user — reviewer conversion
+- [ ] Per-user rate limit on chat endpoint — cost control
+- [ ] Hard monthly spend cap alerts on OpenRouter + OpenAI + Tavily — cost control
+- [ ] `/health` endpoint + Fly health checks — prevents silent cold-start death
+- [ ] CORS + Supabase auth redirect URLs locked to prod origin — basic security
+- [ ] Secrets in Fly/Vercel/Supabase secret stores (no `.env` in repo) — portfolio table stakes
+- [ ] Sentry on frontend — error visibility
+- [ ] LangSmith prod project separate from dev — trace hygiene
+- [ ] Graceful error UI when LLM/provider fails — visible polish
+- [ ] README with live URL, demo creds, screenshot, short architecture note — reviewer experience
 
-### Add After Validation (v1.x)
+### Add After Validation (v1.1.x / quickly after launch)
 
-Features to add once core is working.
+Add once the URL is up and traffic starts trickling in. Triggered by real observations.
 
-- [ ] KB tools: grep, glob -- complete the tool set after ls/tree/read prove the pattern
-- [ ] Explorer sub-agent -- once tools are stable, add the deep-traversal agent
-- [ ] Image OCR -- when users request it (photos of rule cards)
-- [ ] XLSX support -- when users request it (score sheets)
-- [ ] User-controllable search scope -- once the KB grows large enough to need it
-- [ ] Cross-reference discovery -- once explorer sub-agent is working
+- [ ] One-click demo login button — add if README creds copy-paste shows friction in session replay
+- [ ] Nightly demo data reset cron — add as soon as the second visitor pollutes the demo account
+- [ ] Uptime monitor (UptimeRobot free) — add once you notice you don't know when the app is down
+- [ ] Keep-warm strategy (min_machines_running=1 OR cron ping) — add after first complaint about cold start
+- [ ] Per-IP rate limit on unauthenticated routes — add if signup spam appears
+- [ ] CAPTCHA + email verification on signup — add with per-IP limit (same trigger)
+- [ ] Landing page — add once you want to share the URL in contexts beyond "recruiter reviewing resume"
 
-### Future Consideration (v2+)
+### Future Consideration (v1.2+)
 
-Features to defer until product-market fit is established.
+Nice to have, but each introduces complexity disproportionate to portfolio value today.
 
-- [ ] Folder summarization -- nice-to-have, not core
-- [ ] Game comparison/recommendations -- impressive but requires solid KB + tools first
-- [ ] Advanced file manager (drag-drop reorder, bulk operations, right-click menus) -- polish after basics work
-- [ ] Side-by-side rule comparison view in UI -- specialized UI component, low priority
+- [ ] Custom domain — defer until you have a personal brand domain to attach
+- [ ] Owner admin dashboard (custom UI) — defer; LangSmith link covers it
+- [ ] Structured JSON logs + request IDs — defer until you actually need to debug a prod incident
+- [ ] Vercel preview deploys as implicit staging — free, but only add if you start doing meaningful PR work
+- [ ] Multi-provider LLM failover (OpenRouter → direct OpenAI) — defer; graceful degradation is enough
+- [ ] Public status page — defer; Shields.io badge is enough
 
 ## Feature Prioritization Matrix
 
 | Feature | User Value | Implementation Cost | Priority |
 |---------|------------|---------------------|----------|
-| Folder hierarchy (DB/Storage) | HIGH | MEDIUM | P1 |
-| Default board game KB (10 games) | HIGH | MEDIUM | P1 |
-| KB tools: ls, tree, read | HIGH | MEDIUM | P1 |
-| Context-aware source selection | HIGH | MEDIUM | P1 |
-| Transparent tool calls | HIGH | LOW | P1 |
-| Smart chunking / token budget | HIGH | MEDIUM | P1 |
-| File manager UI (basic) | HIGH | HIGH | P1 |
-| KB tools: grep, glob | MEDIUM | MEDIUM | P2 |
-| Explorer sub-agent | HIGH | HIGH | P2 |
-| Image OCR | MEDIUM | MEDIUM | P2 |
-| XLSX support | LOW | LOW | P2 |
-| User-controllable scope | MEDIUM | LOW | P2 |
-| Cross-reference discovery | MEDIUM | MEDIUM | P2 |
-| Folder summarization | LOW | LOW | P3 |
-| Game comparison/recommendations | MEDIUM | MEDIUM | P3 |
-| Advanced file manager features | LOW | HIGH | P3 |
+| Public HTTPS URL | HIGH | LOW | P1 |
+| Demo credentials + seeded user | HIGH | LOW | P1 |
+| Per-user rate limit | HIGH (to owner, not visitor) | MEDIUM | P1 |
+| Monthly spend cap alerts | HIGH (to owner) | LOW | P1 |
+| `/health` endpoint + Fly checks | HIGH (ops) | LOW | P1 |
+| CORS / auth redirect hardening | HIGH (security) | LOW | P1 |
+| Secrets in host stores | HIGH (portfolio integrity) | LOW | P1 |
+| Sentry frontend | MEDIUM | LOW | P1 |
+| LangSmith prod project split | MEDIUM | LOW | P1 |
+| Graceful LLM error UI | HIGH | LOW-MEDIUM | P1 |
+| README with URL/creds/screenshot | HIGH | LOW | P1 |
+| One-click demo login button | HIGH | LOW | P2 |
+| Nightly demo reset cron | MEDIUM | MEDIUM | P2 |
+| Uptime monitor | MEDIUM (owner) | LOW | P2 |
+| Keep-warm (min_machines_running=1) | MEDIUM | LOW | P2 |
+| Per-IP rate limit | MEDIUM | MEDIUM | P2 |
+| CAPTCHA on signup | MEDIUM | LOW-MEDIUM | P2 |
+| Email verification on signup | MEDIUM | LOW | P2 |
+| Graceful degradation (rerank/web/LLM) | MEDIUM | LOW-MEDIUM | P2 |
+| Landing page | MEDIUM | MEDIUM | P2 |
+| Status badge in README | LOW | LOW | P2 |
+| Structured JSON logs | LOW | LOW | P3 |
+| Custom domain | LOW | LOW | P3 |
+| Owner admin UI | LOW | MEDIUM-HIGH | P3 (anti-feature; use LangSmith) |
 
 **Priority key:**
-- P1: Must have for launch -- validates the core concept
-- P2: Should have, add when core is stable
-- P3: Nice to have, future consideration
+- P1: Must ship with v1.1 deployment or the portfolio piece is embarrassing/unsafe
+- P2: Ship in v1.1 or shortly after; strong polish and risk mitigation
+- P3: Defer to v1.2+ unless triggered by real signal
 
 ## Competitor Feature Analysis
 
-| Feature | Ludomentor | Rulepop | Boardside (BGG) | Our Approach |
-|---------|------------|---------|------------------|--------------|
-| Pre-loaded game rules | Yes (curated library) | Yes (publisher partnerships) | Yes (official rulebooks only) | Yes (10 pre-seeded classics) |
-| AI Q&A about rules | Yes (core feature) | No (static reference) | Yes (AI chatbot) | Yes, plus multi-step reasoning via tools |
-| Cross-game queries | No (single-game context) | No (single-game reference) | No (single-game chatbot) | Yes -- grep/vector search across entire KB |
-| User uploads | No | No | No | Yes -- private document uploads with folders |
-| Folder organization | N/A (flat game list) | N/A (per-game site) | N/A (per-game thread) | Yes -- hierarchical folders in file manager |
-| Image/OCR support | No (text-only) | No (digital rules only) | No | Yes -- OCR for photographed rule cards |
-| Transparent agent actions | No (black box) | N/A (not AI) | No (black box) | Yes -- Claude Code-style tool visibility |
-| Offline support | Yes (PWA) | Yes (PWA) | No | No (web app, not PWA -- out of scope) |
-| Multi-step exploration | No (single-turn) | No (static) | No (single-turn) | Yes -- explorer sub-agent with tool loop |
+"Competitors" here = other deployed portfolio AI/RAG apps a hiring manager might click before or after yours. Patterns observed across many public deployments (personal sites, Show HN posts, LangChain/LlamaIndex community showcases, Vercel AI SDK templates).
 
-**Key competitive insight:** Existing board game rule apps are either static references (Rulepop) or single-turn AI Q&A (Ludomentor, Boardside). None offer multi-step agent exploration, cross-game queries, user uploads, or transparent tool use. The combination of structured KB navigation tools + explorer sub-agent + user uploads is genuinely novel in this space.
+| Feature | Typical Portfolio RAG | Typical "Production-Lite" SaaS Demo | Our Approach |
+|---------|----------------------|--------------------------------------|--------------|
+| Login strategy | No auth (totally open) OR magic-link only | Email+password + OAuth + SSO | Email+password (existing) + demo login button |
+| Cost control | None (hope for the best) | Per-tier quotas, Stripe metering | Per-user rate limit + monthly spend alert |
+| Demo data | Polluted free-for-all | Per-session sandbox (ephemeral) | Shared demo user + nightly reset |
+| Observability | console.log in browser devtools | Sentry + Datadog + PagerDuty | Sentry frontend + LangSmith prod project + UptimeRobot |
+| Cold starts | Present, ignored | Kept warm via min instances | `min_machines_running=1` on Fly (or cron ping) |
+| Error UX | White screen or raw stack trace | Toast + retry + status page | Toast on SSE error event + `/health` for monitor |
+| Landing surface | Dropped directly into app UI | Marketing page + pricing + docs | Short landing (about/how/try) + demo button → chat |
+| README | Single line + deploy badge | Full wiki, architecture docs, contributing guide | Live URL + demo creds + screenshot + mermaid diagram + tech stack |
+| Abuse protection | None | WAF + CAPTCHA + fraud detection | CAPTCHA on signup + per-IP + per-user rate limit |
+| Secrets handling | `.env` in repo (occasional) or host env vars | Vault / KMS / rotated secrets | Host secret stores (Fly/Vercel/Supabase) |
+
+Our approach sits deliberately in the middle: more rigorous than "drop it on a VPS" portfolio norms (because this is a *public* LLM endpoint with real cost exposure), less ceremonial than SaaS-demo norms (because it's a solo project, not a business).
 
 ## Sources
 
-- [Ludomentor - Board Game AI](https://play.google.com/store/apps/details?id=com.awakenrealms.ludomentor) - Competitor: AI rules Q&A app
-- [Rulepop](https://rulepop.com/) - Competitor: Digital rulebook platform with linked rules
-- [Boardside AI on BGG](https://boardgamegeek.com/thread/3631492/boardside-ai-app-for-board-game-rules) - Competitor: AI chatbot for board game rules
-- [Claude Code Tools Reference](https://www.vtrivedy.com/posts/claudecode-tools-reference) - Tool design patterns
-- [Claude Code System Prompts (Piebald-AI)](https://github.com/Piebald-AI/claude-code-system-prompts) - Explore agent architecture
-- [Claude Code Sub-agents Docs](https://code.claude.com/docs/en/sub-agents) - Sub-agent patterns
-- [RAG Chunking Strategies 2026 Benchmark](https://blog.premai.io/rag-chunking-strategies-the-2026-benchmark-guide/) - Chunking best practices
-- [Context Window Chunk Strategy Guide 2026](https://markaicode.com/rag-context-window-chunk-strategy/) - Token budget management
-- [Board Game App Companions Market Report](https://dataintelo.com/report/board-game-app-companions-market/amp) - Market size ($1.18B in 2024)
-- [Agentic RAG Survey](https://arxiv.org/abs/2501.09136) - Transparency and tool-use patterns
+- PROJECT.md v1.1 milestone definition (target features confirmed: containerized backend, Fly.io, Vercel, Supabase prod split, auth/CORS hardening, secret stores, observability baseline, demo creds + README)
+- CLAUDE.md architecture context (existing services, auth, RLS, SSE, LangSmith integration already in place — feeds "dependencies on existing features" column)
+- Fly.io documentation norms for free-tier machines (`auto_stop_machines`, `http_checks`, secrets) — MEDIUM confidence, training data
+- Vercel documentation norms for env vars + preview deploys — MEDIUM confidence, training data
+- Supabase Auth capabilities (email verification, captcha hooks, redirect URL allowlist) — MEDIUM confidence, training data
+- LangSmith project-per-environment pattern — HIGH confidence, standard practice
+- Community patterns from Show HN / Vercel AI SDK template deployments / LangChain community showcases (rate-limit-or-regret stories) — MEDIUM confidence, pattern-based not source-cited
+- SlowAPI (FastAPI rate limiting) — MEDIUM confidence, known library
+
+**Confidence caveats:**
+- Host-specific config details (exact Fly.io flag names, Supabase dashboard UI paths) are LOW-MEDIUM confidence from training data and should be verified against current docs during phase planning.
+- "Typical portfolio RAG" patterns are synthesized from community norms, not a formal survey.
+- No Context7 lookups performed; this is ecosystem/pattern research, not library API research. Phase-specific plans (e.g., "add SlowAPI") should Context7-verify the library at plan time.
 
 ---
-*Feature research for: Board Game Knowledge Base with Claude Code-style Agent Tooling*
-*Researched: 2026-04-07*
+*Feature research for: portfolio deployment of feature-complete agentic RAG*
+*Researched: 2026-04-22*
