@@ -1,0 +1,32 @@
+# Secrets — never enter the image
+.env
+.env.*
+!.env.example
+
+# Python runtime artifacts
+venv/
+backend/venv/
+__pycache__/
+**/__pycache__/
+*.pyc
+.pytest_cache/
+.mypy_cache/
+
+# VCS
+.git/
+.gitignore
+
+# Frontend — backend image does not need it
+frontend/
+node_modules/
+**/node_modules/
+
+# Planning / docs / editor config
+.planning/
+docs/
+*.md
+.vscode/
+.idea/
+
+# Tests — not needed in runtime image
+backend/tests/
