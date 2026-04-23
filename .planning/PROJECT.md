@@ -45,21 +45,18 @@ The agent can intelligently search and reason across a structured board game kno
 - ✓ User-controllable search scope (narrow to specific folders/games) — Validated in Phase 6
 - ✓ Update existing sub-agent system for consistency with new explorer agent — Validated in Phase 6
 
+- ✓ Context-aware source selection (agent decides default KB vs private docs vs both) — v1.0 (Phase 6)
+- ✓ File manager-style folder/subfolder UI for organizing documents — v1.0 (Phase 4)
+- ✓ Hierarchical folder structure in Supabase storage and DB — v1.0 (Phase 1 schema + Phase 4 UI)
+- ✓ KB navigation tools: ls, tree, grep, glob, read — v1.0 (Phase 3)
+- ✓ Transparent tool calls in chat UI (like Claude Code) — v1.0 (Phase 3 ToolCallCard)
+- ✓ Smart chunking with automatic token budget management — v1.0 (Phase 6 TokenBudget)
+- ✓ User-controllable search scope (narrow to specific folders/games) — v1.0 (Phase 6 scope parsing + badge)
+- ✓ Update existing sub-agent system for consistency with new explorer agent — v1.0 (Phase 6 analyze_document alignment)
+
 ### Active
 
-- [x] Context-aware source selection (agent decides default KB vs private docs vs both) — Validated in Phase 6
-- [x] File manager-style folder/subfolder UI for organizing documents — Validated in Phase 4
-- [x] Hierarchical folder structure in Supabase storage and DB — Validated in Phase 1 (schema) + Phase 4 (UI)
-- [ ] KB navigation tools: ls (list files in folder)
-- [ ] KB navigation tools: tree (hierarchical structure view)
-- [ ] KB navigation tools: grep (regex content search across chunks)
-- [ ] KB navigation tools: glob (file pattern matching)
-- [ ] KB navigation tools: read (full file or line-range extraction)
-- [ ] KB structure tool: extract tree structure for agent orientation
-- [ ] Transparent tool calls in chat UI (show what agent is doing, like Claude Code)
-- [x] Smart chunking with automatic token budget management — Validated in Phase 6
-- [x] User-controllable search scope (narrow to specific folders/games) — Validated in Phase 6
-- [x] Update existing sub-agent system for consistency with new explorer agent — Validated in Phase 6
+(None — next milestone starts with `/gsd:new-milestone`)
 
 ### Out of Scope
 
@@ -95,13 +92,16 @@ The agent can intelligently search and reason across a structured board game kno
 
 | Decision | Rationale | Outcome |
 |----------|-----------|---------|
-| Pre-seed 10 default board games on deploy | Quick to seed, covers top classics, gives immediate value without user uploads | — Pending |
+| Pre-seed 10 default board games on deploy | Quick to seed, covers top classics, gives immediate value without user uploads | ✓ Phase 2 |
 | Context-aware source selection (agent decides) | More natural than manual toggles — agent picks sources based on query intent | ✓ Phase 6 |
-| File manager-style folder UI | Full drag-drop, tree sidebar, right-click menus — richest interaction model for organizing many files | — Pending |
-| Transparent tool calls (like Claude Code) | Users see what the agent is doing — builds trust and understanding | — Pending |
-| All KB tools query Supabase (not filesystem) | Documents already stored in Supabase — tools should use the same data layer | — Pending |
+| File manager-style folder UI | Full drag-drop, tree sidebar, right-click menus — richest interaction model for organizing many files | ✓ Phase 4 |
+| Transparent tool calls (like Claude Code) | Users see what the agent is doing — builds trust and understanding | ✓ Phase 3 |
+| All KB tools query Supabase (not filesystem) | Documents already stored in Supabase — tools should use the same data layer | ✓ Phase 3 |
 | Explorer sub-agent for deep traversal | Complex multi-step KB searches need isolated context — mirrors Claude Code's explorer agent pattern | ✓ Phase 5 |
 | Smart chunking + user scope controls | Both needed — automatic budget management plus manual override for power users | ✓ Phase 6 |
+| ltree for folder hierarchy | GiST-indexed, recursive queries, matches agent traversal patterns | ✓ Phase 1 |
+| Mixed-visibility RLS (public default + private uploads) | Single table, single query path; `visibility='public'` + `user_id=auth.uid()` OR filter | ✓ Phase 1 |
+| Retroactive verification via decimal phase (03.1) | Phase 3 shipped before VERIFICATION.md step existed — 03.1 closed gap without rework | ✓ Phase 03.1 |
 
 ## Evolution
 
@@ -121,4 +121,11 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-04-22 after Phase 03.1 verification closure (v1.0 audit gaps resolved)*
+## Current State
+
+**Shipped:** v1.0 KB Navigation & Agentic RAG (2026-04-23) — 7 phases, 21 plans, 39/39 requirements satisfied, full cross-phase integration verified. See [milestones/v1.0-ROADMAP.md](milestones/v1.0-ROADMAP.md).
+
+**Next Milestone:** TBD — run `/gsd:new-milestone` to scope v1.1.
+
+---
+*Last updated: 2026-04-23 after v1.0 milestone completion*
