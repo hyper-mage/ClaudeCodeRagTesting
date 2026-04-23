@@ -30,7 +30,9 @@
   3. Frontend `api.ts` prefixes every fetch with `${VITE_API_BASE_URL ?? ''}` so dev (empty → Vite proxy) and prod (absolute Fly URL) both work without code changes.
   4. `backend/requirements.txt` pins `docling` to a specific version and `pip install -r requirements.txt` reproduces the same resolved tree twice in a row.
   5. A production Vite build grepped for `SUPABASE_SERVICE_ROLE_KEY` / other backend-only secrets returns zero matches.
-**Plans**: TBD
+**Plans**: 2 plans
+  - [ ] 01-01-PLAN.md — Backend hygiene: .dockerignore, env-driven CORS allowlist, docling pin + unpinned-dep audit
+  - [ ] 01-02-PLAN.md — Frontend VITE_API_BASE_URL centralization + prod bundle secret-leak grep guard
 
 ### Phase 2: Dockerize Backend
 **Goal**: Developer can build and run the backend container locally and confirm FastAPI + Docling + PDF/DOCX/image ingest all work inside the image before spending any Fly deploy cycles.
@@ -119,7 +121,7 @@
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Secrets & Repo Hygiene | 0/? | Not started | — |
+| 1. Secrets & Repo Hygiene | 0/2 | Not started | — |
 | 2. Dockerize Backend | 0/? | Not started | — |
 | 3. Prod Supabase Project | 0/? | Not started | — |
 | 4. Deploy Backend to Fly.io | 0/? | Not started | — |
