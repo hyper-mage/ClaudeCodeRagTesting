@@ -139,5 +139,7 @@ This document evolves at phase transitions and milestone boundaries.
 
 **Active Milestone:** v1.1 Portfolio Deployment — ship app to public URL on free-tier hosts (Fly.io backend, Vercel frontend, Supabase prod project).
 
+**Progress:** Phase 01 (secrets-repo-hygiene) complete — env-driven CORS allowlist, `.dockerignore`, pinned `requirements.txt` (`docling==2.82.0`), frontend API centralized through `apiFetch`/`apiStream` with `VITE_API_BASE_URL`. DEPLOY-02, DEPLOY-06, DEPLOY-08, SEC-02, SEC-07 satisfied.
+
 ---
-*Last updated: 2026-04-22 — v1.1 milestone started*
+*Last updated: 2026-04-23 — Phase 01 secrets-repo-hygiene complete*
