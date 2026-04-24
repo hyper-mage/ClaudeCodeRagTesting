@@ -1,0 +1,7 @@
+# Binary fixtures — never apply EOL conversion
+*.pdf binary
+*.docx binary
+*.xlsx binary
+*.png binary
+*.jpg binary
+*.jpeg binary
