@@ -43,7 +43,8 @@
   2. `docker run --env-file .env -p 8000:8000 <image>` boots the container and `curl http://localhost:8000/api/health` returns 200.
   3. Ingesting a real PDF and a real DOCX against the running container completes without missing-native-dep errors (no `libgl`, `libglib`, `poppler`, or `tesseract` runtime failures).
   4. Built image size is within Fly free-tier rootfs limits, verified by `docker image inspect`.
-**Plans**: TBD
+**Plans**: 1 plan
+  - [ ] 02-01-PLAN.md — Dockerfile (single-stage, non-root, CPU torch, Docling model preload) + smoke-test script (build, health, PDF/DOCX ingest, size audit) + fixtures
 
 ### Phase 3: Prod Supabase Project
 **Goal**: A dedicated prod Supabase project exists with the exact schema, RLS policies, Storage bucket config, and default board-game KB that the app expects at runtime.
