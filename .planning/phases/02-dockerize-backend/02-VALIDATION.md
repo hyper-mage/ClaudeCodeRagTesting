@@ -18,17 +18,17 @@ created: 2026-04-24
 | Property | Value |
 |----------|-------|
 | **Framework** | bash smoke script (docker build + curl + in-container ingest) |
-| **Config file** | `scripts/smoke-docker.sh` — Wave 0 creates |
-| **Quick run command** | `bash scripts/smoke-docker.sh --quick` |
-| **Full suite command** | `bash scripts/smoke-docker.sh` |
+| **Config file** | `backend/scripts/docker_smoke.sh` — Wave 0 creates |
+| **Quick run command** | `bash backend/scripts/docker_smoke.sh` (full run — no sub-modes per D-11) |
+| **Full suite command** | `bash backend/scripts/docker_smoke.sh` |
 | **Estimated runtime** | ~180 seconds (build cached) / ~600 seconds (cold build + models) |
 
 ---
 
 ## Sampling Rate
 
-- **After every task commit:** Run `bash scripts/smoke-docker.sh --quick` (build + health check only)
-- **After every plan wave:** Run full smoke script (build + run + PDF + DOCX ingest + regression checks + size audit)
+- **After every task commit:** Run `bash backend/scripts/docker_smoke.sh` (full run — build + health + ingest + regression)
+- **After every plan wave:** Run `bash backend/scripts/docker_smoke.sh` (same — no sub-modes)
 - **Before `/gsd:verify-work`:** Full script must exit 0
 - **Max feedback latency:** 600 seconds
 
@@ -38,12 +38,9 @@ created: 2026-04-24
 
 | Task ID | Plan | Wave | Requirement | Test Type | Automated Command | File Exists | Status |
 |---------|------|------|-------------|-----------|-------------------|-------------|--------|
-| 02-01-01 | 01 | 1 | DEPLOY-01 | fixture | `test -f backend/tests/fixtures/sample.pdf && test -f backend/tests/fixtures/sample.docx` | ❌ W0 | ⬜ pending |
-| 02-01-02 | 01 | 1 | DEPLOY-01 | build | `docker build -t ragkb-backend:test -f backend/Dockerfile .` | ❌ W0 | ⬜ pending |
-| 02-01-03 | 01 | 1 | DEPLOY-01 | smoke | `bash scripts/smoke-docker.sh --health` | ❌ W0 | ⬜ pending |
-| 02-01-04 | 01 | 1 | DEPLOY-01 | integration | `bash scripts/smoke-docker.sh --ingest` | ❌ W0 | ⬜ pending |
-| 02-01-05 | 01 | 1 | DEPLOY-01 | regression | `bash scripts/smoke-docker.sh --regression` (no-CUDA, non-root, cache path, no `.env` baked) | ❌ W0 | ⬜ pending |
-| 02-01-06 | 01 | 1 | DEPLOY-01 | size | `docker image inspect ragkb-backend:test --format '{{.Size}}'` ≤ 7.5GB | ❌ W0 | ⬜ pending |
+| 02-01-01 | 01 | 1 | DEPLOY-01 | fixture | `test -f backend/tests/fixtures/hello.pdf && test -f backend/tests/fixtures/hello.docx` | ❌ W0 | ⬜ pending |
+| 02-01-02 | 01 | 1 | DEPLOY-01 | build + regression | `docker build -t ragkb-backend:test .` + CPU-torch/non-root/model-cache/no-`.env`-baked probes | ❌ W0 | ⬜ pending |
+| 02-01-03 | 01 | 1 | DEPLOY-01 | smoke e2e | `bash backend/scripts/docker_smoke.sh` (preflight → build → size audit → health → PDF + DOCX ingest → regression) | ❌ W0 | ⬜ pending |
 
 *Status: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky*
 
@@ -51,11 +48,12 @@ created: 2026-04-24
 
 ## Wave 0 Requirements
 
-- [ ] `backend/tests/fixtures/sample.pdf` — reportlab-generated, ≤50KB, committed
-- [ ] `backend/tests/fixtures/sample.docx` — python-docx-generated, ≤50KB, committed
-- [ ] `scripts/smoke-docker.sh` — executable, supports `--quick`, `--health`, `--ingest`, `--regression`, full run
-- [ ] `backend/Dockerfile` — does not yet exist
-- [ ] `backend/.dockerignore` — does not yet exist
+- [ ] `backend/tests/fixtures/hello.pdf` — reportlab-generated, ≤50KB, committed (D-12)
+- [ ] `backend/tests/fixtures/hello.docx` — python-docx-generated, ≤50KB, committed (D-12)
+- [ ] `backend/scripts/generate_smoke_fixtures.py` — throwaway generator, committed (D-12)
+- [ ] `backend/scripts/docker_smoke.sh` — executable, full run only (D-11)
+- [ ] `Dockerfile` at repo root — does not yet exist (D-10)
+- [ ] `.dockerignore` — preserved from Phase 1
 
 ---
 
@@ -63,7 +61,7 @@ created: 2026-04-24
 
 | Behavior | Requirement | Why Manual | Test Instructions |
 |----------|-------------|------------|-------------------|
-| Image runs on fresh host without cached layers | DEPLOY-01 | Cold-cache only reproducible by pruning local Docker cache | `docker builder prune -af && docker build -t ragkb-backend:cold -f backend/Dockerfile .` then rerun smoke script |
+| Image runs on fresh host without cached layers | DEPLOY-01 | Cold-cache only reproducible by pruning local Docker cache | `docker builder prune -af && docker build -t ragkb-backend:cold .` then rerun smoke script |
 | Docling model download completes inside build (offline runtime) | DEPLOY-01 | Validates `docling-tools models download` executed as `appuser`, weights under `/home/appuser/.cache/docling/models` | `docker run --rm ragkb-backend:test ls -la /home/appuser/.cache/docling/models` |
 
 ---
