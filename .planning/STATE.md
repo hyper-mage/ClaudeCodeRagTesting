@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: milestone
-status: executing
-stopped_at: Phase 2 context gathered
-last_updated: "2026-04-24T04:13:12.895Z"
-last_activity: 2026-04-24
+status: verifying
+stopped_at: Completed 02-01-PLAN.md
+last_updated: "2026-04-26T18:25:56.887Z"
+last_activity: 2026-04-26
 progress:
   total_phases: 8
-  completed_phases: 1
-  total_plans: 2
-  completed_plans: 2
+  completed_phases: 2
+  total_plans: 3
+  completed_plans: 3
   percent: 0
 ---
 
@@ -21,14 +21,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-23 after v1.0 completion)
 
 **Core value:** The agent can intelligently search and reason across a structured board game knowledge base -- finding rules, comparing mechanics, and recommending games -- using the right tool for the job, transparently.
-**Current focus:** Phase 01 — secrets-repo-hygiene
+**Current focus:** Phase 02 — dockerize-backend
 
 ## Current Position
 
-Phase: 2
-Plan: Not started
-Status: Executing Phase 01
-Last activity: 2026-04-24
+Phase: 02 (dockerize-backend) — EXECUTING
+Plan: 1 of 1
+Status: Phase complete — ready for verification
+Last activity: 2026-04-26
 
 Progress: [░░░░░░░░░░] 0% (0/8 phases)
 
@@ -52,6 +52,7 @@ Progress: [░░░░░░░░░░] 0% (0/8 phases)
 - Trend: —
 
 *Updated after each plan completion. v1.0 performance history archived in `.planning/milestones/v1.0-phases/`.*
+| Phase 02 P01 | 90min | 3 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -65,6 +66,7 @@ Recent decisions affecting current work:
 - [v1.1 Roadmap]: Phase 1 is pure code hygiene — must land before any container build to prevent `.env` leak and CORS spec-invalid combo
 - [v1.1 Roadmap]: Observability (Phase 7) kept separate from Polish (Phase 8) because observability must be live *before* sharing URL publicly; Phase 8 is the "share it" phase
 - [v1.1 Roadmap]: Fly free-tier default (`auto_stop_machines=suspend`, no `min_machines_running`) with documented one-line toggle for keep-warm — accept cold-start cost for portfolio traffic initially
+- [Phase 02]: Dockerfile at repo root with USER appuser before docling-tools models download (cache lands under /home/appuser/.cache/docling); CPU torch via --extra-index-url; fixtures host-side only
 
 ### Pending Todos
 
@@ -80,7 +82,7 @@ None — roadmap complete, awaiting `/gsd:plan-phase 1`.
 
 ## Session Continuity
 
-Last session: 2026-04-24T04:13:12.889Z
-Stopped at: Phase 2 context gathered
-Resume file: .planning/phases/02-dockerize-backend/02-CONTEXT.md
+Last session: 2026-04-26T18:25:48.654Z
+Stopped at: Completed 02-01-PLAN.md
+Resume file: None
 Next: `/gsd:plan-phase 1` (Secrets & Repo Hygiene)
