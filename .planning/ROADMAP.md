@@ -56,7 +56,9 @@
   3. Storage bucket `documents` exists in prod with policies reapplied so RLS behaves identically to dev.
   4. Default board-game KB seed script completes successfully against prod and `SELECT count(*) FROM documents WHERE visibility='public'` returns the expected seed count (≥10 games).
   5. Prod `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, and anon key are captured in the developer's password manager (not in the repo).
-**Plans**: TBD
+**Plans**: 2 plans
+  - [ ] 03-01-PLAN.md — Repo prep (.gitignore .env*, supabase init, migration rename to timestamps, run_all bundle to legacy/, backend/config.py ENV_FILE patch, verify_prod_supabase.sh) + supabase link/db push + schema verify
+  - [ ] 03-02-PLAN.md — Build .env.prod, run idempotent seed (10 board games), verify seed counts, capture creds in 1Password, supabase unlink
 
 ### Phase 4: Deploy Backend to Fly.io
 **Goal**: The containerized backend is reachable at a public `*.fly.dev` URL, talking to the prod Supabase project, serving `/api/health` and SSE chat end-to-end.
@@ -124,7 +126,7 @@
 |-------|----------------|--------|-----------|
 | 1. Secrets & Repo Hygiene | 0/2 | Not started | — |
 | 2. Dockerize Backend | 0/? | Not started | — |
-| 3. Prod Supabase Project | 0/? | Not started | — |
+| 3. Prod Supabase Project | 0/2 | Not started | — |
 | 4. Deploy Backend to Fly.io | 0/? | Not started | — |
 | 5. Deploy Frontend to Cloudflare Pages | 0/? | Not started | — |
 | 6. Prod Wiring — Auth, CORS, Rate Limiting, Cost Caps | 0/? | Not started | — |
