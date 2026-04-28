@@ -27,10 +27,17 @@ def _get_converter():
         from docling.document_converter import (
             DocumentConverter, PdfFormatOption, ImageFormatOption, ExcelFormatOption
         )
-        from docling.datamodel.pipeline_options import PdfPipelineOptions
+        from docling.datamodel.pipeline_options import PdfPipelineOptions, TesseractCliOcrOptions
         from docling.datamodel.base_models import InputFormat
 
         pdf_options = PdfPipelineOptions()
+        # Pin OCR engine to Tesseract. Docling 2.82's default RapidOCR (3.8.1)
+        # ships an arch_config.yaml that no longer recognizes the PP-OCRv4 model
+        # layout `docling-tools models download` fetches, producing
+        # "architecture ch_PP-OCRv4_det_infer is not in arch_config.yaml" at parse time.
+        # Tesseract uses OS-managed apt tessdata (no Docling model cache), so it is
+        # immune to docling/rapidocr version drift. See docs/ocr-decision.md.
+        pdf_options.ocr_options = TesseractCliOcrOptions()
         if _MODELS_DIR.exists():
             pdf_options.artifacts_path = _MODELS_DIR
 

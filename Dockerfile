@@ -13,15 +13,23 @@ ENV PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1
 
 # Native deps per ROADMAP Phase 2 success criterion 1 (broader than upstream Docling's list).
-# poppler-utils: Docling PDF backend (pdftoppm/pdftotext)
-# tesseract-ocr: Docling OCR path for scanned/image-only PDFs
-# libglib2.0-0:  transitive for opencv/pillow/lxml variants (prevents libglib-2.0.so.0 ImportError)
+# poppler-utils:     Docling PDF backend (pdftoppm/pdftotext)
+# tesseract-ocr:     Docling OCR engine (pinned via TesseractOcrOptions in parsing_service.py)
+# tesseract-ocr-eng: English language data (`eng.traineddata`); required because Docling
+#                    invokes tesseract with `-l eng` by default. Without this, OCR fails
+#                    silently with "Failed loading language 'eng'".
+# libgl1:            opencv (transitive Docling dep) needs libGL.so.1 at runtime
+# libglib2.0-0:      transitive for opencv/pillow/lxml variants (prevents libglib-2.0.so.0 ImportError)
 # fonts-dejavu-core: PDF rendering fallback font
 # --no-install-recommends + rm apt lists keeps the layer minimal (~200MB saved vs defaults).
+# Tesseract chosen over rapidocr/easyocr because it is OS-managed (apt) and immune to
+# docling/rapidocr version drift (see docs/ocr-decision.md).
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
         poppler-utils \
         tesseract-ocr \
+        tesseract-ocr-eng \
+        libgl1 \
         libglib2.0-0 \
         fonts-dejavu-core \
     && rm -rf /var/lib/apt/lists/*
