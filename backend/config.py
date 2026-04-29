@@ -3,8 +3,10 @@ from functools import lru_cache
 import os
 from dotenv import load_dotenv
 
-# Load .env from repo root
-load_dotenv(os.path.join(os.path.dirname(__file__), "..", ".env"))
+# Load .env from repo root; ENV_FILE env var overrides the filename
+# (e.g., ENV_FILE=.env.prod for prod seed runs — see Phase 3 D-12)
+_env_filename = os.environ.get("ENV_FILE", ".env")
+load_dotenv(os.path.join(os.path.dirname(__file__), "..", _env_filename))
 
 
 class Settings(BaseSettings):
