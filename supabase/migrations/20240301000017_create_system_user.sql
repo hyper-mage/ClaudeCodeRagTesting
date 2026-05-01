@@ -4,6 +4,10 @@
 -- The fixed UUID '00000000-0000-0000-0000-000000000000' allows other migrations to
 -- reference this user without needing a lookup query.
 
+-- pgcrypto provides crypt() and gen_salt() used below.
+-- Supabase prod projects do not enable pgcrypto by default; dev projects often do.
+CREATE EXTENSION IF NOT EXISTS pgcrypto WITH SCHEMA extensions;
+
 DO $$
 DECLARE
   system_user_id UUID := '00000000-0000-0000-0000-000000000000';
@@ -21,7 +25,7 @@ BEGIN
       'authenticated',
       'authenticated',
       'default-kb@system.internal',
-      crypt('SYSTEM_USER_NO_LOGIN_' || gen_random_uuid()::text, gen_salt('bf')),
+      extensions.crypt('SYSTEM_USER_NO_LOGIN_' || gen_random_uuid()::text, extensions.gen_salt('bf')),
       now(),
       now(),
       now(),
