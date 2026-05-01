@@ -10,7 +10,7 @@
 
 - [x] **DEPLOY-01**: Developer can build a backend container image locally that boots FastAPI + Docling, passes `/api/health`, and handles PDF/DOCX ingest without missing native deps
 - [ ] **DEPLOY-02**: Developer has a `.dockerignore` that excludes `.env*`, `venv/`, `__pycache__/`, `.git/`, `frontend/node_modules/`, `backend/tests/` so secrets and bloat never enter the image
-- [ ] **DEPLOY-03**: Developer has a dedicated prod Supabase project with all migrations applied in order, pgvector enabled, Storage bucket policies applied, and default board game KB seeded
+- [x] **DEPLOY-03**: Developer has a dedicated prod Supabase project with all migrations applied in order, pgvector enabled, Storage bucket policies applied, and default board game KB seeded
 - [ ] **DEPLOY-04**: Developer can run `fly deploy` and reach the backend at a public `*.fly.dev` URL serving `/api/health` and SSE chat end-to-end
 - [ ] **DEPLOY-05**: Developer can push the frontend build to Cloudflare Pages and reach a public URL that loads the SPA with correct deep-link refresh behavior (`_redirects`)
 - [ ] **DEPLOY-06**: Frontend built for prod reads an absolute `VITE_API_BASE_URL` pointing at Fly; dev build still uses Vite proxy (empty default preserves local workflow)
@@ -68,7 +68,7 @@
 |--------|-------|--------|
 | DEPLOY-01 | Phase 2 | Complete |
 | DEPLOY-02 | Phase 1 | Pending |
-| DEPLOY-03 | Phase 3 | Pending |
+| DEPLOY-03 | Phase 3 | Complete |
 | DEPLOY-04 | Phase 4 | Pending |
 | DEPLOY-05 | Phase 5 | Pending |
 | DEPLOY-06 | Phase 1 | Pending |
