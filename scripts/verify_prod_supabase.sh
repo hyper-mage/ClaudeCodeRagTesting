@@ -46,7 +46,7 @@ check "tables.core" \
 
 # D-07 layer 2: RPCs
 check "rpcs.kb" \
-  "SELECT count(*) FROM pg_proc WHERE proname IN ('match_document_chunks','keyword_search_chunks','kb_grep_regex','kb_glob','execute_readonly_query')" "5"
+  "SELECT count(*) FROM pg_proc WHERE proname IN ('match_document_chunks','keyword_search_chunks','kb_grep_regex','kb_glob_match','execute_readonly_query')" "5"
 
 # D-09: storage bucket
 check "storage.bucket.documents" \
