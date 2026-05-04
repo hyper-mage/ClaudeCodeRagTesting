@@ -11,17 +11,17 @@
 - [x] **DEPLOY-01**: Developer can build a backend container image locally that boots FastAPI + Docling, passes `/api/health`, and handles PDF/DOCX ingest without missing native deps
 - [ ] **DEPLOY-02**: Developer has a `.dockerignore` that excludes `.env*`, `venv/`, `__pycache__/`, `.git/`, `frontend/node_modules/`, `backend/tests/` so secrets and bloat never enter the image
 - [x] **DEPLOY-03**: Developer has a dedicated prod Supabase project with all migrations applied in order, pgvector enabled, Storage bucket policies applied, and default board game KB seeded
-- [ ] **DEPLOY-04**: Developer can run `fly deploy` and reach the backend at a public `*.fly.dev` URL serving `/api/health` and SSE chat end-to-end
+- [x] **DEPLOY-04**: Developer can run `fly deploy` and reach the backend at a public `*.fly.dev` URL serving `/api/health` and SSE chat end-to-end
 - [ ] **DEPLOY-05**: Developer can push the frontend build to Cloudflare Pages and reach a public URL that loads the SPA with correct deep-link refresh behavior (`_redirects`)
 - [ ] **DEPLOY-06**: Frontend built for prod reads an absolute `VITE_API_BASE_URL` pointing at Fly; dev build still uses Vite proxy (empty default preserves local workflow)
-- [ ] **DEPLOY-07**: `fly.toml` defaults to free-tier (`auto_stop_machines="suspend"`, no `min_machines_running` set) with a documented one-line toggle to enable keep-warm later
+- [x] **DEPLOY-07**: `fly.toml` defaults to free-tier (`auto_stop_machines="suspend"`, no `min_machines_running` set) with a documented one-line toggle to enable keep-warm later
 - [ ] **DEPLOY-08**: `backend/requirements.txt` pins `docling` to a specific version so image builds are reproducible
 
 ### Security & Cost (SEC)
 
 - [ ] **SEC-01**: User can log in from the prod frontend with Supabase Auth redirect URLs correctly configured for the Cloudflare Pages domain (no redirect loops, email verification links land on prod)
 - [ ] **SEC-02**: Backend CORS allowlist reads from env (`CORS_ALLOWED_ORIGINS`), blocks non-prod origins, and preserves credentialed SSE (no `*` + `credentials=true` combo)
-- [ ] **SEC-03**: All secrets (Supabase service role key, OpenRouter key, LangSmith key, Tavily key) live in Fly `flyctl secrets` and Cloudflare Pages env vars — never committed, never baked into image
+- [x] **SEC-03**: All secrets (Supabase service role key, OpenRouter key, LangSmith key, Tavily key) live in Fly `flyctl secrets` and Cloudflare Pages env vars — never committed, never baked into image
 - [ ] **SEC-04**: `/api/chat` enforces a per-authenticated-user rate limit (configurable via env) that caps requests per minute to prevent LLM cost blowout
 - [ ] **SEC-05**: Main chat tool-use loop has a max-iterations cap (mirror explorer sub-agent's pattern) so runaway agent behavior can't drain budget
 - [ ] **SEC-06**: OpenRouter account has a monthly spend cap or alert configured so provider-level cost is bounded independent of app-level limits
@@ -69,14 +69,14 @@
 | DEPLOY-01 | Phase 2 | Complete |
 | DEPLOY-02 | Phase 1 | Pending |
 | DEPLOY-03 | Phase 3 | Complete |
-| DEPLOY-04 | Phase 4 | Pending |
+| DEPLOY-04 | Phase 4 | Complete |
 | DEPLOY-05 | Phase 5 | Pending |
 | DEPLOY-06 | Phase 1 | Pending |
-| DEPLOY-07 | Phase 4 | Pending |
+| DEPLOY-07 | Phase 4 | Complete |
 | DEPLOY-08 | Phase 1 | Pending |
 | SEC-01 | Phase 6 | Pending |
 | SEC-02 | Phase 1 | Pending |
-| SEC-03 | Phase 4 | Pending |
+| SEC-03 | Phase 4 | Complete |
 | SEC-04 | Phase 6 | Pending |
 | SEC-05 | Phase 6 | Pending |
 | SEC-06 | Phase 6 | Pending |

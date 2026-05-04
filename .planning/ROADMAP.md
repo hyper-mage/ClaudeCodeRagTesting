@@ -69,7 +69,9 @@
   2. All runtime secrets (`SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `OPENROUTER_API_KEY`, `LANGSMITH_*`, `TAVILY_API_KEY`, placeholder `CORS_ALLOWED_ORIGINS`) are set via `flyctl secrets set` — verified with `flyctl secrets list` and grep of the pushed image showing none of these values baked in.
   3. `fly deploy` succeeds and `curl https://<app>.fly.dev/api/health` returns 200.
   4. End-to-end SSE chat request via `curl` to the Fly URL streams tokens without buffering.
-**Plans**: TBD
+**Plans**: 2 plans
+  - [x] 04-01-PLAN.md — Wave 1 artifacts: fly.toml (D-11/D-12), shared JWT helper _lib/get_test_jwt.sh (D-14), fly_smoke.sh (D-13), refactor docker_smoke.sh to consume helper
+  - [ ] 04-02-PLAN.md — Wave 2 deploy: preflight (auth, .env.prod, prod test user), flyctl apps create (with collision fallback), secrets import --stage, flyctl deploy, fly_smoke.sh end-to-end, SEC-03 image-purity check
 
 ### Phase 5: Deploy Frontend to Cloudflare Pages
 **Goal**: The Vite SPA is live at a public Cloudflare Pages URL, pointing its API calls at the Fly backend, with correct SPA deep-link refresh behavior.

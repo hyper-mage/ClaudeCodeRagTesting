@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: milestone
-status: verifying
-stopped_at: Phase 4 context gathered
-last_updated: "2026-05-04T02:07:48.688Z"
+status: executing
+stopped_at: Completed 04-01-PLAN.md
+last_updated: "2026-05-04T12:53:24.849Z"
 last_activity: 2026-05-04
 progress:
   total_phases: 9
   completed_phases: 3
-  total_plans: 5
-  completed_plans: 5
+  total_plans: 7
+  completed_plans: 6
   percent: 0
 ---
 
@@ -21,13 +21,13 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-23 after v1.0 completion)
 
 **Core value:** The agent can intelligently search and reason across a structured board game knowledge base -- finding rules, comparing mechanics, and recommending games -- using the right tool for the job, transparently.
-**Current focus:** Phase 03 — prod-supabase-project
+**Current focus:** Phase 04 — deploy-backend-to-fly-io
 
 ## Current Position
 
-Phase: 03 (prod-supabase-project) — EXECUTING
+Phase: 04 (deploy-backend-to-fly-io) — EXECUTING
 Plan: 2 of 2
-Status: Phase complete — ready for verification
+Status: Ready to execute
 Last activity: 2026-05-04
 
 Progress: [░░░░░░░░░░] 0% (0/8 phases)
@@ -55,6 +55,7 @@ Progress: [░░░░░░░░░░] 0% (0/8 phases)
 | Phase 02 P01 | 90min | 3 tasks | 5 files |
 | Phase 03 P01 | 25m | 8 tasks | 8 files |
 | Phase 03 P02 | 30min | 3 tasks | 1 files |
+| Phase 04 P01 | 3min | 3 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -72,6 +73,7 @@ Recent decisions affecting current work:
 - [Phase 03]: Path A migration rename to YYYYMMDDHHMMSS_*.sql; pgcrypto schema-qualified in migration 17; no ivfflat index on VECTOR(2048) embedding column
 - [Phase 03]: Phase 3: .env.prod must hold both un-prefixed (SUPABASE_URL/ANON_KEY) and VITE_-prefixed copies — backend Settings vs Vite frontend share one env file
 - [Phase 03]: Phase 3: idempotent seed + content-hash dedup proven on prod (10 docs, 11 folders, 62 chunks, zero half-ingested)
+- [Phase 04]: Phase 04 P01: fly.toml verbatim D-11 keys + D-12 commented adjacency toggle; get_test_jwt helper at backend/scripts/_lib/; fly_smoke.sh asserts ≥3 SSE data lines AND first chunk <20s (Pitfall 3)
 
 ### Pending Todos
 
@@ -87,7 +89,7 @@ None — roadmap complete, awaiting `/gsd:plan-phase 1`.
 
 ## Session Continuity
 
-Last session: 2026-05-04T02:07:48.681Z
-Stopped at: Phase 4 context gathered
-Resume file: .planning/phases/04-deploy-backend-to-fly-io/04-CONTEXT.md
+Last session: 2026-05-04T12:53:24.843Z
+Stopped at: Completed 04-01-PLAN.md
+Resume file: None
 Next: `/gsd:plan-phase 1` (Secrets & Repo Hygiene)
