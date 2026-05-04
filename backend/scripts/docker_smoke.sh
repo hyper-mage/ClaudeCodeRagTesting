@@ -83,14 +83,11 @@ for i in $(seq 1 30); do
   sleep 2
 done
 
-# --- 6. Auth (Supabase password grant -- RESEARCH.md Pitfall 6) ----------
-log "Auth: exchanging ragtest1 creds for JWT"
-AUTH_JSON=$(curl -sS -X POST "$VITE_SUPABASE_URL/auth/v1/token?grant_type=password" \
-  -H "apikey: $VITE_SUPABASE_ANON_KEY" \
-  -H "Content-Type: application/json" \
-  -d '{"email":"ragtest1@gmail.com","password":"testpass123"}')
-JWT=$(echo "$AUTH_JSON" | jq -r '.access_token // empty')
-[ -n "$JWT" ] || fail "Auth failed -- response: $AUTH_JSON"
+# --- 6. Auth (Supabase password grant -- shared helper, Phase 4 D-14) ----
+log "Auth: exchanging ragtest1 creds for JWT (via _lib/get_test_jwt.sh)"
+# shellcheck source=_lib/get_test_jwt.sh
+source "$(dirname "$0")/_lib/get_test_jwt.sh"
+get_test_jwt || fail "Auth failed (see stderr above)"
 ok "JWT acquired"
 
 # --- 7. Ingest PDF + DOCX ------------------------------------------------
