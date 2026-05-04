@@ -1,0 +1,27 @@
+# Fly.io deploy config for Phase 4 — locked by 04-CONTEXT.md D-11/D-12.
+# Free-tier defaults: suspend on idle, no min_machines_running.
+# To enable keep-warm later, uncomment the line marked below.
+app = "boardgame-rag-prod"
+primary_region = "iad"
+
+[build]
+  dockerfile = "Dockerfile"
+
+[http_service]
+  internal_port = 8000
+  force_https = true
+  auto_stop_machines = "suspend"
+  auto_start_machines = true
+  # min_machines_running = 1  # uncomment to keep machine warm (kills suspend/cold-start at the cost of always-on hours)
+  min_machines_running = 0
+
+  [[http_service.checks]]
+    grace_period = "10s"
+    interval     = "30s"
+    method       = "GET"
+    timeout      = "5s"
+    path         = "/api/health"
+
+[[vm]]
+  size   = "shared-cpu-1x"
+  memory = "1gb"
