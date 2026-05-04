@@ -58,7 +58,7 @@
   5. Prod `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, and anon key are captured in the developer's password manager (not in the repo).
 **Plans**: 2 plans
   - [x] 03-01-PLAN.md — Repo prep (.gitignore .env*, supabase init, migration rename to timestamps, run_all bundle to legacy/, backend/config.py ENV_FILE patch, verify_prod_supabase.sh) + supabase link/db push + schema verify
-  - [ ] 03-02-PLAN.md — Build .env.prod, run idempotent seed (10 board games), verify seed counts, capture creds in 1Password, supabase unlink
+  - [x] 03-02-PLAN.md — Build .env.prod, run idempotent seed (10 board games), verify seed counts, capture creds in 1Password, supabase unlink
 
 ### Phase 4: Deploy Backend to Fly.io
 **Goal**: The containerized backend is reachable at a public `*.fly.dev` URL, talking to the prod Supabase project, serving `/api/health` and SSE chat end-to-end.

@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: milestone
-status: executing
-stopped_at: Completed 03-01-PLAN.md
-last_updated: "2026-05-01T20:24:41.965Z"
-last_activity: 2026-05-01
+status: verifying
+stopped_at: Completed 03-02-PLAN.md
+last_updated: "2026-05-04T00:45:22.494Z"
+last_activity: 2026-05-04
 progress:
   total_phases: 8
-  completed_phases: 2
+  completed_phases: 3
   total_plans: 5
-  completed_plans: 4
+  completed_plans: 5
   percent: 0
 ---
 
@@ -27,8 +27,8 @@ See: .planning/PROJECT.md (updated 2026-04-23 after v1.0 completion)
 
 Phase: 03 (prod-supabase-project) — EXECUTING
 Plan: 2 of 2
-Status: Ready to execute
-Last activity: 2026-05-01
+Status: Phase complete — ready for verification
+Last activity: 2026-05-04
 
 Progress: [░░░░░░░░░░] 0% (0/8 phases)
 
@@ -54,6 +54,7 @@ Progress: [░░░░░░░░░░] 0% (0/8 phases)
 *Updated after each plan completion. v1.0 performance history archived in `.planning/milestones/v1.0-phases/`.*
 | Phase 02 P01 | 90min | 3 tasks | 5 files |
 | Phase 03 P01 | 25m | 8 tasks | 8 files |
+| Phase 03 P02 | 30min | 3 tasks | 1 files |
 
 ## Accumulated Context
 
@@ -69,6 +70,8 @@ Recent decisions affecting current work:
 - [v1.1 Roadmap]: Fly free-tier default (`auto_stop_machines=suspend`, no `min_machines_running`) with documented one-line toggle for keep-warm — accept cold-start cost for portfolio traffic initially
 - [Phase 02]: Dockerfile at repo root with USER appuser before docling-tools models download (cache lands under /home/appuser/.cache/docling); CPU torch via --extra-index-url; fixtures host-side only
 - [Phase 03]: Path A migration rename to YYYYMMDDHHMMSS_*.sql; pgcrypto schema-qualified in migration 17; no ivfflat index on VECTOR(2048) embedding column
+- [Phase 03]: Phase 3: .env.prod must hold both un-prefixed (SUPABASE_URL/ANON_KEY) and VITE_-prefixed copies — backend Settings vs Vite frontend share one env file
+- [Phase 03]: Phase 3: idempotent seed + content-hash dedup proven on prod (10 docs, 11 folders, 62 chunks, zero half-ingested)
 
 ### Pending Todos
 
@@ -84,7 +87,7 @@ None — roadmap complete, awaiting `/gsd:plan-phase 1`.
 
 ## Session Continuity
 
-Last session: 2026-05-01T20:24:41.958Z
-Stopped at: Completed 03-01-PLAN.md
+Last session: 2026-05-04T00:45:16.648Z
+Stopped at: Completed 03-02-PLAN.md
 Resume file: None
 Next: `/gsd:plan-phase 1` (Secrets & Repo Hygiene)
