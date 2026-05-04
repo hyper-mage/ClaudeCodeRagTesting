@@ -1,0 +1,111 @@
+#!/usr/bin/env bash
+# backend/scripts/fly_smoke.sh
+# Phase 4 post-deploy smoke. Locked by 04-CONTEXT.md D-13/D-14 + RESEARCH.md Pitfall 3.
+#
+# Flow:
+#   1. preflight   -- $1 = $FLY_URL, .env.prod present, jq + curl installed
+#   2. health poll -- GET $FLY_URL/api/health until 200 (60s budget, 2s cadence)
+#   3. auth        -- source .env.prod, source _lib/get_test_jwt.sh, get_test_jwt
+#   4. thread      -- POST $FLY_URL/api/threads -> capture thread_id
+#   5. SSE chat    -- POST $FLY_URL/api/threads/{id}/messages with Accept: text/event-stream
+#                     assert ≥3 'data:' lines AND first chunk in <20s (Pitfall 3)
+#
+# Usage: bash backend/scripts/fly_smoke.sh https://boardgame-rag-prod.fly.dev
+# Exits 0 on full pass. Non-zero with clear message on any failure.
+
+set -euo pipefail
+
+FLY_URL="${1:?usage: fly_smoke.sh <FLY_URL> (e.g. https://boardgame-rag-prod.fly.dev)}"
+HEALTH_TIMEOUT=60       # seconds total
+HEALTH_CADENCE=2        # seconds between polls
+SSE_TIMEOUT=30          # seconds total for SSE read
+MIN_DATA_LINES=3        # D-13 step 4 lower bound
+FIRST_CHUNK_MAX=20      # seconds; Pitfall 3 hardening — first chunk must arrive
+
+log()  { printf '\033[1;34m[smoke]\033[0m %s\n' "$*"; }
+fail() { printf '\033[1;31m[FAIL]\033[0m  %s\n' "$*" >&2; exit 1; }
+ok()   { printf '\033[1;32m[ OK ]\033[0m  %s\n' "$*"; }
+
+# --- 1. Preflight --------------------------------------------------------
+log "Preflight: tools, .env.prod, target=$FLY_URL"
+command -v curl >/dev/null || fail "curl not installed"
+command -v jq   >/dev/null || fail "jq not installed (winget install jqlang.jq on Windows)"
+[ -f .env.prod ] || fail ".env.prod not found at repo root (Phase 3 deliverable)"
+
+# load prod env so VITE_SUPABASE_URL + VITE_SUPABASE_ANON_KEY are set for the helper
+# shellcheck disable=SC1091
+set -a; source .env.prod; set +a
+[ -n "${VITE_SUPABASE_URL:-}" ]      || fail "VITE_SUPABASE_URL missing in .env.prod"
+[ -n "${VITE_SUPABASE_ANON_KEY:-}" ] || fail "VITE_SUPABASE_ANON_KEY missing in .env.prod"
+ok "Preflight passed"
+
+# --- 2. Health poll (60s budget, 2s cadence) -----------------------------
+log "Health: polling $FLY_URL/api/health (up to ${HEALTH_TIMEOUT}s)"
+ATTEMPTS=$(( HEALTH_TIMEOUT / HEALTH_CADENCE ))
+for i in $(seq 1 "$ATTEMPTS"); do
+  if curl -sSf "$FLY_URL/api/health" >/dev/null 2>&1; then
+    ok "/api/health 200 after $((i*HEALTH_CADENCE))s"
+    break
+  fi
+  if [ "$i" -eq "$ATTEMPTS" ]; then
+    fail "/api/health never returned 200 within ${HEALTH_TIMEOUT}s"
+  fi
+  sleep "$HEALTH_CADENCE"
+done
+
+# --- 3. JWT (shared helper, D-14) ----------------------------------------
+log "Auth: exchanging ragtest1 creds for JWT (via _lib/get_test_jwt.sh)"
+# shellcheck source=_lib/get_test_jwt.sh
+source "$(dirname "$0")/_lib/get_test_jwt.sh"
+get_test_jwt || fail "Auth failed against prod Supabase (see stderr; verify ragtest1@gmail.com exists in prod auth.users — RESEARCH Pitfall 5)"
+ok "JWT acquired"
+
+# --- 4. Create thread ----------------------------------------------------
+log "Thread: POST $FLY_URL/api/threads"
+THREAD_RESP=$(curl -sS -X POST "$FLY_URL/api/threads" \
+  -H "Authorization: Bearer $JWT" \
+  -H "Content-Type: application/json" \
+  -d '{"title":"phase4-smoke"}')
+THREAD_ID=$(echo "$THREAD_RESP" | jq -r '.id // empty')
+[ -n "$THREAD_ID" ] || fail "thread create failed: $THREAD_RESP"
+ok "Thread created: $THREAD_ID"
+
+# --- 5. SSE chat ---------------------------------------------------------
+# Endpoint per backend/routers/chat.py: prefix=/api/threads, route=/{thread_id}/messages
+log "SSE: POST $FLY_URL/api/threads/$THREAD_ID/messages"
+START=$(date +%s)
+DATA_LINES=0
+FIRST_AT=-1
+
+# curl -N disables output buffering; --max-time bounds total read.
+# Use process substitution so the while-loop variables persist after EOF.
+while IFS= read -r line; do
+  case "$line" in
+    data:*)
+      if [ "$DATA_LINES" -eq 0 ]; then
+        FIRST_AT=$(( $(date +%s) - START ))
+      fi
+      DATA_LINES=$((DATA_LINES+1))
+      if [ "$DATA_LINES" -ge "$MIN_DATA_LINES" ]; then
+        break
+      fi
+      ;;
+  esac
+done < <(curl -N --no-buffer --max-time "$SSE_TIMEOUT" \
+  -H "Authorization: Bearer $JWT" \
+  -H "Accept: text/event-stream" \
+  -H "Content-Type: application/json" \
+  -X POST "$FLY_URL/api/threads/$THREAD_ID/messages" \
+  -d '{"message":"What is Catan?"}' 2>/dev/null)
+
+if [ "$DATA_LINES" -lt "$MIN_DATA_LINES" ]; then
+  fail "only $DATA_LINES SSE 'data:' lines (need ≥$MIN_DATA_LINES) — check backend logs via 'flyctl logs'"
+fi
+if [ "$FIRST_AT" -lt 0 ]; then
+  fail "no SSE data lines observed at all"
+fi
+if [ "$FIRST_AT" -gt "$FIRST_CHUNK_MAX" ]; then
+  fail "first chunk took ${FIRST_AT}s (>${FIRST_CHUNK_MAX}s) — Fly proxy buffering suspected (RESEARCH Pitfall 3)"
+fi
+
+ok "SMOKE PASS: $DATA_LINES SSE 'data:' lines, first chunk in ${FIRST_AT}s"
