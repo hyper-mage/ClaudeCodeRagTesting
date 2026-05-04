@@ -162,3 +162,14 @@
 | PORT-04 | 8 |
 
 **Coverage:** 23/23 requirements mapped, no orphans, no duplicates.
+
+## Backlog
+
+### Phase 999.1: Chat empty-state UX (BACKLOG)
+
+**Goal:** When no threads exist, sending a chat message silently does nothing. Either block the input until "+ New Chat" is clicked OR auto-create an initial thread on first message send. Caught during Phase 3 UAT.
+**Requirements:** TBD
+**Plans:** 0 plans
+
+Plans:
+- [ ] TBD (promote with /gsd:review-backlog when ready)
