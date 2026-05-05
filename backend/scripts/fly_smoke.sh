@@ -96,7 +96,7 @@ done < <(curl -N --no-buffer --max-time "$SSE_TIMEOUT" \
   -H "Accept: text/event-stream" \
   -H "Content-Type: application/json" \
   -X POST "$FLY_URL/api/threads/$THREAD_ID/messages" \
-  -d '{"message":"What is Catan?"}' 2>/dev/null)
+  -d '{"content":"What is Catan?"}' 2>/dev/null)
 
 if [ "$DATA_LINES" -lt "$MIN_DATA_LINES" ]; then
   fail "only $DATA_LINES SSE 'data:' lines (need ≥$MIN_DATA_LINES) — check backend logs via 'flyctl logs'"

@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: milestone
-status: executing
-stopped_at: Completed 04-01-PLAN.md
-last_updated: "2026-05-04T12:53:24.849Z"
-last_activity: 2026-05-04
+status: verifying
+stopped_at: Completed 04-02-PLAN.md
+last_updated: "2026-05-05T12:51:51.684Z"
+last_activity: 2026-05-05
 progress:
   total_phases: 9
-  completed_phases: 3
+  completed_phases: 4
   total_plans: 7
-  completed_plans: 6
+  completed_plans: 7
   percent: 0
 ---
 
@@ -27,8 +27,8 @@ See: .planning/PROJECT.md (updated 2026-04-23 after v1.0 completion)
 
 Phase: 04 (deploy-backend-to-fly-io) — EXECUTING
 Plan: 2 of 2
-Status: Ready to execute
-Last activity: 2026-05-04
+Status: Phase complete — ready for verification
+Last activity: 2026-05-05
 
 Progress: [░░░░░░░░░░] 0% (0/8 phases)
 
@@ -56,6 +56,7 @@ Progress: [░░░░░░░░░░] 0% (0/8 phases)
 | Phase 03 P01 | 25m | 8 tasks | 8 files |
 | Phase 03 P02 | 30min | 3 tasks | 1 files |
 | Phase 04 P01 | 3min | 3 tasks | 4 files |
+| Phase 04 P02 | 25min | 5 tasks | 1 files |
 
 ## Accumulated Context
 
@@ -74,6 +75,8 @@ Recent decisions affecting current work:
 - [Phase 03]: Phase 3: .env.prod must hold both un-prefixed (SUPABASE_URL/ANON_KEY) and VITE_-prefixed copies — backend Settings vs Vite frontend share one env file
 - [Phase 03]: Phase 3: idempotent seed + content-hash dedup proven on prod (10 docs, 11 folders, 62 chunks, zero half-ingested)
 - [Phase 04]: Phase 04 P01: fly.toml verbatim D-11 keys + D-12 commented adjacency toggle; get_test_jwt helper at backend/scripts/_lib/; fly_smoke.sh asserts ≥3 SSE data lines AND first chunk <20s (Pitfall 3)
+- [Phase 04]: Phase 04 P02: Fly app boardgame-rag-prod live; 24 secrets staged; SSE smoke PASS (3 chunks, 14s first); SEC-03 verified at runtime via flyctl ssh (Docker Desktop unavailable for layer grep)
+- [Phase 04]: Phase 04 P02: Auto-fixed Plan 01 carry-overs — body field is content not message (schema MessageCreate); LLM_API_KEY Fly secret set from OPENROUTER_API_KEY (config.resolved_llm_api_key chain)
 
 ### Pending Todos
 
@@ -89,7 +92,7 @@ None — roadmap complete, awaiting `/gsd:plan-phase 1`.
 
 ## Session Continuity
 
-Last session: 2026-05-04T12:53:24.843Z
-Stopped at: Completed 04-01-PLAN.md
+Last session: 2026-05-05T12:51:51.678Z
+Stopped at: Completed 04-02-PLAN.md
 Resume file: None
 Next: `/gsd:plan-phase 1` (Secrets & Repo Hygiene)

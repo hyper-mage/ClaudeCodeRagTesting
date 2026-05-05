@@ -71,7 +71,7 @@
   4. End-to-end SSE chat request via `curl` to the Fly URL streams tokens without buffering.
 **Plans**: 2 plans
   - [x] 04-01-PLAN.md — Wave 1 artifacts: fly.toml (D-11/D-12), shared JWT helper _lib/get_test_jwt.sh (D-14), fly_smoke.sh (D-13), refactor docker_smoke.sh to consume helper
-  - [ ] 04-02-PLAN.md — Wave 2 deploy: preflight (auth, .env.prod, prod test user), flyctl apps create (with collision fallback), secrets import --stage, flyctl deploy, fly_smoke.sh end-to-end, SEC-03 image-purity check
+  - [x] 04-02-PLAN.md — Wave 2 deploy: preflight (auth, .env.prod, prod test user), flyctl apps create (with collision fallback), secrets import --stage, flyctl deploy, fly_smoke.sh end-to-end, SEC-03 image-purity check
 
 ### Phase 5: Deploy Frontend to Cloudflare Pages
 **Goal**: The Vite SPA is live at a public Cloudflare Pages URL, pointing its API calls at the Fly backend, with correct SPA deep-link refresh behavior.
