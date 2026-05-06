@@ -139,7 +139,11 @@ This document evolves at phase transitions and milestone boundaries.
 
 **Active Milestone:** v1.1 Portfolio Deployment — ship app to public URL on free-tier hosts (Fly.io backend, Vercel frontend, Supabase prod project).
 
-**Progress:** Phase 01 (secrets-repo-hygiene) complete — env-driven CORS allowlist, `.dockerignore`, pinned `requirements.txt` (`docling==2.82.0`), frontend API centralized through `apiFetch`/`apiStream` with `VITE_API_BASE_URL`. DEPLOY-02, DEPLOY-06, DEPLOY-08, SEC-02, SEC-07 satisfied.
+**Progress:** Phases 01-04 complete.
+- Phase 01 (secrets-repo-hygiene): env-driven CORS allowlist, `.dockerignore`, pinned `requirements.txt` (`docling==2.82.0`), frontend API centralized through `apiFetch`/`apiStream` with `VITE_API_BASE_URL`. DEPLOY-02, DEPLOY-06, DEPLOY-08, SEC-02, SEC-07 satisfied.
+- Phase 02 (dockerize-backend): Dockerfile + docker_smoke.sh; CPU torch + Docling models baked. DEPLOY-01 satisfied.
+- Phase 03 (prod-supabase-project): Supabase CLI link + db push; pgvector + ltree; storage bucket; default KB seeded (10 games). DEPLOY-03 satisfied.
+- Phase 04 (deploy-backend-to-fly-io): Live at https://boardgame-rag-prod.fly.dev — `/api/health` 200, SSE chat verified ≥3 chunks, 24 secrets in flyctl, image purity verified. DEPLOY-04, DEPLOY-07, SEC-03 satisfied.
 
 ---
-*Last updated: 2026-04-23 — Phase 01 secrets-repo-hygiene complete*
+*Last updated: 2026-05-06 — Phase 04 deploy-backend-to-fly-io complete*
