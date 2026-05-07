@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: milestone
 status: verifying
-stopped_at: Phase 5 context gathered
-last_updated: "2026-05-06T02:37:24.779Z"
-last_activity: 2026-05-06
+stopped_at: Completed 05-01-PLAN.md — Phase 5 ready for verification
+last_updated: "2026-05-07T12:53:39.532Z"
+last_activity: 2026-05-07
 progress:
   total_phases: 9
-  completed_phases: 4
-  total_plans: 7
-  completed_plans: 7
+  completed_phases: 5
+  total_plans: 8
+  completed_plans: 8
   percent: 0
 ---
 
@@ -21,14 +21,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-23 after v1.0 completion)
 
 **Core value:** The agent can intelligently search and reason across a structured board game knowledge base -- finding rules, comparing mechanics, and recommending games -- using the right tool for the job, transparently.
-**Current focus:** Phase 04 — deploy-backend-to-fly-io
+**Current focus:** Phase 5 — deploy-frontend-to-cloudflare-pages
 
 ## Current Position
 
-Phase: 999.1
-Plan: Not started
+Phase: 5 (deploy-frontend-to-cloudflare-pages) — EXECUTING
+Plan: 1 of 1
 Status: Phase complete — ready for verification
-Last activity: 2026-05-06
+Last activity: 2026-05-07
 
 Progress: [░░░░░░░░░░] 0% (0/8 phases)
 
@@ -57,6 +57,7 @@ Progress: [░░░░░░░░░░] 0% (0/8 phases)
 | Phase 03 P02 | 30min | 3 tasks | 1 files |
 | Phase 04 P01 | 3min | 3 tasks | 4 files |
 | Phase 04 P02 | 25min | 5 tasks | 1 files |
+| Phase 05 P01 | 45min | 5 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -77,6 +78,8 @@ Recent decisions affecting current work:
 - [Phase 04]: Phase 04 P01: fly.toml verbatim D-11 keys + D-12 commented adjacency toggle; get_test_jwt helper at backend/scripts/_lib/; fly_smoke.sh asserts ≥3 SSE data lines AND first chunk <20s (Pitfall 3)
 - [Phase 04]: Phase 04 P02: Fly app boardgame-rag-prod live; 24 secrets staged; SSE smoke PASS (3 chunks, 14s first); SEC-03 verified at runtime via flyctl ssh (Docker Desktop unavailable for layer grep)
 - [Phase 04]: Phase 04 P02: Auto-fixed Plan 01 carry-overs — body field is content not message (schema MessageCreate); LLM_API_KEY Fly secret set from OPENROUTER_API_KEY (config.resolved_llm_api_key chain)
+- [Phase 05]: Phase 05 P01: CF Pages project boardgame-rag-prod live at https://boardgame-rag-prod.pages.dev; _redirects + .nvmrc committed (e132d4f); Fly CORS overwritten (digest 95c5bee→a3f4b15); SEC-07 leak grep clean against deployed bundle; D-13 5/5 PASS.
+- [Phase 05]: Phase 05 P01: CF dashboard unification quirk — first deploy landed in Workers (Static Assets, rejected /* /index.html 200 with code 10021); resolved by deleting Worker and recreating via Pages tab. Future agents: use Pages tab in Create dialog explicitly.
 
 ### Pending Todos
 
@@ -92,7 +95,7 @@ None — roadmap complete, awaiting `/gsd:plan-phase 1`.
 
 ## Session Continuity
 
-Last session: 2026-05-06T02:37:24.774Z
-Stopped at: Phase 5 context gathered
-Resume file: .planning/phases/05-deploy-frontend-to-cloudflare-pages/05-CONTEXT.md
+Last session: 2026-05-07T12:53:39.525Z
+Stopped at: Completed 05-01-PLAN.md — Phase 5 ready for verification
+Resume file: None
 Next: `/gsd:plan-phase 1` (Secrets & Repo Hygiene)

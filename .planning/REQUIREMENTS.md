@@ -12,7 +12,7 @@
 - [ ] **DEPLOY-02**: Developer has a `.dockerignore` that excludes `.env*`, `venv/`, `__pycache__/`, `.git/`, `frontend/node_modules/`, `backend/tests/` so secrets and bloat never enter the image
 - [x] **DEPLOY-03**: Developer has a dedicated prod Supabase project with all migrations applied in order, pgvector enabled, Storage bucket policies applied, and default board game KB seeded
 - [x] **DEPLOY-04**: Developer can run `fly deploy` and reach the backend at a public `*.fly.dev` URL serving `/api/health` and SSE chat end-to-end
-- [ ] **DEPLOY-05**: Developer can push the frontend build to Cloudflare Pages and reach a public URL that loads the SPA with correct deep-link refresh behavior (`_redirects`)
+- [x] **DEPLOY-05**: Developer can push the frontend build to Cloudflare Pages and reach a public URL that loads the SPA with correct deep-link refresh behavior (`_redirects`)
 - [ ] **DEPLOY-06**: Frontend built for prod reads an absolute `VITE_API_BASE_URL` pointing at Fly; dev build still uses Vite proxy (empty default preserves local workflow)
 - [x] **DEPLOY-07**: `fly.toml` defaults to free-tier (`auto_stop_machines="suspend"`, no `min_machines_running` set) with a documented one-line toggle to enable keep-warm later
 - [ ] **DEPLOY-08**: `backend/requirements.txt` pins `docling` to a specific version so image builds are reproducible
@@ -70,7 +70,7 @@
 | DEPLOY-02 | Phase 1 | Pending |
 | DEPLOY-03 | Phase 3 | Complete |
 | DEPLOY-04 | Phase 4 | Complete |
-| DEPLOY-05 | Phase 5 | Pending |
+| DEPLOY-05 | Phase 5 | Complete |
 | DEPLOY-06 | Phase 1 | Pending |
 | DEPLOY-07 | Phase 4 | Complete |
 | DEPLOY-08 | Phase 1 | Pending |

@@ -13,7 +13,7 @@
 - [ ] **Phase 2: Dockerize Backend** — Build a reproducible backend image that boots FastAPI + Docling with all native deps, validated locally before any cloud deploy.
 - [ ] **Phase 3: Prod Supabase Project** — Stand up a dedicated prod Supabase project with all migrations, pgvector, Storage policies, and default KB seed applied.
 - [ ] **Phase 4: Deploy Backend to Fly.io** — Ship the container to Fly with free-tier config, secrets in `flyctl secrets`, and a public `*.fly.dev` URL serving `/api/health` + SSE chat.
-- [ ] **Phase 5: Deploy Frontend to Cloudflare Pages** — Build and deploy the Vite SPA to a public CF Pages URL with `VITE_API_BASE_URL` pointing at Fly and SPA deep-link routing.
+- [x] **Phase 5: Deploy Frontend to Cloudflare Pages** — Build and deploy the Vite SPA to a public CF Pages URL with `VITE_API_BASE_URL` pointing at Fly and SPA deep-link routing. (completed 2026-05-07)
 - [ ] **Phase 6: Prod Wiring — Auth, CORS, Rate Limiting, Cost Caps** — Close the loop between frontend and backend: Auth redirect URLs, CORS allowlist, per-user chat rate limit, max-iterations cap, and OpenRouter spend alert.
 - [ ] **Phase 7: Observability Baseline** — Wire Sentry (with source maps), LangSmith prod project, and UptimeRobot monitors (including DB-touching `/api/health`) so prod failures are visible.
 - [ ] **Phase 8: Portfolio Polish** — Demo user + "Try demo" button, graceful degradation, and a portfolio-grade README (live URL, creds, architecture diagram, screenshots, deploy badge).
@@ -84,7 +84,7 @@
   4. Loading the public CF Pages URL in a browser renders the login page and the Network tab shows requests going to the absolute Fly URL (not same-origin `/api`).
   5. UI hint check: frontend phase involves React/Vite/SPA routing.
 **Plans**: 1 plan
-  - [ ] 05-01-PLAN.md — Create _redirects + .nvmrc, deploy CF Pages project, overwrite Fly CORS, SEC-07 re-check, D-13 browser verify
+  - [x] 05-01-PLAN.md — Create _redirects + .nvmrc, deploy CF Pages project, overwrite Fly CORS, SEC-07 re-check, D-13 browser verify
 **UI hint**: yes
 
 ### Phase 6: Prod Wiring — Auth, CORS, Rate Limiting, Cost Caps
@@ -131,7 +131,7 @@
 | 2. Dockerize Backend | 0/? | Not started | — |
 | 3. Prod Supabase Project | 0/2 | Not started | — |
 | 4. Deploy Backend to Fly.io | 0/? | Not started | — |
-| 5. Deploy Frontend to Cloudflare Pages | 0/1 | Not started | — |
+| 5. Deploy Frontend to Cloudflare Pages | 1/1 | Complete   | 2026-05-07 |
 | 6. Prod Wiring — Auth, CORS, Rate Limiting, Cost Caps | 0/? | Not started | — |
 | 7. Observability Baseline | 0/? | Not started | — |
 | 8. Portfolio Polish | 0/? | Not started | — |
@@ -172,7 +172,7 @@
 
 **Goal:** When no threads exist, sending a chat message silently does nothing. Either block the input until "+ New Chat" is clicked OR auto-create an initial thread on first message send. Caught during Phase 3 UAT.
 **Requirements:** TBD
-**Plans:** 0 plans
+**Plans:** 1/1 plans complete
 
 Plans:
 - [ ] TBD (promote with /gsd:review-backlog when ready)
