@@ -131,7 +131,7 @@
 | 2. Dockerize Backend | 0/? | Not started | — |
 | 3. Prod Supabase Project | 0/2 | Not started | — |
 | 4. Deploy Backend to Fly.io | 0/? | Not started | — |
-| 5. Deploy Frontend to Cloudflare Pages | 1/1 | Complete   | 2026-05-07 |
+| 5. Deploy Frontend to Cloudflare Pages | 1/1 | Complete    | 2026-05-07 |
 | 6. Prod Wiring — Auth, CORS, Rate Limiting, Cost Caps | 0/? | Not started | — |
 | 7. Observability Baseline | 0/? | Not started | — |
 | 8. Portfolio Polish | 0/? | Not started | — |
