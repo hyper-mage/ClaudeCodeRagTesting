@@ -53,6 +53,7 @@ The agent can intelligently search and reason across a structured board game kno
 - ✓ Smart chunking with automatic token budget management — v1.0 (Phase 6 TokenBudget)
 - ✓ User-controllable search scope (narrow to specific folders/games) — v1.0 (Phase 6 scope parsing + badge)
 - ✓ Update existing sub-agent system for consistency with new explorer agent — v1.0 (Phase 6 analyze_document alignment)
+- ✓ Frontend deployed to Cloudflare Pages with prod API base URL — Validated in v1.1 Phase 5 (https://boardgame-rag-prod.pages.dev)
 
 ### Active
 
@@ -146,4 +147,4 @@ This document evolves at phase transitions and milestone boundaries.
 - Phase 04 (deploy-backend-to-fly-io): Live at https://boardgame-rag-prod.fly.dev — `/api/health` 200, SSE chat verified ≥3 chunks, 24 secrets in flyctl, image purity verified. DEPLOY-04, DEPLOY-07, SEC-03 satisfied.
 
 ---
-*Last updated: 2026-05-06 — Phase 04 deploy-backend-to-fly-io complete*
+*Last updated: 2026-05-07 — Phase 05 deploy-frontend-to-cloudflare-pages complete; SPA live at https://boardgame-rag-prod.pages.dev*
