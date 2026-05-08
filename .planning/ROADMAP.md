@@ -13,7 +13,8 @@
 - [ ] **Phase 2: Dockerize Backend** — Build a reproducible backend image that boots FastAPI + Docling with all native deps, validated locally before any cloud deploy.
 - [ ] **Phase 3: Prod Supabase Project** — Stand up a dedicated prod Supabase project with all migrations, pgvector, Storage policies, and default KB seed applied.
 - [ ] **Phase 4: Deploy Backend to Fly.io** — Ship the container to Fly with free-tier config, secrets in `flyctl secrets`, and a public `*.fly.dev` URL serving `/api/health` + SSE chat.
-- [x] **Phase 5: Deploy Frontend to Cloudflare Pages** — Build and deploy the Vite SPA to a public CF Pages URL with `VITE_API_BASE_URL` pointing at Fly and SPA deep-link routing. (completed 2026-05-07)
+- [x] **Phase 5: Deploy Frontend to Cloudflare Pages** — Build and deploy the Vite SPA to a public CF Pages URL with `VITE_API_BASE_URL` pointing at Fly and SPA deep-link routing.
+ (completed 2026-05-07)
 - [ ] **Phase 6: Prod Wiring — Auth, CORS, Rate Limiting, Cost Caps** — Close the loop between frontend and backend: Auth redirect URLs, CORS allowlist, per-user chat rate limit, max-iterations cap, and OpenRouter spend alert.
 - [ ] **Phase 7: Observability Baseline** — Wire Sentry (with source maps), LangSmith prod project, and UptimeRobot monitors (including DB-touching `/api/health`) so prod failures are visible.
 - [ ] **Phase 8: Portfolio Polish** — Demo user + "Try demo" button, graceful degradation, and a portfolio-grade README (live URL, creds, architecture diagram, screenshots, deploy badge).
@@ -97,7 +98,12 @@
   3. A single authenticated user exceeding the configured per-minute `/api/chat` cap receives HTTP 429 with a JSON error — verified by a scripted burst.
   4. The main chat tool-use loop has a max-iterations cap (mirroring the explorer's 6-cap); an adversarial prompt cannot drive unbounded tool calls.
   5. An OpenRouter monthly spend alert/cap is configured on the account and a test alert has been confirmed delivered.
-**Plans**: TBD
+**Plans**: 5 plans
+  - [ ] 06-00-PLAN.md — Wave 0 test scaffolding (conftest fixtures + 3 placeholder test files for SEC-04 + SEC-05)
+  - [ ] 06-01-PLAN.md — SEC-04 rate limiter (slowapi + limiter.py module + auth bridge + chat route decoration + 429 JSON handler)
+  - [ ] 06-02-PLAN.md — SEC-05 max-iter cap on chat tool-use loop (chat_max_iterations=15 + counter-bounded refactor + graceful cap-hit + LangSmith tag)
+  - [ ] 06-03-PLAN.md — Smoke script extensions (rate-limit burst + CORS rejection) + Fly LLM_MODEL swap to openai/gpt-oss-120b:free + extended smoke PASS
+  - [ ] 06-04-PLAN.md — SEC-01 + SEC-06 manual checklists (Supabase Auth URL config + signup E2E + OpenRouter alert config + alert delivery test)
 
 ### Phase 7: Observability Baseline
 **Goal**: Before the prod URL is shared publicly, uncaught frontend errors, backend traces, and uptime all flow to dedicated prod channels so real failures are visible to the developer.
