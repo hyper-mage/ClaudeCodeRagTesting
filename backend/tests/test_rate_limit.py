@@ -24,7 +24,6 @@ def test_user_id_key_func_fallback(mock_request_no_user):
     assert user_id_key(mock_request_no_user) == "anonymous"
 
 
-@pytest.mark.skip(reason="Wave 1 06-01 Task 1-2: chat route decorated with @limiter.limit and accepts request: Request")
 def test_chat_route_decorated():
     """Verify chat.py:send_message has @limiter.limit applied AND accepts request: Request."""
     import inspect

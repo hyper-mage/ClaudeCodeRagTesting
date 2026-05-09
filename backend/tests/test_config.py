@@ -19,7 +19,6 @@ def test_chat_max_iterations_env_override(monkeypatch):
     assert s.chat_max_iterations == 7
 
 
-@pytest.mark.skip(reason="Wave 1 06-01 Task 1-2: chat_rate_limit field added")
 def test_chat_rate_limit_default():
     """Settings.chat_rate_limit defaults to '20/minute' (D-05)."""
     from config import Settings
@@ -27,7 +26,6 @@ def test_chat_rate_limit_default():
     assert s.chat_rate_limit == "20/minute"
 
 
-@pytest.mark.skip(reason="Wave 1 06-01 Task 1-2: chat_rate_limit env override")
 def test_chat_rate_limit_env_override(monkeypatch):
     """CHAT_RATE_LIMIT env var overrides default."""
     monkeypatch.setenv("CHAT_RATE_LIMIT", "5/minute")

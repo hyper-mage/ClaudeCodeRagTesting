@@ -45,6 +45,7 @@ def get_user_id(
         user_id = payload.get("sub")
         if not user_id:
             raise HTTPException(status_code=401, detail="Invalid token: no sub claim")
+        request.state.user_id = user_id   # SEC-04: bridge for slowapi key_func (Phase 6 D-04)
         return user_id
     except jwt.ExpiredSignatureError:
         raise HTTPException(status_code=401, detail="Token expired")
