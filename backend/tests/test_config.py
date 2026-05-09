@@ -2,7 +2,6 @@
 import pytest
 
 
-@pytest.mark.skip(reason="Wave 1 06-02: chat_max_iterations field added")
 def test_chat_max_iterations_default():
     """Settings.chat_max_iterations defaults to 15 (D-08, D-09)."""
     from config import Settings
@@ -10,7 +9,6 @@ def test_chat_max_iterations_default():
     assert s.chat_max_iterations == 15
 
 
-@pytest.mark.skip(reason="Wave 1 06-02: chat_max_iterations env override")
 def test_chat_max_iterations_env_override(monkeypatch):
     """CHAT_MAX_ITERATIONS env var overrides default."""
     monkeypatch.setenv("CHAT_MAX_ITERATIONS", "7")

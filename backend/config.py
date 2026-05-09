@@ -101,6 +101,11 @@ class Settings(BaseSettings):
     explorer_max_summary_chars: int = 3000
     explorer_timeout: int = 120
 
+    # Main chat tool-use loop max iterations (Phase 6 D-08, D-09 — SEC-05)
+    # Mirrors explorer pattern (counter+graceful-stop architecture, NOT the numeric value).
+    # 15 chosen because the main loop has more legitimate tools than the explorer (~10 vs 5).
+    chat_max_iterations: int = 15
+
     # Token budget management (Phase 6)
     model_context_length: int = 128000  # fallback if OpenRouter lookup fails
     response_reserve_tokens: int = 4096  # reserved for LLM response
