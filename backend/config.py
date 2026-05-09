@@ -21,6 +21,9 @@ class Settings(BaseSettings):
     # CORS allowlist (comma-separated origins, e.g. "https://app.pages.dev,http://localhost:5173")
     cors_allowed_origins: str = ""
 
+    # Rate limiting (Phase 6 D-05) — slowapi window string consumed by @limiter.limit(...)
+    chat_rate_limit: str = "20/minute"
+
     @property
     def cors_origins_list(self) -> list[str]:
         """Parse CORS_ALLOWED_ORIGINS env var into a list.

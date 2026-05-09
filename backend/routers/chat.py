@@ -1,8 +1,9 @@
 import json
 import logging
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sse_starlette.sse import EventSourceResponse
 from auth import get_user_id
+from limiter import limiter
 
 logger = logging.getLogger(__name__)
 from database import get_supabase
@@ -456,8 +457,10 @@ def execute_tool(fn_name: str, fn_args: dict, user_id: str) -> str:
 
 
 @router.post("/{thread_id}/messages")
+@limiter.limit(get_settings().chat_rate_limit)  # SEC-04: per-user 20/minute on /api/chat
 @traceable(name="chat_send_message")
 async def send_message(
+    request: Request,                            # SEC-04: REQUIRED by slowapi (RESEARCH Pitfall 1)
     thread_id: str,
     body: MessageCreate,
     user_id: str = Depends(get_user_id),
