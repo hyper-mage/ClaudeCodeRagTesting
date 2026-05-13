@@ -31,6 +31,14 @@ except ImportError:
 router = APIRouter(prefix="/api/threads", tags=["chat"])
 
 
+# SEC-05 cap-hit graceful notice — markdown-italic so chat UI styles it as a meta-note.
+# Per Phase 6 D-10 (verbatim wording from CONTEXT.md).
+CAP_HIT_NOTICE = (
+    "\n\n_I hit the tool-call limit ({n}) before finishing this answer. "
+    "Try narrowing the question or breaking it into steps._"
+)
+
+
 RETRIEVAL_TOOL = {
     "type": "function",
     "function": {
@@ -564,7 +572,13 @@ async def send_message(
 
             current_messages = list(messages)
 
-            while True:
+            # SEC-05 (Phase 6 D-08..D-11): counter-bounded loop with graceful cap-hit.
+            # Mirrors explorer_service.py:232 architecture (NOT numeric value: 15 vs explorer's 6).
+            iteration = 0
+            cap_hit = False
+            settings_local = get_settings()  # @lru_cache; safe to call inside the generator
+            while iteration < settings_local.chat_max_iterations:
+                iteration += 1
                 tool_call_happened = False
 
                 for event in stream_chat_completion(
@@ -795,7 +809,35 @@ async def send_message(
                             }
 
                 if not tool_call_happened:
-                    break
+                    break  # voluntary stop — main exit path
+            else:
+                # while-else: fires only when counter exhausts without `break`.
+                # This is the CAP-HIT path. Mirrors explorer's exhaustion flag.
+                cap_hit = True
+
+            if cap_hit:
+                notice = CAP_HIT_NOTICE.format(n=settings_local.chat_max_iterations)
+                full_content += notice
+                yield {
+                    "event": "content_delta",
+                    "data": json.dumps({"text": notice}),
+                }
+                logger.warning(
+                    f"Chat loop hit max_iterations cap "
+                    f"({settings_local.chat_max_iterations}) for user {user_id}, "
+                    f"thread {thread_id}"
+                )
+                # LangSmith metadata tag — RESEARCH Pitfall 5: best-effort, non-fatal.
+                try:
+                    from langsmith.run_helpers import get_current_run_tree
+                    run = get_current_run_tree()
+                    if run is not None:
+                        run.add_metadata({
+                            "iteration_cap_hit": True,
+                            "cap_value": settings_local.chat_max_iterations,
+                        })
+                except Exception as e:
+                    logger.debug(f"LangSmith metadata tag failed (non-fatal): {e}")
 
             # Update assistant message with final content
             db.table("messages").update({
