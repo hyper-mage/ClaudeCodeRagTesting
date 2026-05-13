@@ -109,3 +109,60 @@ if [ "$FIRST_AT" -gt "$FIRST_CHUNK_MAX" ]; then
 fi
 
 ok "SMOKE PASS: $DATA_LINES SSE 'data:' lines, first chunk in ${FIRST_AT}s"
+
+# --- 6. Rate-limit burst (SEC-04) -------------------------------------
+# Issue 25 rapid /api/chat requests; expect ≥1 × 429 with the slowapi JSON shape
+# {"error":"rate_limited","detail":..., "retry_after_seconds": <int>}.
+# Cap is 20/minute per user (Phase 6 D-05) so requests 21..25 should 429.
+log "Burst: 25 rapid /api/threads/$THREAD_ID/messages requests, expect ≥1 × 429"
+BURST_429=0
+BURST_429_BODY=""
+BURST_RETRY_AFTER=""
+for i in $(seq 1 25); do
+  CODE=$(curl -sS -o "/tmp/burst_body_$i" -w "%{http_code}" -D "/tmp/burst_hdr_$i" \
+    -X POST \
+    -H "Authorization: Bearer $JWT" \
+    -H "Content-Type: application/json" \
+    -H "Accept: application/json" \
+    "$FLY_URL/api/threads/$THREAD_ID/messages" \
+    -d '{"content":"hi"}' 2>/dev/null)
+  if [ "$CODE" = "429" ]; then
+    BURST_429=$((BURST_429 + 1))
+    if [ -z "$BURST_429_BODY" ]; then
+      BURST_429_BODY=$(cat "/tmp/burst_body_$i")
+      BURST_RETRY_AFTER=$(grep -i "^retry-after:" "/tmp/burst_hdr_$i" | head -1 | tr -d '\r\n')
+    fi
+  fi
+done
+[ "$BURST_429" -ge 1 ] || fail "burst test got 0 × 429 in 25 reqs (expected ≥1) — check @limiter.limit decorator + Request param (RESEARCH Pitfall 1)"
+
+# Validate JSON shape: {"error":"rate_limited", ...}
+echo "$BURST_429_BODY" | jq -e '.error == "rate_limited"' >/dev/null \
+  || fail "429 body wrong shape — expected {\"error\":\"rate_limited\",...}, got: $BURST_429_BODY"
+# Validate retry_after_seconds is a positive integer
+echo "$BURST_429_BODY" | jq -e '.retry_after_seconds | type == "number" and . > 0' >/dev/null \
+  || fail "429 body missing positive integer retry_after_seconds; got: $BURST_429_BODY"
+# Validate Retry-After header present
+[ -n "$BURST_RETRY_AFTER" ] \
+  || fail "429 response missing Retry-After header (D-06 contract)"
+
+ok "Rate limit fired $BURST_429 × 429; body shape OK; Retry-After: $BURST_RETRY_AFTER"
+
+# cleanup tmp files
+rm -f /tmp/burst_body_*.* /tmp/burst_hdr_*.* 2>/dev/null || true
+rm -f /tmp/burst_body_* /tmp/burst_hdr_* 2>/dev/null || true
+
+# --- 7. CORS rejection-path (SC#2 / D-22) -----------------------------
+# Verify a non-allowlisted Origin does NOT receive Access-Control-Allow-Origin echo.
+# Per RESEARCH Pitfall 6: assertion is HEADER ABSENCE, not status code.
+log "CORS: verify non-allowlisted origin gets no Access-Control-Allow-Origin echo"
+CORS_RESP=$(curl -sI -X OPTIONS \
+  -H "Origin: https://evil.example" \
+  -H "Access-Control-Request-Method: POST" \
+  -H "Access-Control-Request-Headers: authorization,content-type" \
+  "$FLY_URL/api/threads/$THREAD_ID/messages" 2>&1 || true)
+if echo "$CORS_RESP" | grep -qi "Access-Control-Allow-Origin: https://evil.example"; then
+  echo "$CORS_RESP" >&2
+  fail "CORS allowed evil.example — rejection path broken (RESEARCH Pitfall 6 / SC#2 fail)"
+fi
+ok "CORS rejection: Access-Control-Allow-Origin NOT echoed for evil.example"
