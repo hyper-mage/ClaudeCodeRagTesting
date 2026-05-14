@@ -465,8 +465,8 @@ def execute_tool(fn_name: str, fn_args: dict, user_id: str) -> str:
 
 
 @router.post("/{thread_id}/messages")
-@limiter.limit(get_settings().chat_rate_limit)  # SEC-04: per-user 20/minute on /api/chat
 @traceable(name="chat_send_message")
+@limiter.limit(get_settings().chat_rate_limit)  # SEC-04: per-user 20/minute on /api/chat (decorator placed ADJACENT to fn so slowapi sees raw signature; #2128)
 async def send_message(
     request: Request,                            # SEC-04: REQUIRED by slowapi (RESEARCH Pitfall 1)
     thread_id: str,

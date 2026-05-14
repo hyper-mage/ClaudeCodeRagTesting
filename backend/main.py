@@ -2,6 +2,7 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from slowapi.errors import RateLimitExceeded
+from slowapi.middleware import SlowAPIMiddleware
 
 from routers import threads, chat, documents, folders
 from services.tracing import setup_tracing
@@ -44,6 +45,8 @@ async def rate_limit_handler(request: Request, exc: RateLimitExceeded) -> JSONRe
         headers={"Retry-After": str(retry_after)},
     )
 
+
+app.add_middleware(SlowAPIMiddleware)  # SEC-04: required for slowapi to enforce decorator-based limits in prod (Pitfall 1)
 
 app.add_middleware(
     CORSMiddleware,
