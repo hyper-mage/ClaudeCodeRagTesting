@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: milestone
 status: verifying
-stopped_at: Phase 06.1 UI-SPEC approved
-last_updated: "2026-05-15T15:16:22.009Z"
+stopped_at: Phase 06.1 plans approved
+last_updated: "2026-05-15T15:40:25.106Z"
 last_activity: 2026-05-13
 progress:
   total_phases: 11
   completed_phases: 5
-  total_plans: 13
+  total_plans: 15
   completed_plans: 12
-  percent: 92
+  percent: 80
 ---
 
 # Project State
@@ -99,7 +99,7 @@ None — roadmap complete, awaiting `/gsd:plan-phase 1`.
 
 ## Session Continuity
 
-Last session: 2026-05-15T15:16:21.930Z
-Stopped at: Phase 06.1 UI-SPEC approved
-Resume file: .planning/phases/06.1-mobile-responsive-chat-layout/06.1-UI-SPEC.md
+Last session: 2026-05-15T15:40:25.050Z
+Stopped at: Phase 06.1 plans approved
+Resume file: .planning/phases/06.1-mobile-responsive-chat-layout/06.1-01-PLAN.md
 Next: `/gsd:plan-phase 1` (Secrets & Repo Hygiene)
