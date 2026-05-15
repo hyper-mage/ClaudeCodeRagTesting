@@ -182,3 +182,12 @@
 
 Plans:
 - [ ] TBD (promote with /gsd:review-backlog when ready)
+
+### Phase 999.2: Cost guardrail burn script (BACKLOG)
+
+**Goal:** Programmatic test to trip the OpenRouter $0.10 cost guardrail. Mint N parallel chat requests against the paid model (`openai/gpt-4o-mini` ~$0.005/call → ~20 reqs) from a script in `backend/scripts/`. Watch credits page for $0.10 delta + inbox for delivery email. Captured during 06-04 friend-testing reached only $0.0105 (10.5% of trip) before benching. Verifies whether OpenRouter Guardrail trip emits email-on-trip OR just blocks calls — current behavior unknown. Surface during v1.2 BYO-key + multi-model picker phase planning.
+**Requirements:** TBD
+**Plans:** 0 plans
+
+Plans:
+- [ ] TBD (promote with /gsd:review-backlog when ready)
