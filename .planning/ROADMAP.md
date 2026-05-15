@@ -107,13 +107,14 @@
 
 ### Phase 06.1: mobile-responsive-chat-layout (INSERTED)
 
-**Goal:** [Urgent work - to be planned]
-**Requirements**: TBD
+**Goal:** Chat + Documents pages usable on mobile viewports (≤768px) via a hamburger-drawer pattern: below md: (768px) both IconSidebar (w-14) and ThreadSidebar (w-64) hide; a 48px mobile top bar exposes a hamburger that opens a 288px slide-in drawer hosting the icon nav row + thread list (ChatPage) or folder tree (DocumentsPage). Desktop layout ≥768px unchanged.
+**Requirements**: UX-MOBILE-01 (in-phase id; not in REQUIREMENTS.md — bug fix found during 06-04 friend-testing)
 **Depends on:** Phase 6
-**Plans:** 0 plans
+**Plans:** 2 plans
 
 Plans:
-- [ ] TBD (run /gsd-plan-phase 06.1 to break down)
+- [ ] 06.1-01-PLAN.md — Build shared mobile shell: useBodyScrollLock + useSwipeToClose hooks, MobileDrawer + MobileTopBar components, hidden md:flex on IconSidebar + ThreadSidebar, named exports IconNavRow + ThreadListContent
+- [ ] 06.1-02-PLAN.md — Wire MobileTopBar + MobileDrawer into ChatPage + DocumentsPage; hidden md:flex on documents w-64 tree wrapper; 12-point UAT checkpoint covering CONTEXT.md success criteria
 
 ### Phase 7: Observability Baseline
 **Goal**: Before the prod URL is shared publicly, uncaught frontend errors, backend traces, and uptime all flow to dedicated prod channels so real failures are visible to the developer.
