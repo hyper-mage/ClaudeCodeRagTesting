@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { Plus, Pencil, FolderInput, Trash2 } from 'lucide-react'
 import { DragDropProvider } from '@dnd-kit/react'
 import type { DragEndEvent } from '@dnd-kit/react'
@@ -12,6 +12,9 @@ import FolderTree from '../components/FolderTree'
 import FileListView from '../components/FileListView'
 import Breadcrumb from '../components/Breadcrumb'
 import FileUpload from '../components/FileUpload'
+import MobileTopBar from '../components/MobileTopBar'
+import MobileDrawer from '../components/MobileDrawer'
+import { IconNavRow } from '../components/IconSidebar'
 import { useContextMenu } from '../hooks/useContextMenu'
 import ContextMenu from '../components/ContextMenu'
 import ContextMenuItem from '../components/ContextMenuItem'
@@ -74,6 +77,10 @@ export default function DocumentsPage() {
   const [creatingUnderId, setCreatingUnderId] = useState<string | null>(null)
   const [confirmDelete, setConfirmDelete] = useState<DeleteTarget | null>(null)
   const [movingItem, setMovingItem] = useState<MoveTarget | null>(null)
+  const [isDrawerOpen, setIsDrawerOpen] = useState(false)
+  const hamburgerRef = useRef<HTMLButtonElement>(null)
+  const closeDrawer = () => setIsDrawerOpen(false)
+  const openDrawer = () => setIsDrawerOpen(true)
 
   // Selection over the current folder's documents.
   const currentDocuments = folderContents?.documents ?? []
@@ -285,9 +292,15 @@ export default function DocumentsPage() {
 
   return (
     <DragDropProvider onDragEnd={handleDragEnd}>
-      <div className="flex-1 bg-gray-950 text-white flex overflow-hidden">
+      <div className="flex-1 bg-gray-950 text-white flex flex-col md:flex-row overflow-hidden">
+        <MobileTopBar
+          title="Documents"
+          onOpenDrawer={openDrawer}
+          hamburgerRef={hamburgerRef}
+          isDrawerOpen={isDrawerOpen}
+        />
         {/* Tree Sidebar */}
-        <div className="w-64 bg-gray-900 border-r border-gray-800 flex flex-col h-full overflow-y-auto">
+        <div className="hidden md:flex w-64 bg-gray-900 border-r border-gray-800 flex-col h-full overflow-y-auto">
           <FolderTree
             folders={folders}
             selectedFolderId={selectedFolderId}
@@ -526,6 +539,33 @@ export default function DocumentsPage() {
             onCancel={() => setMovingItem(null)}
           />
         )}
+
+        {/* Mobile Drawer — FolderTree gated on isDrawerOpen to avoid duplicate dnd-kit ids with the desktop tree (T-06.1-07). */}
+        <MobileDrawer isOpen={isDrawerOpen} onClose={closeDrawer} triggerRef={hamburgerRef}>
+          <IconNavRow onNavigate={closeDrawer} />
+          {isDrawerOpen && (
+            <div className="flex-1 overflow-y-auto">
+              <FolderTree
+                folders={folders}
+                selectedFolderId={selectedFolderId}
+                expandedIds={expandedIds}
+                onSelect={(id) => { selectFolder(id); closeDrawer() }}
+                onToggleExpand={toggleExpand}
+                onContextMenu={handleFolderContextMenu}
+                renamingId={renamingId}
+                onStartRename={setRenamingId}
+                onConfirmRename={handleConfirmRename}
+                onCancelRename={() => setRenamingId(null)}
+                creatingUnderId={creatingUnderId}
+                onStartCreate={setCreatingUnderId}
+                onConfirmCreate={handleConfirmCreate}
+                onCancelCreate={() => setCreatingUnderId(null)}
+                onExternalFileDrop={handleExternalFileDrop}
+                suppressRootCreate={selectedFolderId === ROOT_PRIVATE_ID}
+              />
+            </div>
+          )}
+        </MobileDrawer>
       </div>
     </DragDropProvider>
   )
