@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: milestone
-status: executing
-stopped_at: Phase 06.1 Plan 02 complete (code); UAT deferred to deployed URL
-last_updated: "2026-05-15T16:30:00Z"
+status: verified
+stopped_at: Phase 06.1 verified — mobile UAT 14/14 PASS on deployed CF Pages
+last_updated: "2026-05-15T17:00:00Z"
 last_activity: 2026-05-15
 progress:
   total_phases: 11
-  completed_phases: 5
+  completed_phases: 6
   total_plans: 16
-  completed_plans: 15
-  percent: 94
+  completed_plans: 16
+  percent: 100
 ---
 
 # Project State
@@ -21,16 +21,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-23 after v1.0 completion)
 
 **Core value:** The agent can intelligently search and reason across a structured board game knowledge base -- finding rules, comparing mechanics, and recommending games -- using the right tool for the job, transparently.
-**Current focus:** Phase 5 — deploy-frontend-to-cloudflare-pages
+**Current focus:** Phase 6 — Prod Wiring (resume from 06-00-PLAN.md); Phase 06.1 (mobile responsive) verified and closed.
 
 ## Current Position
 
 Phase: 06.1
-Plan: 02 (code complete; UAT deferred to deployed CF Pages URL)
-Status: Phase 06.1 code-complete, verification pending deployed UAT
+Plan: 02 (verified via deployed UAT 14/14 PASS)
+Status: Phase 06.1 verified and closed; ready to resume Phase 6
 Last activity: 2026-05-15
 
-Progress: [█████████░] 94%
+Progress: [██████████] 100% of plans landed for completed/verified phases
 
 ## Performance Metrics
 
@@ -59,13 +59,13 @@ Progress: [█████████░] 94%
 | Phase 04 P02 | 25min | 5 tasks | 1 files |
 | Phase 05 P01 | 45min | 5 tasks | 2 files |
 | Phase 06.1 P01 | ~18min | 3 tasks | 6 files |
-| Phase 06.1 P02 | ~12min | 2 of 3 tasks (Task 3 UAT deferred-to-deployed) | 2 files |
+| Phase 06.1 P02 | ~12min | 2 of 3 tasks (Task 3 UAT deferred-to-deployed; UAT PASS 2026-05-15) | 2 files |
 
 ## Accumulated Context
 
 ### Roadmap Evolution
 
-- Phase 06.1 inserted after Phase 6: mobile-responsive-chat-layout — sidebar w-64 always-visible eats mobile viewport; hide below md: breakpoint + add hamburger drawer (URGENT)
+- Phase 06.1 inserted after Phase 6: mobile-responsive-chat-layout — sidebar w-64 always-visible eats mobile viewport; hide below md: breakpoint + add hamburger drawer (URGENT) — VERIFIED 2026-05-15 via deployed UAT 14/14 PASS
 
 ### Decisions
 
@@ -89,11 +89,12 @@ Recent decisions affecting current work:
 - [Phase 06.1 P01]: Mobile drawer primitives built without new npm deps — useBodyScrollLock + useSwipeToClose (hand-rolled pointer events) + MobileDrawer (dialog/focus-trap/Escape/swipe) + MobileTopBar. IconSidebar/ThreadSidebar marked `hidden md:flex` with `IconNavRow` / `ThreadListContent` named exports for drawer reuse in Plan 02.
 - [Phase 06.1 P01]: Pre-existing lint errors in 4 untouched files (FileUpload, AuthContext, ToastContext, ChatPage) logged to `06.1/deferred-items.md` per SCOPE BOUNDARY rule.
 - [Phase 06.1 P02]: ChatPage + DocumentsPage wired with MobileTopBar + MobileDrawer; per-page drawer state (not hoisted); DocumentsPage drawer FolderTree gated on isDrawerOpen to prevent duplicate dnd-kit droppable ids (T-06.1-07); auto-close only on primary select actions, not rename/create/contextMenu/external-drop.
-- [Phase 06.1 P02]: Task 3 (12-point mobile UAT) DEFERRED-TO-DEPLOYED — local `.env` Supabase URL mismatch with prod project made local emulation non-representative. UAT will run on `https://boardgame-rag-prod.pages.dev` after CF Pages auto-deploys from master. Tracked in `06.1/deferred-items.md`; phase 06.1 NOT marked verified until deployed UAT passes.
+- [Phase 06.1 P02]: Task 3 (12-point mobile UAT) DEFERRED-TO-DEPLOYED — local `.env` Supabase URL mismatch with prod project made local emulation non-representative. UAT ran on `https://boardgame-rag-prod.pages.dev` 2026-05-15: 14/14 PASS (12 functional + 2 a11y sanity). Phase 06.1 verified.
+- [Phase 06.1 verification]: Goal-backward verification 2026-05-15 — all 12 CONTEXT.md success criteria + 2 a11y sanity checks PASS on deployed CF Pages URL; `git diff frontend/package.json frontend/package-lock.json` empty (zero new deps); `npm run build` succeeds. Phase 06.1 closed.
 
 ### Pending Todos
 
-None — roadmap complete, awaiting `/gsd:plan-phase 1`.
+None — Phase 06.1 verified. Resume Phase 6 (06-00-PLAN.md → 06-04-PLAN.md).
 
 ### Blockers/Concerns
 
@@ -105,7 +106,7 @@ None — roadmap complete, awaiting `/gsd:plan-phase 1`.
 
 ## Session Continuity
 
-Last session: 2026-05-15T16:30:00Z
-Stopped at: Phase 06.1 Plan 02 code-complete; UAT deferred to deployed CF Pages URL
-Resume file: .planning/phases/06.1-mobile-responsive-chat-layout/deferred-items.md (run deployed-URL UAT)
-Next: Push master to remote → wait for CF Pages auto-deploy → run 12-point UAT + 2 a11y checks on https://boardgame-rag-prod.pages.dev → on PASS, mark Phase 06.1 verified and resume Phase 6 (06-00-PLAN.md)
+Last session: 2026-05-15T17:00:00Z
+Stopped at: Phase 06.1 verified — deployed UAT 14/14 PASS; ready to resume Phase 6
+Resume file: .planning/phases/06-prod-wiring/06-00-PLAN.md (next plan in Phase 6 sequence)
+Next: Resume Phase 6 (Prod Wiring — Auth, CORS, Rate Limiting, Cost Caps) from `06-00-PLAN.md`.

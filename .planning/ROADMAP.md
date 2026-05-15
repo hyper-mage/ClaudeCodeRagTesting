@@ -105,16 +105,17 @@
   - [ ] 06-03-PLAN.md — Smoke script extensions (rate-limit burst + CORS rejection) + Fly LLM_MODEL swap to openai/gpt-oss-120b:free + extended smoke PASS
   - [ ] 06-04-PLAN.md — SEC-01 + SEC-06 manual checklists (Supabase Auth URL config + signup E2E + OpenRouter alert config + alert delivery test)
 
-### Phase 06.1: mobile-responsive-chat-layout (INSERTED)
+### Phase 06.1: mobile-responsive-chat-layout (INSERTED) [x] VERIFIED 2026-05-15
 
 **Goal:** Chat + Documents pages usable on mobile viewports (≤768px) via a hamburger-drawer pattern: below md: (768px) both IconSidebar (w-14) and ThreadSidebar (w-64) hide; a 48px mobile top bar exposes a hamburger that opens a 288px slide-in drawer hosting the icon nav row + thread list (ChatPage) or folder tree (DocumentsPage). Desktop layout ≥768px unchanged.
 **Requirements**: UX-MOBILE-01 (in-phase id; not in REQUIREMENTS.md — bug fix found during 06-04 friend-testing)
 **Depends on:** Phase 6
 **Plans:** 2 plans
+**Verified:** 2026-05-15 — deployed UAT 14/14 PASS (12 functional + 2 a11y sanity) against https://boardgame-rag-prod.pages.dev. See `.planning/phases/06.1-mobile-responsive-chat-layout/06.1-VERIFICATION.md`.
 
 Plans:
 - [x] 06.1-01-PLAN.md — Build shared mobile shell: useBodyScrollLock + useSwipeToClose hooks, MobileDrawer + MobileTopBar components, hidden md:flex on IconSidebar + ThreadSidebar, named exports IconNavRow + ThreadListContent
-- [x] 06.1-02-PLAN.md — Wire MobileTopBar + MobileDrawer into ChatPage + DocumentsPage; hidden md:flex on documents w-64 tree wrapper; 12-point UAT checkpoint covering CONTEXT.md success criteria (code complete; UAT DEFERRED-TO-DEPLOYED on https://boardgame-rag-prod.pages.dev — see `06.1/deferred-items.md`; phase verification gated on deployed-UAT approval)
+- [x] 06.1-02-PLAN.md — Wire MobileTopBar + MobileDrawer into ChatPage + DocumentsPage; hidden md:flex on documents w-64 tree wrapper; 12-point UAT verified 2026-05-15 on deployed CF Pages (14/14 PASS: 12 functional + 2 a11y sanity)
 
 ### Phase 7: Observability Baseline
 **Goal**: Before the prod URL is shared publicly, uncaught frontend errors, backend traces, and uptime all flow to dedicated prod channels so real failures are visible to the developer.
