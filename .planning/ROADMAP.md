@@ -105,6 +105,16 @@
   - [ ] 06-03-PLAN.md — Smoke script extensions (rate-limit burst + CORS rejection) + Fly LLM_MODEL swap to openai/gpt-oss-120b:free + extended smoke PASS
   - [ ] 06-04-PLAN.md — SEC-01 + SEC-06 manual checklists (Supabase Auth URL config + signup E2E + OpenRouter alert config + alert delivery test)
 
+### Phase 06.1: mobile-responsive-chat-layout (INSERTED)
+
+**Goal:** [Urgent work - to be planned]
+**Requirements**: TBD
+**Depends on:** Phase 6
+**Plans:** 0 plans
+
+Plans:
+- [ ] TBD (run /gsd-plan-phase 06.1 to break down)
+
 ### Phase 7: Observability Baseline
 **Goal**: Before the prod URL is shared publicly, uncaught frontend errors, backend traces, and uptime all flow to dedicated prod channels so real failures are visible to the developer.
 **Depends on**: Phase 6

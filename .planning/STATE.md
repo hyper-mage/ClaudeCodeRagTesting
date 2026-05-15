@@ -4,14 +4,14 @@ milestone: v1.1
 milestone_name: milestone
 status: verifying
 stopped_at: Phase 6 context gathered
-last_updated: "2026-05-13T03:45:57.830Z"
-last_activity: 2026-05-07
+last_updated: "2026-05-15T14:48:33.975Z"
+last_activity: 2026-05-13
 progress:
-  total_phases: 9
+  total_phases: 11
   completed_phases: 5
   total_plans: 13
-  completed_plans: 11
-  percent: 85
+  completed_plans: 12
+  percent: 92
 ---
 
 # Project State
@@ -28,9 +28,9 @@ See: .planning/PROJECT.md (updated 2026-04-23 after v1.0 completion)
 Phase: 999.1
 Plan: Not started
 Status: Phase complete — ready for verification
-Last activity: 2026-05-07
+Last activity: 2026-05-13
 
-Progress: [░░░░░░░░░░] 0% (0/8 phases)
+Progress: [█████████░] 85%
 
 ## Performance Metrics
 
@@ -60,6 +60,10 @@ Progress: [░░░░░░░░░░] 0% (0/8 phases)
 | Phase 05 P01 | 45min | 5 tasks | 2 files |
 
 ## Accumulated Context
+
+### Roadmap Evolution
+
+- Phase 06.1 inserted after Phase 6: mobile-responsive-chat-layout — sidebar w-64 always-visible eats mobile viewport; hide below md: breakpoint + add hamburger drawer (URGENT)
 
 ### Decisions
 
