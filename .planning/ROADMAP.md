@@ -113,7 +113,7 @@
 **Plans:** 2 plans
 
 Plans:
-- [ ] 06.1-01-PLAN.md — Build shared mobile shell: useBodyScrollLock + useSwipeToClose hooks, MobileDrawer + MobileTopBar components, hidden md:flex on IconSidebar + ThreadSidebar, named exports IconNavRow + ThreadListContent
+- [x] 06.1-01-PLAN.md — Build shared mobile shell: useBodyScrollLock + useSwipeToClose hooks, MobileDrawer + MobileTopBar components, hidden md:flex on IconSidebar + ThreadSidebar, named exports IconNavRow + ThreadListContent
 - [ ] 06.1-02-PLAN.md — Wire MobileTopBar + MobileDrawer into ChatPage + DocumentsPage; hidden md:flex on documents w-64 tree wrapper; 12-point UAT checkpoint covering CONTEXT.md success criteria
 
 ### Phase 7: Observability Baseline

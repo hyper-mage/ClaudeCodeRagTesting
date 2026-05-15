@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: milestone
-status: verifying
-stopped_at: Phase 06.1 plans approved
-last_updated: "2026-05-15T15:40:25.106Z"
-last_activity: 2026-05-13
+status: executing
+stopped_at: Phase 06.1 Plan 01 complete
+last_updated: "2026-05-15T16:05:40Z"
+last_activity: 2026-05-15
 progress:
   total_phases: 11
   completed_phases: 5
-  total_plans: 15
-  completed_plans: 12
-  percent: 80
+  total_plans: 16
+  completed_plans: 14
+  percent: 88
 ---
 
 # Project State
@@ -25,12 +25,12 @@ See: .planning/PROJECT.md (updated 2026-04-23 after v1.0 completion)
 
 ## Current Position
 
-Phase: 999.1
-Plan: Not started
-Status: Phase complete — ready for verification
-Last activity: 2026-05-13
+Phase: 06.1
+Plan: 02 (next; Plan 01 complete)
+Status: Executing Phase 06.1
+Last activity: 2026-05-15
 
-Progress: [█████████░] 85%
+Progress: [█████████░] 88%
 
 ## Performance Metrics
 
@@ -58,6 +58,7 @@ Progress: [█████████░] 85%
 | Phase 04 P01 | 3min | 3 tasks | 4 files |
 | Phase 04 P02 | 25min | 5 tasks | 1 files |
 | Phase 05 P01 | 45min | 5 tasks | 2 files |
+| Phase 06.1 P01 | ~18min | 3 tasks | 6 files |
 
 ## Accumulated Context
 
@@ -84,6 +85,8 @@ Recent decisions affecting current work:
 - [Phase 04]: Phase 04 P02: Auto-fixed Plan 01 carry-overs — body field is content not message (schema MessageCreate); LLM_API_KEY Fly secret set from OPENROUTER_API_KEY (config.resolved_llm_api_key chain)
 - [Phase 05]: Phase 05 P01: CF Pages project boardgame-rag-prod live at https://boardgame-rag-prod.pages.dev; _redirects + .nvmrc committed (e132d4f); Fly CORS overwritten (digest 95c5bee→a3f4b15); SEC-07 leak grep clean against deployed bundle; D-13 5/5 PASS.
 - [Phase 05]: Phase 05 P01: CF dashboard unification quirk — first deploy landed in Workers (Static Assets, rejected /* /index.html 200 with code 10021); resolved by deleting Worker and recreating via Pages tab. Future agents: use Pages tab in Create dialog explicitly.
+- [Phase 06.1 P01]: Mobile drawer primitives built without new npm deps — useBodyScrollLock + useSwipeToClose (hand-rolled pointer events) + MobileDrawer (dialog/focus-trap/Escape/swipe) + MobileTopBar. IconSidebar/ThreadSidebar marked `hidden md:flex` with `IconNavRow` / `ThreadListContent` named exports for drawer reuse in Plan 02.
+- [Phase 06.1 P01]: Pre-existing lint errors in 4 untouched files (FileUpload, AuthContext, ToastContext, ChatPage) logged to `06.1/deferred-items.md` per SCOPE BOUNDARY rule.
 
 ### Pending Todos
 
@@ -99,7 +102,7 @@ None — roadmap complete, awaiting `/gsd:plan-phase 1`.
 
 ## Session Continuity
 
-Last session: 2026-05-15T15:40:25.050Z
-Stopped at: Phase 06.1 plans approved
-Resume file: .planning/phases/06.1-mobile-responsive-chat-layout/06.1-01-PLAN.md
-Next: `/gsd:plan-phase 1` (Secrets & Repo Hygiene)
+Last session: 2026-05-15T16:05:40Z
+Stopped at: Phase 06.1 Plan 01 complete
+Resume file: .planning/phases/06.1-mobile-responsive-chat-layout/06.1-02-PLAN.md
+Next: Execute Phase 06.1 Plan 02 (wire MobileTopBar + MobileDrawer into AuthenticatedLayout / ChatPage / DocumentsPage)
