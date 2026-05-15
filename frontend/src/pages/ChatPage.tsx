@@ -1,6 +1,9 @@
-import { useCallback, useEffect, useState } from 'react'
-import ThreadSidebar from '../components/ThreadSidebar'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import ThreadSidebar, { ThreadListContent } from '../components/ThreadSidebar'
 import ChatContainer from '../components/ChatContainer'
+import MobileTopBar from '../components/MobileTopBar'
+import MobileDrawer from '../components/MobileDrawer'
+import { IconNavRow } from '../components/IconSidebar'
 import { apiFetch } from '../lib/api'
 import { useChat } from '../hooks/useChat'
 
@@ -14,6 +17,10 @@ interface Thread {
 export default function ChatPage() {
   const [threads, setThreads] = useState<Thread[]>([])
   const [activeThreadId, setActiveThreadId] = useState<string | null>(null)
+  const [isDrawerOpen, setIsDrawerOpen] = useState(false)
+  const hamburgerRef = useRef<HTMLButtonElement>(null)
+  const closeDrawer = () => setIsDrawerOpen(false)
+  const openDrawer = () => setIsDrawerOpen(true)
   const { messages, isStreaming, sendMessage, loadMessages, cancel } = useChat(activeThreadId)
 
   useEffect(() => {
@@ -56,8 +63,17 @@ export default function ChatPage() {
     loadThreads()
   }
 
+  const activeThread = threads.find(t => t.id === activeThreadId)
+  const topBarTitle = activeThread?.title || (activeThreadId ? 'New Chat' : 'Chat')
+
   return (
-    <div className="flex-1 bg-gray-950 text-white flex overflow-hidden">
+    <div className="flex-1 bg-gray-950 text-white flex flex-col md:flex-row overflow-hidden">
+      <MobileTopBar
+        title={topBarTitle}
+        onOpenDrawer={openDrawer}
+        hamburgerRef={hamburgerRef}
+        isDrawerOpen={isDrawerOpen}
+      />
       <ThreadSidebar
         threads={threads}
         activeThreadId={activeThreadId}
@@ -70,6 +86,16 @@ export default function ChatPage() {
         onSend={handleSend}
         isStreaming={isStreaming}
       />
+      <MobileDrawer isOpen={isDrawerOpen} onClose={closeDrawer} triggerRef={hamburgerRef}>
+        <IconNavRow onNavigate={closeDrawer} />
+        <ThreadListContent
+          threads={threads}
+          activeThreadId={activeThreadId}
+          onSelectThread={(id) => { setActiveThreadId(id); closeDrawer() }}
+          onNewThread={async () => { await handleNewThread(); closeDrawer() }}
+          onDeleteThread={handleDeleteThread}
+        />
+      </MobileDrawer>
     </div>
   )
 }
