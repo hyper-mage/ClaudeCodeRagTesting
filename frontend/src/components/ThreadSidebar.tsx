@@ -13,9 +13,23 @@ interface Props {
   onDeleteThread: (id: string) => void
 }
 
-export default function ThreadSidebar({ threads, activeThreadId, onSelectThread, onNewThread, onDeleteThread }: Props) {
+/**
+ * ThreadListContent — inner content (`+ New Chat` CTA + thread list)
+ * without the outer `w-64` chrome. Reused by the desktop ThreadSidebar
+ * and by MobileDrawer (Plan 02) so the surface lives in one place.
+ *
+ * Empty state copy locked by 06.1-UI-SPEC.md Copywriting Contract:
+ *   "No conversations yet" / Tap "+ New Chat" to start.
+ */
+export function ThreadListContent({
+  threads,
+  activeThreadId,
+  onSelectThread,
+  onNewThread,
+  onDeleteThread,
+}: Props) {
   return (
-    <div className="w-64 bg-gray-900 border-r border-gray-800 flex flex-col h-full">
+    <>
       <div className="p-3">
         <button
           onClick={onNewThread}
@@ -25,24 +39,39 @@ export default function ThreadSidebar({ threads, activeThreadId, onSelectThread,
         </button>
       </div>
       <div className="flex-1 overflow-y-auto">
-        {threads.map(thread => (
-          <div
-            key={thread.id}
-            className={`group flex items-center px-3 py-2 cursor-pointer text-sm hover:bg-gray-800 ${
-              thread.id === activeThreadId ? 'bg-gray-800' : ''
-            }`}
-            onClick={() => onSelectThread(thread.id)}
-          >
-            <span className="flex-1 truncate">{thread.title || 'New Chat'}</span>
-            <button
-              onClick={e => { e.stopPropagation(); onDeleteThread(thread.id) }}
-              className="opacity-0 group-hover:opacity-100 text-gray-500 hover:text-red-400 ml-2"
-            >
-              ×
-            </button>
+        {threads.length === 0 ? (
+          <div className="px-3 py-6 text-center">
+            <p className="text-sm text-gray-500">No conversations yet</p>
+            <p className="text-sm text-gray-500 mt-1">Tap "+ New Chat" to start.</p>
           </div>
-        ))}
+        ) : (
+          threads.map(thread => (
+            <div
+              key={thread.id}
+              className={`group flex items-center px-3 py-2 cursor-pointer text-sm hover:bg-gray-800 ${
+                thread.id === activeThreadId ? 'bg-gray-800' : ''
+              }`}
+              onClick={() => onSelectThread(thread.id)}
+            >
+              <span className="flex-1 truncate">{thread.title || 'New Chat'}</span>
+              <button
+                onClick={e => { e.stopPropagation(); onDeleteThread(thread.id) }}
+                className="opacity-0 group-hover:opacity-100 text-gray-500 hover:text-red-400 ml-2"
+              >
+                ×
+              </button>
+            </div>
+          ))
+        )}
       </div>
+    </>
+  )
+}
+
+export default function ThreadSidebar(props: Props) {
+  return (
+    <div className="hidden md:flex w-64 bg-gray-900 border-r border-gray-800 flex-col h-full">
+      <ThreadListContent {...props} />
     </div>
   )
 }

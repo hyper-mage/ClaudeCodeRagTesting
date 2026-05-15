@@ -11,7 +11,7 @@ export default function IconSidebar() {
   const isDocs = location.pathname === '/documents'
 
   return (
-    <div className="w-14 bg-gray-900 border-r border-gray-800 flex flex-col items-center py-3 h-screen shrink-0">
+    <div className="hidden md:flex w-14 bg-gray-900 border-r border-gray-800 flex-col items-center py-3 h-screen shrink-0">
       <button
         onClick={() => navigate('/')}
         className={`p-2 rounded mb-2 ${isChat ? 'bg-gray-800 text-white' : 'text-gray-500 hover:text-white'}`}
@@ -29,6 +29,62 @@ export default function IconSidebar() {
       <div className="flex-1" />
       <button
         onClick={signOut}
+        className="p-2 rounded text-gray-500 hover:text-white"
+        title="Sign Out"
+      >
+        <LogOut size={20} />
+      </button>
+    </div>
+  )
+}
+
+interface IconNavRowProps {
+  onNavigate?: () => void
+}
+
+/**
+ * IconNavRow — horizontal nav cluster (Chat / Documents / Sign Out) for
+ * reuse inside MobileDrawer. Same active/inactive style logic as the
+ * desktop rail. When `onNavigate` is provided, it fires AFTER the
+ * navigation / signOut call so the drawer can auto-close on tap.
+ */
+export function IconNavRow({ onNavigate }: IconNavRowProps) {
+  const location = useLocation()
+  const navigate = useNavigate()
+  const { signOut } = useAuth()
+
+  const isChat = location.pathname === '/'
+  const isDocs = location.pathname === '/documents'
+
+  const handleNavigate = (path: string) => {
+    navigate(path)
+    onNavigate?.()
+  }
+
+  const handleSignOut = () => {
+    signOut()
+    onNavigate?.()
+  }
+
+  return (
+    <div className="flex items-center gap-2 px-3 py-3 border-b border-gray-800">
+      <button
+        onClick={() => handleNavigate('/')}
+        className={`p-2 rounded ${isChat ? 'bg-gray-800 text-white' : 'text-gray-500 hover:text-white'}`}
+        title="Chat"
+      >
+        <MessageSquare size={20} />
+      </button>
+      <button
+        onClick={() => handleNavigate('/documents')}
+        className={`p-2 rounded ${isDocs ? 'bg-gray-800 text-white' : 'text-gray-500 hover:text-white'}`}
+        title="Documents"
+      >
+        <FileText size={20} />
+      </button>
+      <div className="flex-1" />
+      <button
+        onClick={handleSignOut}
         className="p-2 rounded text-gray-500 hover:text-white"
         title="Sign Out"
       >
