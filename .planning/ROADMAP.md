@@ -114,7 +114,7 @@
 
 Plans:
 - [x] 06.1-01-PLAN.md — Build shared mobile shell: useBodyScrollLock + useSwipeToClose hooks, MobileDrawer + MobileTopBar components, hidden md:flex on IconSidebar + ThreadSidebar, named exports IconNavRow + ThreadListContent
-- [ ] 06.1-02-PLAN.md — Wire MobileTopBar + MobileDrawer into ChatPage + DocumentsPage; hidden md:flex on documents w-64 tree wrapper; 12-point UAT checkpoint covering CONTEXT.md success criteria
+- [x] 06.1-02-PLAN.md — Wire MobileTopBar + MobileDrawer into ChatPage + DocumentsPage; hidden md:flex on documents w-64 tree wrapper; 12-point UAT checkpoint covering CONTEXT.md success criteria (code complete; UAT DEFERRED-TO-DEPLOYED on https://boardgame-rag-prod.pages.dev — see `06.1/deferred-items.md`; phase verification gated on deployed-UAT approval)
 
 ### Phase 7: Observability Baseline
 **Goal**: Before the prod URL is shared publicly, uncaught frontend errors, backend traces, and uptime all flow to dedicated prod channels so real failures are visible to the developer.

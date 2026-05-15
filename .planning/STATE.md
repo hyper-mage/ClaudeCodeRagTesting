@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: milestone
 status: executing
-stopped_at: Phase 06.1 Plan 01 complete
-last_updated: "2026-05-15T16:05:40Z"
+stopped_at: Phase 06.1 Plan 02 complete (code); UAT deferred to deployed URL
+last_updated: "2026-05-15T16:30:00Z"
 last_activity: 2026-05-15
 progress:
   total_phases: 11
   completed_phases: 5
   total_plans: 16
-  completed_plans: 14
-  percent: 88
+  completed_plans: 15
+  percent: 94
 ---
 
 # Project State
@@ -26,11 +26,11 @@ See: .planning/PROJECT.md (updated 2026-04-23 after v1.0 completion)
 ## Current Position
 
 Phase: 06.1
-Plan: 02 (next; Plan 01 complete)
-Status: Executing Phase 06.1
+Plan: 02 (code complete; UAT deferred to deployed CF Pages URL)
+Status: Phase 06.1 code-complete, verification pending deployed UAT
 Last activity: 2026-05-15
 
-Progress: [█████████░] 88%
+Progress: [█████████░] 94%
 
 ## Performance Metrics
 
@@ -59,6 +59,7 @@ Progress: [█████████░] 88%
 | Phase 04 P02 | 25min | 5 tasks | 1 files |
 | Phase 05 P01 | 45min | 5 tasks | 2 files |
 | Phase 06.1 P01 | ~18min | 3 tasks | 6 files |
+| Phase 06.1 P02 | ~12min | 2 of 3 tasks (Task 3 UAT deferred-to-deployed) | 2 files |
 
 ## Accumulated Context
 
@@ -87,6 +88,8 @@ Recent decisions affecting current work:
 - [Phase 05]: Phase 05 P01: CF dashboard unification quirk — first deploy landed in Workers (Static Assets, rejected /* /index.html 200 with code 10021); resolved by deleting Worker and recreating via Pages tab. Future agents: use Pages tab in Create dialog explicitly.
 - [Phase 06.1 P01]: Mobile drawer primitives built without new npm deps — useBodyScrollLock + useSwipeToClose (hand-rolled pointer events) + MobileDrawer (dialog/focus-trap/Escape/swipe) + MobileTopBar. IconSidebar/ThreadSidebar marked `hidden md:flex` with `IconNavRow` / `ThreadListContent` named exports for drawer reuse in Plan 02.
 - [Phase 06.1 P01]: Pre-existing lint errors in 4 untouched files (FileUpload, AuthContext, ToastContext, ChatPage) logged to `06.1/deferred-items.md` per SCOPE BOUNDARY rule.
+- [Phase 06.1 P02]: ChatPage + DocumentsPage wired with MobileTopBar + MobileDrawer; per-page drawer state (not hoisted); DocumentsPage drawer FolderTree gated on isDrawerOpen to prevent duplicate dnd-kit droppable ids (T-06.1-07); auto-close only on primary select actions, not rename/create/contextMenu/external-drop.
+- [Phase 06.1 P02]: Task 3 (12-point mobile UAT) DEFERRED-TO-DEPLOYED — local `.env` Supabase URL mismatch with prod project made local emulation non-representative. UAT will run on `https://boardgame-rag-prod.pages.dev` after CF Pages auto-deploys from master. Tracked in `06.1/deferred-items.md`; phase 06.1 NOT marked verified until deployed UAT passes.
 
 ### Pending Todos
 
@@ -102,7 +105,7 @@ None — roadmap complete, awaiting `/gsd:plan-phase 1`.
 
 ## Session Continuity
 
-Last session: 2026-05-15T16:05:40Z
-Stopped at: Phase 06.1 Plan 01 complete
-Resume file: .planning/phases/06.1-mobile-responsive-chat-layout/06.1-02-PLAN.md
-Next: Execute Phase 06.1 Plan 02 (wire MobileTopBar + MobileDrawer into AuthenticatedLayout / ChatPage / DocumentsPage)
+Last session: 2026-05-15T16:30:00Z
+Stopped at: Phase 06.1 Plan 02 code-complete; UAT deferred to deployed CF Pages URL
+Resume file: .planning/phases/06.1-mobile-responsive-chat-layout/deferred-items.md (run deployed-URL UAT)
+Next: Push master to remote → wait for CF Pages auto-deploy → run 12-point UAT + 2 a11y checks on https://boardgame-rag-prod.pages.dev → on PASS, mark Phase 06.1 verified and resume Phase 6 (06-00-PLAN.md)
