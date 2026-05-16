@@ -16,7 +16,7 @@ class Settings(BaseSettings):
     openai_api_key: str = ""
     langsmith_api_key: str = ""
     langchain_tracing_v2: str = "true"
-    langchain_project: str = "rag-masterclass"
+    langsmith_project: str = "rag-masterclass"
 
     # CORS allowlist (comma-separated origins, e.g. "https://app.pages.dev,http://localhost:5173")
     cors_allowed_origins: str = ""
