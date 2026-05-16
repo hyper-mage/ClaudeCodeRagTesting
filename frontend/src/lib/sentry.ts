@@ -27,8 +27,12 @@ const dsn = import.meta.env.VITE_SENTRY_DSN as string | undefined
 if (dsn) {
   Sentry.init({
     dsn,
-    integrations: [Sentry.browserTracingIntegration()],
+    integrations: [
+      Sentry.browserTracingIntegration(),
+      Sentry.consoleLoggingIntegration({ levels: ['log', 'warn', 'error'] }),
+    ],
     tracesSampleRate: 0.1,
+    enableLogs: true,
     beforeSend(event: Sentry.ErrorEvent) {
       const headers = event.request?.headers as Record<string, string> | undefined
       if (headers) {
