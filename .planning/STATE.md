@@ -21,13 +21,13 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-23 after v1.0 completion)
 
 **Core value:** The agent can intelligently search and reason across a structured board game knowledge base -- finding rules, comparing mechanics, and recommending games -- using the right tool for the job, transparently.
-**Current focus:** Phase 6 — Prod Wiring (resume from 06-00-PLAN.md); Phase 06.1 (mobile responsive) verified and closed.
+**Current focus:** Phase 7 — Observability Baseline (next). Phase 6 (Prod Wiring) and Phase 06.1 (mobile responsive) both verified and closed.
 
 ## Current Position
 
 Phase: 06.1
 Plan: 02 (verified via deployed UAT 14/14 PASS)
-Status: Phase 06.1 verified and closed; ready to resume Phase 6
+Status: Phase 6 + 06.1 verified; Phase 6 success criterion #5 (OpenRouter alert delivery) carry-forward to backlog 999.2. Ready to start Phase 7.
 Last activity: 2026-05-15
 
 Progress: [██████████] 100% of plans landed for completed/verified phases
@@ -106,7 +106,7 @@ None — Phase 06.1 verified. Resume Phase 6 (06-00-PLAN.md → 06-04-PLAN.md).
 
 ## Session Continuity
 
-Last session: 2026-05-15T17:00:00Z
-Stopped at: Phase 06.1 verified — deployed UAT 14/14 PASS; ready to resume Phase 6
-Resume file: .planning/phases/06-prod-wiring/06-00-PLAN.md (next plan in Phase 6 sequence)
-Next: Resume Phase 6 (Prod Wiring — Auth, CORS, Rate Limiting, Cost Caps) from `06-00-PLAN.md`.
+Last session: 2026-05-15T17:15:00Z
+Stopped at: Roadmap reconciled — Phase 6 marked verified (Part B carry-forward to 999.2); Phase 06.1 verified. Ready for Phase 7.
+Resume file: .planning/ROADMAP.md (Phase 7 — Observability Baseline)
+Next: `/gsd:discuss-phase 7` to begin Phase 7 (Observability Baseline — Sentry frontend + backend traces + uptime).

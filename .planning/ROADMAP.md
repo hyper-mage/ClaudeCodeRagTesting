@@ -88,7 +88,7 @@
   - [x] 05-01-PLAN.md — Create _redirects + .nvmrc, deploy CF Pages project, overwrite Fly CORS, SEC-07 re-check, D-13 browser verify
 **UI hint**: yes
 
-### Phase 6: Prod Wiring — Auth, CORS, Rate Limiting, Cost Caps
+### Phase 6: Prod Wiring — Auth, CORS, Rate Limiting, Cost Caps [x] VERIFIED 2026-05-13 (Part B carry-forward to 999.2)
 **Goal**: With both URLs known, a real end user can log in and chat on the prod URL, and no agentic or rate-based runaway can drain the LLM budget.
 **Depends on**: Phase 4, Phase 5
 **Requirements**: SEC-01, SEC-04, SEC-05, SEC-06
@@ -99,11 +99,11 @@
   4. The main chat tool-use loop has a max-iterations cap (mirroring the explorer's 6-cap); an adversarial prompt cannot drive unbounded tool calls.
   5. An OpenRouter monthly spend alert/cap is configured on the account and a test alert has been confirmed delivered.
 **Plans**: 5 plans
-  - [ ] 06-00-PLAN.md — Wave 0 test scaffolding (conftest fixtures + 3 placeholder test files for SEC-04 + SEC-05)
-  - [ ] 06-01-PLAN.md — SEC-04 rate limiter (slowapi + limiter.py module + auth bridge + chat route decoration + 429 JSON handler)
-  - [ ] 06-02-PLAN.md — SEC-05 max-iter cap on chat tool-use loop (chat_max_iterations=15 + counter-bounded refactor + graceful cap-hit + LangSmith tag)
-  - [ ] 06-03-PLAN.md — Smoke script extensions (rate-limit burst + CORS rejection) + Fly LLM_MODEL swap to openai/gpt-oss-120b:free + extended smoke PASS
-  - [ ] 06-04-PLAN.md — SEC-01 + SEC-06 manual checklists (Supabase Auth URL config + signup E2E + OpenRouter alert config + alert delivery test)
+  - [x] 06-00-PLAN.md — Wave 0 test scaffolding (conftest fixtures + 3 placeholder test files for SEC-04 + SEC-05)
+  - [x] 06-01-PLAN.md — SEC-04 rate limiter (slowapi + limiter.py module + auth bridge + chat route decoration + 429 JSON handler)
+  - [x] 06-02-PLAN.md — SEC-05 max-iter cap on chat tool-use loop (chat_max_iterations=15 + counter-bounded refactor + graceful cap-hit + LangSmith tag)
+  - [x] 06-03-PLAN.md — Smoke script extensions (rate-limit burst + CORS rejection) + Fly LLM_MODEL swap to openai/gpt-oss-120b:free + extended smoke PASS
+  - [x] 06-04-PLAN.md — SEC-01 + SEC-06 manual checklists (Part A: Supabase Auth URL config + signup E2E ✅; Part B: OpenRouter guardrail trip deferred to backlog 999.2 — see 06-04-VERIFICATION.md)
 
 ### Phase 06.1: mobile-responsive-chat-layout (INSERTED) [x] VERIFIED 2026-05-15
 
