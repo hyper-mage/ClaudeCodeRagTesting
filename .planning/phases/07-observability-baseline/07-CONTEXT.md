@@ -44,7 +44,7 @@ Phase 7 — Observability Baseline. Before the prod URL is shared publicly, unca
 - **Success response:** HTTP 200 + JSON `{"status": "ok"}` (preserves existing contract).
 - **Failure response:** HTTP 503 + JSON `{"status": "degraded", "db": "unreachable"}`. Non-2xx triggers UptimeRobot alert. Process still alive but DB unreachable is the failure mode this catches.
 - **Auth:** Public, unauthenticated.
-- **Rate limit:** EXCLUDED from slowapi rate limiter added in Phase 6. UptimeRobot pings from rotating IPs without auth headers; rate-limit 429s would corrupt uptime ratio and mask real outages. Acceptable DoS exposure because `select 1` is O(microseconds).
+- **Rate limit:** Confirmed already exempt by construction — slowapi limiter is per-route opt-in via `@limiter.limit` (only applied to `chat.py:469` in current codebase per Phase 6 P01). `/api/health` has no decorator. Plan must assert this invariant (test verifies no decorator added inadvertently) but requires no positive code change.
 - **OBS-04 side effect:** Every 5-min ping issues a DB query → keeps Supabase free-tier project active (7-day idle pause prevented).
 
 ## LangSmith (OBS-02)
@@ -52,7 +52,11 @@ Phase 7 — Observability Baseline. Before the prod URL is shared publicly, unca
 - **Routing:** Single LangSmith API key in account. Project name routed via `LANGSMITH_PROJECT` env var per environment.
   - Local dev (`.env`): `LANGSMITH_PROJECT=boardgame-rag-dev`
   - Fly prod secret: `LANGSMITH_PROJECT=boardgame-rag-prod`
-- **Existing wiring untouched:** `backend/services/tracing.py` already reads project from env; no SDK code change required. Phase work is dashboard setup + Fly secret confirmation.
+- **Canonical env var name — RECONCILIATION:** Research surfaced that the current codebase uses `LANGCHAIN_PROJECT` (legacy LangChain convention) at `backend/services/tracing.py:15` and `backend/config.py` `Settings.langchain_project`. **User decision 2026-05-15: rename to the modern `LANGSMITH_PROJECT` convention.** Phase 7 plan must:
+  1. Rename `Settings.langchain_project` → `Settings.langsmith_project` (env field name `LANGSMITH_PROJECT`).
+  2. Update `tracing.py` to set `os.environ["LANGSMITH_PROJECT"]` (and keep `LANGCHAIN_PROJECT` as an alias if the langsmith SDK still reads the old name, otherwise drop it).
+  3. Local `.env` updated; Fly secret renamed (`flyctl secrets unset LANGCHAIN_PROJECT && flyctl secrets set LANGSMITH_PROJECT=boardgame-rag-prod`).
+- **Existing wiring fix required:** the unconditional `os.environ` override in `tracing.py:15` is the bug that would have leaked prod traces to `rag-masterclass`. Plan 07-03 fixes this.
 - **Verification:** Automated. Plan must include a verification step that:
   1. Sends a chat request against the deployed Fly URL.
   2. Calls `langsmith.Client().list_runs(project_name="boardgame-rag-prod", start_time=now-5min)` and asserts at least one run exists.
