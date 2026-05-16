@@ -1,3 +1,5 @@
+import logging
+
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -7,7 +9,10 @@ from slowapi.middleware import SlowAPIMiddleware
 from routers import threads, chat, documents, folders
 from services.tracing import setup_tracing
 from config import get_settings
+from database import get_supabase
 from limiter import limiter
+
+logger = logging.getLogger(__name__)
 
 setup_tracing()
 
@@ -64,4 +69,28 @@ app.include_router(folders.router)
 
 @app.get("/api/health")
 async def health():
-    return {"status": "ok"}
+    """Liveness + DB-reachability probe (OBS-04).
+
+    Returns 200 + {"status": "ok"} when Supabase is reachable.
+    Returns 503 + {"status": "degraded", "db": "unreachable"} on any DB exception.
+
+    Issues a head-only count against `documents` on every request so the 5-min
+    UptimeRobot ping resets the Supabase 7-day idle-pause clock. `documents` is
+    chosen because (a) it has ≥10 rows post-Phase-3 seed, (b) the service-role
+    client bypasses RLS, and (c) head=True returns no body — only the count
+    header — making this the lightest probe supabase-py 2.13.0 supports.
+
+    NOTE: This route is deliberately NOT rate-limited (no limiter.limit decorator) so
+    UptimeRobot's 288/day cadence never trips a 429 (Phase 6 invariant —
+    slowapi is per-route opt-in; absence of decorator IS the exemption).
+    """
+    try:
+        db = get_supabase()
+        db.table("documents").select("id", count="exact", head=True).limit(1).execute()
+        return {"status": "ok"}
+    except Exception as e:
+        logger.error("Health check DB probe failed: %s", e, exc_info=True)
+        return JSONResponse(
+            status_code=503,
+            content={"status": "degraded", "db": "unreachable"},
+        )
