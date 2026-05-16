@@ -126,7 +126,12 @@ Plans:
   2. A real chat request against the prod backend appears as a trace in the `boardgame-rag-prod` LangSmith project and not in the dev project.
   3. UptimeRobot monitors are active against the Fly `/api/health` endpoint and the CF Pages frontend on ≤5-minute intervals, and a simulated downtime produces an email alert to the owner.
   4. `/api/health` performs a lightweight Supabase query (e.g. `select 1` or a `count` on a small table) so monitor success also keeps the Supabase prod project from pausing after 7 days idle.
-**Plans**: TBD
+**Plans**: 5 plans
+  - [ ] 07-01-PLAN.md — Sentry frontend integration (vite-plugin source-map upload + `src/lib/sentry.ts` init with PII scrub for JWTs/email/UUID + main.tsx wiring)
+  - [ ] 07-02-PLAN.md — `/api/health` DB-reachability probe (supabase-py head-only select on `documents`, 503 on Exception with degraded JSON, assert no slowapi decorator)
+  - [ ] 07-03-PLAN.md — LangSmith routing fix (rename `LANGCHAIN_PROJECT`→`LANGSMITH_PROJECT` in Settings + tracing.py, Fly secret rename runbook, `verify_langsmith_routing.py` script)
+  - [ ] 07-04-PLAN.md — Sentry dashboard provisioning + CF Pages env vars (DSN runtime / auth token build) + source-map upload smoke + deliberate-error verification
+  - [ ] 07-05-PLAN.md — UptimeRobot setup (2 monitors at 5-min, owner email alert, no public status page) + simulated downtime drill
 
 ### Phase 8: Portfolio Polish
 **Goal**: A reviewer visiting the public URL cold can try the app in one click, see a polished error surface if anything upstream fails, and get a full portfolio story from the README.
@@ -151,7 +156,7 @@ Plans:
 | 4. Deploy Backend to Fly.io | 0/? | Not started | — |
 | 5. Deploy Frontend to Cloudflare Pages | 1/1 | Complete    | 2026-05-07 |
 | 6. Prod Wiring — Auth, CORS, Rate Limiting, Cost Caps | 0/? | Not started | — |
-| 7. Observability Baseline | 0/? | Not started | — |
+| 7. Observability Baseline | 0/5 | Planned | — |
 | 8. Portfolio Polish | 0/? | Not started | — |
 
 ## Coverage Map
