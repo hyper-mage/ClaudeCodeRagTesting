@@ -67,7 +67,7 @@ app.include_router(documents.router)
 app.include_router(folders.router)
 
 
-@app.get("/api/health")
+@app.api_route("/api/health", methods=["GET", "HEAD"])
 async def health():
     """Liveness + DB-reachability probe (OBS-04).
 
