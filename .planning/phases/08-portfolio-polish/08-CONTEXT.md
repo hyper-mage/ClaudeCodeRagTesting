@@ -33,7 +33,7 @@ Out of scope (deferred): backend Sentry SDK, public UptimeRobot status page, dem
 - **D-01 — Identity:** Supabase **anonymous auth**. Every "Try demo" click invokes `supabase.auth.signInAnonymously()` and produces a throwaway anon user with its own `user_id`. RLS continues to isolate per-user data — no shared-account collisions, no shared-password leakage. Requires enabling anonymous sign-ins in the prod Supabase project's **Auth > Providers** panel.
 - **D-02 — Starter content per anon user:** On first signin the anon user gets BOTH:
   1. **1–2 seeded sample chat threads** showing good queries (e.g. "Recommend a 2-player strategy game", "Compare Catan vs Carcassonne") — pre-rendered assistant turns OR queued user messages, planner to choose lightest impl.
-  2. **One sample private PDF** auto-attached so the anon user immediately sees the private-doc-in-chat experience without uploading anything. Sample doc must be a board-game rulebook (genre-consistent), small (≤2 MB), and ingested via the standard pipeline so the demo exercises chunking + embeddings + retrieval honestly.
+  2. **One sample private PDF** auto-attached so the anon user immediately sees the private-doc-in-chat experience without uploading anything. Sample doc = **D&D 5e common-rules quick-reference guide** (cheat-sheet style: ability checks, saving throws, advantage/disadvantage, combat actions, conditions). Cross-genre on purpose — showcases that the agent retrieves over *whatever* the user uploads, not just the board-game corpus. Must be small (≤2 MB), sourced from a permissively licensed source (D&D 5e SRD is CC-BY 4.0 / OGL — researcher to confirm preferred source: WotC SRD PDF excerpt vs community CC quick-ref vs original markdown→PDF generated in-repo), and ingested via the standard pipeline so the demo exercises chunking + embeddings + retrieval honestly. README pitch can lean on this as a "cross-domain RAG" data point.
   - Public seeded KB (≥10 board games, `visibility='public'`) is already visible from Phase 3 — no extra work needed for that surface.
 - **D-03 — Cleanup:** **Opportunistic purge on next anon signin.** When a new anon-signin lands, fire a backend cleanup that deletes anon users (and their threads, messages, documents, document_chunks, storage objects) created more than **7 days** ago. No external scheduler; cost ≈ a few deletes per signin event. Acceptable since RLS already isolates users, so an orphan never affects anyone else.
 - **D-04 — Login page:** New "Try demo" CTA on `frontend/src/pages/LoginPage.tsx` rendered prominently above the email/password form. Copy must make clear it's a no-signup ephemeral demo. README documents this path; no shared credentials needed (anon auth has none).
@@ -79,7 +79,7 @@ Out of scope (deferred): backend Sentry SDK, public UptimeRobot status page, dem
 - Exact error-bubble component shape (subclass of `MessageBubble` vs a separate `ErrorMessageBubble`) — planner to choose based on existing component patterns.
 - Excalidraw vs draw.io — researcher to recommend based on the developer's existing tooling; both are acceptable.
 - Hero GIF recording tool — any tool that produces a small (<5 MB) GIF or animated WebP is fine; specifics deferred to plan execution.
-- Sample-PDF candidate (must be a real public-domain or original board-game rulebook ≤2 MB) — researcher to source 2–3 candidates.
+- Sample-PDF sourcing for the D&D 5e quick-ref (D-02) — researcher to pick the cleanest licensed source: (a) excerpt of official WotC SRD 5.1 (CC-BY 4.0), (b) existing community CC-licensed quick-reference card, or (c) original markdown→PDF generated in-repo at `data/sample-private-docs/dnd5e-quickref.md` rendered via Docling-compatible converter. Must include license attribution embedded in the PDF metadata and in `docs/CREDITS.md`.
 - Sample-thread seed strategy (DB seed of `messages` rows vs first-launch UI hint) — planner to pick the simpler/cleaner option.
 
 </decisions>
@@ -152,6 +152,7 @@ Out of scope (deferred): backend Sentry SDK, public UptimeRobot status page, dem
 - Developer explicitly asked for: **"list of technologies used, a link to the ones I use such as cf, fly, uptimerobot, supabase, etc, what they do, and how they are utilized in this project"** — captured verbatim in D-13 as Table 2 (Services / Infrastructure) with columns `Service | Link | What it does | How this project uses it`. This is a non-negotiable section of the new README.
 - "Try demo" must be a one-click experience — no email, no password, no captcha. (Supabase anon auth supports this; rate-limit configurable in Auth settings.)
 - Mobile drawer (Phase 06.1) must appear in at least one screenshot — it's a differentiating polish item that reviewers should see.
+- Sample private PDF is **D&D 5e common-rules quick reference** — cross-genre on purpose. README + hero GIF can lean on this: "ask about Catan rules AND a D&D advantage roll in the same chat" demonstrates that retrieval is content-agnostic. Source must be permissively licensed (5e SRD = CC-BY 4.0); attribution recorded in `docs/CREDITS.md`.
 
 </specifics>
 

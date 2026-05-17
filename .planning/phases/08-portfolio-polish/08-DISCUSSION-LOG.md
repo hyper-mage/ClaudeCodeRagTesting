@@ -46,6 +46,8 @@
 **User's choice:** Both 2 and 3 — seeded threads AND a sample private PDF.
 **Notes:** Exercises both the chat surface and the private-doc retrieval surface from the first click.
 
+**Addendum (same session):** Sample private PDF = **D&D 5e common-rules quick reference** (cheat-sheet style). User picked option C from a follow-up scope question — keep D&D content out of the public board-game KB, fold it into the per-anon sample PDF instead. Cross-genre on purpose: reinforces "agent retrieves over whatever you upload." Source must be permissively licensed (5e SRD CC-BY 4.0); attribution to `docs/CREDITS.md`.
+
 ### Cleanup
 
 | Option | Description | Selected |
