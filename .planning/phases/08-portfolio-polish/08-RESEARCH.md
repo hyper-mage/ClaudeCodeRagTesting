@@ -913,19 +913,19 @@ Also add the same attribution to `docs/CREDITS.md`.
 
 **Empty rows mean nothing was assumed for that area.**
 
-## Open Questions
+## Open Questions (RESOLVED — dispatched to plan tasks: Q1→08-00 T1, Q2→08-07 T1, Q3→08-07 T2)
 
-1. **Does the existing prod Supabase project have anonymous sign-ins enabled?**
+1. **Does the existing prod Supabase project have anonymous sign-ins enabled?** — RESOLVED: gated to Plan 08-00 Task 1 (human-action checkpoint enables the toggle + empirically captures an anon JWT to decide auth.py audience widening).
    - What we know: D-01 requires it; Phase 6 verified Supabase Auth URL config but not this toggle specifically.
    - What's unclear: Whether the toggle has been flipped at any point.
    - Recommendation: Plan task should verify (and flip if needed) via Supabase Dashboard → Auth → Providers → "Allow anonymous sign-ins" toggle, before the first plan iteration runs the verification recipe in Pitfall 1.
 
-2. **Has the UptimeRobot monitor 803088267 "Public Stats" toggle been enabled?**
+2. **Has the UptimeRobot monitor 803088267 "Public Stats" toggle been enabled?** — RESOLVED: gated to Plan 08-07 Task 1 (human-action checkpoint enables Public Stats + curl-verifies the shields.io uptime-ratio badge SVG).
    - What we know: Monitor exists, public stats badge requires the toggle.
    - What's unclear: Default state.
    - Recommendation: Plan task asserts the badge URL renders a non-default SVG by curl-ing it during plan verification.
 
-3. **What `owner/repo` does GitHub host this code under?** (for the `last-commit` badge URL)
+3. **What `owner/repo` does GitHub host this code under?** (for the `last-commit` badge URL) — RESOLVED: gated to Plan 08-07 Task 2 (human-action checkpoint confirms repo visibility + captures owner/repo slug, with fallback to a static `version` badge if private).
    - What we know: `git remote -v` will resolve it.
    - What's unclear: Whether it's public or private — `last-commit` badge requires public repos.
    - Recommendation: Plan task includes `git remote get-url origin` resolution + verification that the repo is public-readable.
