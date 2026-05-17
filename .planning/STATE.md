@@ -106,7 +106,7 @@ None — Phase 06.1 verified. Resume Phase 6 (06-00-PLAN.md → 06-04-PLAN.md).
 
 ## Session Continuity
 
-Last session: 2026-05-16T05:50:00Z
-Stopped at: Phase 7 Wave 1 complete — 3 plans cherry-picked from parallel worktree executors. 07-01 Sentry frontend (@sentry/react + @sentry/vite-plugin installed, sentry.ts with PII scrub, vite-plugin LAST + CF_PAGES_COMMIT_SHA release tag). 07-02 /api/health DB probe (head-only count on documents, 503 degraded envelope, 4 pytest pass). 07-03 LangSmith routing (Settings rename + 3-tier precedence + dual env-var write in tracing.py + verify_langsmith_routing.py + 4 pytest pass). 8 tests pass; npm run build clean.
-Resume file: .planning/phases/07-observability-baseline/07-04-PLAN.md
-Next: `/gsd:execute-phase 7 --wave 2` for Wave 2 (07-04 Sentry dashboard + 07-05 UptimeRobot — both human-checkpoint dashboard work).
+Last session: 2026-05-17T04:30:00Z
+Stopped at: Phase 7 complete (5/5 plans). Wave 2 verification: Sentry project boardgame-rag-frontend live on free Developer tier with CF Pages env vars wired (DSN runtime, auth token build-only), source maps uploaded to release ad8a98f, events landing (Logs surface confirms); per-project Issues onboarding overlay sticky despite events received (UI-only caveat). UptimeRobot 2 monitors (803088267 /api/health + 803088282 cf-pages root) at 5-min interval with owner-email alert verified end-to-end (4h 32m 405 incident → fix 8300fd3 → recovery email). OBS-04 side effect operational: 288 daily DB pings keep Supabase active.
+Resume file: .planning/ROADMAP.md (Phase 8 — Portfolio Polish)
+Next: `/gsd:discuss-phase 8` to start Phase 8 (final phase — Try Demo button, graceful error handling, README polish, deploy badge).

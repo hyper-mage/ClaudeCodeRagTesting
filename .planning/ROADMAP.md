@@ -117,7 +117,7 @@ Plans:
 - [x] 06.1-01-PLAN.md — Build shared mobile shell: useBodyScrollLock + useSwipeToClose hooks, MobileDrawer + MobileTopBar components, hidden md:flex on IconSidebar + ThreadSidebar, named exports IconNavRow + ThreadListContent
 - [x] 06.1-02-PLAN.md — Wire MobileTopBar + MobileDrawer into ChatPage + DocumentsPage; hidden md:flex on documents w-64 tree wrapper; 12-point UAT verified 2026-05-15 on deployed CF Pages (14/14 PASS: 12 functional + 2 a11y sanity)
 
-### Phase 7: Observability Baseline
+### Phase 7: Observability Baseline [x] VERIFIED 2026-05-17 (Sentry UI onboarding overlay caveat + OBS-02 verify-script deferred to live Fly runtime)
 **Goal**: Before the prod URL is shared publicly, uncaught frontend errors, backend traces, and uptime all flow to dedicated prod channels so real failures are visible to the developer.
 **Depends on**: Phase 6
 **Requirements**: OBS-01, OBS-02, OBS-03, OBS-04
@@ -130,8 +130,8 @@ Plans:
   - [x] 07-01-PLAN.md — Sentry frontend integration (vite-plugin source-map upload + `src/lib/sentry.ts` init with PII scrub for JWTs/email/UUID + main.tsx wiring)
   - [x] 07-02-PLAN.md — `/api/health` DB-reachability probe (supabase-py head-only select on `documents`, 503 on Exception with degraded JSON, assert no slowapi decorator)
   - [x] 07-03-PLAN.md — LangSmith routing fix (rename `LANGCHAIN_PROJECT`→`LANGSMITH_PROJECT` in Settings + tracing.py, Fly secret rename runbook, `verify_langsmith_routing.py` script)
-  - [ ] 07-04-PLAN.md — Sentry dashboard provisioning + CF Pages env vars (DSN runtime / auth token build) + source-map upload smoke + deliberate-error verification
-  - [ ] 07-05-PLAN.md — UptimeRobot setup (2 monitors at 5-min, owner email alert, no public status page) + simulated downtime drill
+  - [x] 07-04-PLAN.md — Sentry dashboard provisioning + CF Pages env vars (DSN runtime / auth token build) + source-map upload smoke + deliberate-error verification
+  - [x] 07-05-PLAN.md — UptimeRobot setup (2 monitors at 5-min, owner email alert, no public status page) + simulated downtime drill
 
 ### Phase 8: Portfolio Polish
 **Goal**: A reviewer visiting the public URL cold can try the app in one click, see a polished error surface if anything upstream fails, and get a full portfolio story from the README.
@@ -156,7 +156,7 @@ Plans:
 | 4. Deploy Backend to Fly.io | 0/? | Not started | — |
 | 5. Deploy Frontend to Cloudflare Pages | 1/1 | Complete    | 2026-05-07 |
 | 6. Prod Wiring — Auth, CORS, Rate Limiting, Cost Caps | 0/? | Not started | — |
-| 7. Observability Baseline | 3/5 | Wave 1 complete | — |
+| 7. Observability Baseline | 5/5 | Complete    | 2026-05-17 |
 | 8. Portfolio Polish | 0/? | Not started | — |
 
 ## Coverage Map
