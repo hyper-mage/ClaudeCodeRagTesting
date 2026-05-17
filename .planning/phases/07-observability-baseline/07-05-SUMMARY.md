@@ -18,7 +18,7 @@
 
 ## Alert contact
 
-- Single email contact: `mlynn808138@gmail.com` (verified)
+- Single email contact: `<your-email>` (verified)
 - Both monitors share this single Alert Contact
 - No SMS, no webhook, no Slack/Discord
 - No public status page

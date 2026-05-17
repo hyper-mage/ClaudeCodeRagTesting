@@ -68,7 +68,7 @@ The four open questions from CONTEXT.md are resolved with HIGH confidence: vite-
   - Monitor 1: `GET https://boardgame-rag-prod.fly.dev/api/health` — HTTP-status check (200 = up, 503 = down).
   - Monitor 2: `GET https://boardgame-rag-prod.pages.dev/` — HTTP-status check on CF Pages root.
 - **Interval:** 5 minutes.
-- **Alert contact:** Single email `mlynn808138@gmail.com`. No SMS. No webhook.
+- **Alert contact:** Single email `<your-email>`. No SMS. No webhook.
 - **Public status page:** NOT created.
 - **Verification (simulated downtime):** `flyctl machine stop` on the prod machine briefly (or set CORS to a bogus value to force `/api/health` 5xx without taking down the machine — cleaner since it leaves the process running). Wait ≤10 min, confirm alert email arrives. Revert.
 
@@ -148,7 +148,7 @@ Verified 2026-05-15: latest stable versions are `@sentry/react@10.53.1` and `@se
 
 ```
                           ┌─────────────────────────────────────┐
-                          │       Developer (mlynn808138)       │
+                          │       Developer (developer)       │
                           │  Receives: Sentry digest, UR email  │
                           └────────────▲────────────────────────┘
                                        │ email alerts

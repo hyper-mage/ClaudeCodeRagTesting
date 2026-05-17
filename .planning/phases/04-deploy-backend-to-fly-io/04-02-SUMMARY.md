@@ -34,7 +34,7 @@ key-files:
     - backend/scripts/fly_smoke.sh   # body field content→message fix (D-13)
 
 key-decisions:
-  - "Fly app name primary boardgame-rag-prod (D-01) — no collision in mlynn808138@gmail.com / personal org"
+  - "Fly app name primary boardgame-rag-prod (D-01) — no collision in <your-email> / personal org"
   - "fly.toml line 4 unchanged — primary name held"
   - "Body field for POST /api/threads/{id}/messages is `content` (per backend MessageCreate schema), not `message` — Plan 01 SUMMARY recorded the wrong field; fixed in fly_smoke.sh"
   - "LLM_API_KEY Fly secret set explicitly to OPENROUTER_API_KEY value — backend config.resolved_llm_api_key reads LLM_API_KEY OR OPENAI_API_KEY, neither was populated by Phase 3 .env.prod"
@@ -81,7 +81,7 @@ completed: 2026-05-05
 | ------------------- | ------------------------------------------------ |
 | Fly app name        | `boardgame-rag-prod`                             |
 | Fly URL             | `https://boardgame-rag-prod.fly.dev`             |
-| Org / account       | `personal` / `mlynn808138@gmail.com`             |
+| Org / account       | `personal` / `<your-email>`             |
 | Region              | `iad` (us-east-1)                                |
 | Image               | `registry.fly.io/boardgame-rag-prod:deployment-01KQV7ATBRJG7S7P5C2FJRRR82` |
 | Image digest        | `sha256:f7d866989efa6db5ff9c981690485f101e88979b7a66ef97d5b61f8cfa6ff6c3` |
@@ -94,7 +94,7 @@ completed: 2026-05-05
 
 ## Task Outcomes
 
-1. **Task 1 — Wave-0 preflight (2026-05-04):** PASS all 5 steps. flyctl auth as `mlynn808138@gmail.com`. All 9 D-05 keys in `.env.prod`. Pitfall 2 multi-line scan clean. Prod test user `ragtest1@gmail.com`/`testpass123` returns valid JWT via password grant against prod Supabase. 1Password update deferred to manual user step.
+1. **Task 1 — Wave-0 preflight (2026-05-04):** PASS all 5 steps. flyctl auth as `<your-email>`. All 9 D-05 keys in `.env.prod`. Pitfall 2 multi-line scan clean. Prod test user `ragtest1@gmail.com`/`testpass123` returns valid JWT via password grant against prod Supabase. 1Password update deferred to manual user step.
 2. **Task 2 — Fly app create (checkpoint, approved primary, 2026-05-05):** App `boardgame-rag-prod` created cleanly in `personal` org. No collision. fly.toml line 4 unchanged.
 3. **Task 3 — Stage secrets:** `flyctl secrets import --stage` of VITE_-filtered `.env.prod.backend`. 24 keys staged. `Secrets have been staged, but not set on VMs` confirmed (no in-flight deploy). Diff verification adjusted from `.Name` to `.name` (Rule 3 — current flyctl JSON uses lowercase field names).
 4. **Task 4 — Deploy + smoke:** `flyctl deploy -a boardgame-rag-prod --remote-only` succeeded in 500s (build 432s including Docling model download to remote builder, push 160s, image 2.9 GB). 2 HA machines provisioned. `/api/health` 200 within 7s. First smoke run failed with 0 SSE lines; second run failed with 1 SSE line (error chunk); root-caused via `flyctl logs`; fixed two bugs (see Deviations); third run PASSED with 3 SSE chunks, first chunk in 14s.

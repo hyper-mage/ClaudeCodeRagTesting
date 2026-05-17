@@ -95,7 +95,7 @@ Active machine: `80e35ef6015d48` (region `iad`, `shared-cpu-1x` 1GB, `auto_stop=
 ## Carry-forward to 06-04
 
 - Supabase Auth URLs not yet updated (`https://boardgame-rag-prod.pages.dev` + `http://localhost:5173`)
-- OpenRouter alert not yet configured ($0.01 threshold, email `mlynn808138@gmail.com`)
+- OpenRouter alert not yet configured ($0.01 threshold, email `<your-email>`)
 
 ## Carry-forward to v1.2 milestone
 

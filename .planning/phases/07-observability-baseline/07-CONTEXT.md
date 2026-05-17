@@ -70,7 +70,7 @@ Phase 7 — Observability Baseline. Before the prod URL is shared publicly, unca
   - Monitor 1: `GET https://boardgame-rag-prod.fly.dev/api/health` — HTTP-status check (200 = up, 503 = down).
   - Monitor 2: `GET https://boardgame-rag-prod.pages.dev/` — HTTP-status check on CF Pages root.
 - **Interval:** 5 minutes.
-- **Alert contact:** Single email `mlynn808138@gmail.com`. No SMS. No webhook.
+- **Alert contact:** Single email `<your-email>`. No SMS. No webhook.
 - **Public status page:** NOT created. UptimeRobot dashboard is private to owner.
 - **Verification (success criterion #3 simulated downtime):**
   - `flyctl machine stop` on the prod machine briefly (or set CORS to a bogus value to force `/api/health` 5xx without taking down the machine — cleaner since it leaves the process running).

@@ -43,7 +43,7 @@ Plan assumed **OpenRouter "Usage Alerts"** with `$0.01` email threshold. As of 2
 ### What was done
 
 1. **Top-up:** $5 (min). Stripe-charged.
-2. **Guardrail set:** $0.10 / `mlynn808138@gmail.com` (account email).
+2. **Guardrail set:** $0.10 / `<your-email>` (account email).
 3. **Fly secret swap to paid model:** `flyctl secrets set LLM_MODEL="openai/gpt-4o-mini" -a boardgame-rag-prod` — rolling update succeeded, machine `80e35ef6015d48` restarted.
 4. **Burn attempt:** self + invited friends via throwaway accounts on `https://boardgame-rag-prod.pages.dev`. Total spend reached **$0.0105** (≈10.5% of guardrail).
 5. **Decision:** bench remaining ~$0.0895 burn — externalize to a deterministic backlog script (see Carry-forward) rather than continue manual chatting.

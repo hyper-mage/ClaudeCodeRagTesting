@@ -146,7 +146,7 @@ Pure manual dashboard work. Plan: `.planning/phases/06-prod-wiring-auth-cors-rat
    - Test: fresh throwaway-email signup from prod CF URL, click email link, lands on prod (NOT localhost), can send chat
 
 2. **OpenRouter alert (D-19/D-20):**
-   - Configure $0.01 alert with email `mlynn808138@gmail.com`
+   - Configure $0.01 alert with email `<your-email>`
    - Delivery test: top up $1, swap `LLM_MODEL=openai/gpt-4o-mini` via flyctl, send 1 chat, confirm alert email arrives, swap LLM_MODEL back to `:free`, drain remaining balance
 
 3. Record all evidence (timestamps, screenshots, fresh email used) in `06-04-VERIFICATION.md`
