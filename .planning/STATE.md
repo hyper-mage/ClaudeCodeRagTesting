@@ -3,8 +3,8 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: milestone
 status: verifying
-stopped_at: Phase 8 context gathered
-last_updated: "2026-05-17T05:43:33.628Z"
+stopped_at: Phase 8 UI-SPEC approved
+last_updated: "2026-05-17T06:02:27.152Z"
 last_activity: 2026-05-15
 progress:
   total_phases: 11
@@ -106,7 +106,7 @@ None — Phase 06.1 verified. Resume Phase 6 (06-00-PLAN.md → 06-04-PLAN.md).
 
 ## Session Continuity
 
-Last session: 2026-05-17T05:43:33.611Z
-Stopped at: Phase 8 context gathered
-Resume file: .planning/phases/08-portfolio-polish/08-CONTEXT.md
+Last session: 2026-05-17T06:02:27.135Z
+Stopped at: Phase 8 UI-SPEC approved
+Resume file: .planning/phases/08-portfolio-polish/08-UI-SPEC.md
 Next: `/gsd:discuss-phase 8` to start Phase 8 (final phase — Try Demo button, graceful error handling, README polish, deploy badge).
