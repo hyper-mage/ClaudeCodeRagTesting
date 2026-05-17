@@ -143,3 +143,61 @@ def mock_langsmith_run(monkeypatch):
     except (ImportError, AttributeError):
         pass
     return run
+
+
+# ---------------------------------------------------------------------
+# Phase 8 Wave 0 fixtures: anon JWT, permanent JWT, sample doc path
+# ---------------------------------------------------------------------
+import base64
+import json as _json
+import uuid as _uuid
+from pathlib import Path
+
+
+# `aud` claim value verified empirically against prod Supabase per Plan 08-00 Task 1.
+# Source of truth: .planning/phases/08-portfolio-polish/08-00-SUMMARY.md.
+# If Supabase ever changes the anon `aud` claim, update this constant and re-run Plan 08-01 tests.
+_ANON_AUD_CLAIM = "authenticated"
+
+
+def _make_fake_jwt(payload: dict) -> str:
+    """Forge a JWT-shaped string (header.payload.signature). Signature is dummy — test-only."""
+    header = {"alg": "ES256", "typ": "JWT", "kid": "test-kid"}
+
+    def _b64url(obj: dict) -> str:
+        raw = _json.dumps(obj, separators=(",", ":")).encode("utf-8")
+        return base64.urlsafe_b64encode(raw).rstrip(b"=").decode("ascii")
+
+    return f"{_b64url(header)}.{_b64url(payload)}.test-signature"
+
+
+@pytest.fixture
+def anon_jwt() -> str:
+    """Fake anon JWT for Plan 08-01 auth tests. `aud` reflects empirical Task 1 capture."""
+    payload = {
+        "sub": str(_uuid.uuid4()),
+        "aud": _ANON_AUD_CLAIM,
+        "role": "authenticated",
+        "is_anonymous": True,
+    }
+    return _make_fake_jwt(payload)
+
+
+@pytest.fixture
+def permanent_jwt() -> str:
+    """Fake permanent (email/password) JWT — `aud` always `authenticated`."""
+    payload = {
+        "sub": str(_uuid.uuid4()),
+        "aud": "authenticated",
+        "role": "authenticated",
+        "is_anonymous": False,
+    }
+    return _make_fake_jwt(payload)
+
+
+@pytest.fixture
+def seed_sample_doc_path() -> Path:
+    """Absolute path to the D&D 5e SRD sample doc seeded for anon demo users (Plan 08-02)."""
+    # conftest.py lives at backend/tests/conftest.py; repo root is two parents up from backend/.
+    repo_root = Path(__file__).resolve().parents[2]
+    return repo_root / "data" / "sample-private-docs" / "dnd5e-quickref.md"
