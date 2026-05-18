@@ -3,9 +3,9 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: milestone
 status: executing
-stopped_at: Phase 8 Wave 1 complete; Wave 0 Task 1 RESOLVED 2026-05-18 (aud="authenticated" empirically confirmed); 4 user-actions remain (USER-2/3/4/5)
-last_updated: "2026-05-18T22:00:00.000Z"
-last_activity: 2026-05-18 -- USER-1 resolved: anon JWT aud="authenticated" confirmed via REST decode against prod project; 08-00 + 08-01 SUMMARY upgraded to complete
+stopped_at: Phase 8 Wave 0 + Wave 1 closed; Plan 08-07 badges live; 2 user-actions remain (USER-4 deploy+UAT, USER-5 assets)
+last_updated: "2026-05-18T22:50:00.000Z"
+last_activity: 2026-05-18 -- USER-2 + USER-3 resolved: UR uptime badge (97.194%) + GitHub last-commit badge (hyper-mage/ClaudeCodeRagTesting) live + verified; Plan 08-07 complete
 progress:
   total_phases: 11
   completed_phases: 7
@@ -110,7 +110,7 @@ Recent decisions affecting current work:
 
 ## Session Continuity
 
-Last session: 2026-05-18T22:00:00.000Z
-Stopped at: Phase 8 Wave 0 USER-1 resolved (aud="authenticated"); 4 user-actions remain
+Last session: 2026-05-18T22:50:00.000Z
+Stopped at: Phase 8 — Plan 08-07 complete (UR + GitHub badges live); 2 user-actions remain (USER-4, USER-5)
 Resume file: .planning/phases/08-portfolio-polish/.continue-here.md
-Next: Present USER-2 (UptimeRobot monitor-specific API key for Plan 08-07 shields.io badge).
+Next: Present USER-4 (deploy backend+frontend, run 12-point UAT against deployed CF Pages URL).
