@@ -1,6 +1,7 @@
 import { MessageSquare, FileText, LogOut } from 'lucide-react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
+import DemoPill from './DemoPill'
 
 export default function IconSidebar() {
   const location = useLocation()
@@ -27,6 +28,7 @@ export default function IconSidebar() {
         <FileText size={20} />
       </button>
       <div className="flex-1" />
+      <DemoPill />
       <button
         onClick={signOut}
         className="p-2 rounded text-gray-500 hover:text-white"
@@ -83,6 +85,7 @@ export function IconNavRow({ onNavigate }: IconNavRowProps) {
         <FileText size={20} />
       </button>
       <div className="flex-1" />
+      <DemoPill />
       <button
         onClick={handleSignOut}
         className="p-2 rounded text-gray-500 hover:text-white"

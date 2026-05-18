@@ -21,7 +21,8 @@ export default function ChatPage() {
   const hamburgerRef = useRef<HTMLButtonElement>(null)
   const closeDrawer = () => setIsDrawerOpen(false)
   const openDrawer = () => setIsDrawerOpen(true)
-  const { messages, isStreaming, sendMessage, loadMessages, cancel } = useChat(activeThreadId)
+  const { messages, isStreaming, sendMessage, loadMessages, cancel, retryLastUserMessage } =
+    useChat(activeThreadId)
 
   useEffect(() => {
     return () => { cancel() }
@@ -85,6 +86,7 @@ export default function ChatPage() {
         messages={messages}
         onSend={handleSend}
         isStreaming={isStreaming}
+        onRetry={retryLastUserMessage}
       />
       <MobileDrawer isOpen={isDrawerOpen} onClose={closeDrawer} triggerRef={hamburgerRef}>
         <IconNavRow onNavigate={closeDrawer} />

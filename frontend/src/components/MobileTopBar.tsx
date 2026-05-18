@@ -1,5 +1,6 @@
 import type { RefObject } from 'react'
 import { Menu } from 'lucide-react'
+import DemoPill from './DemoPill'
 
 interface Props {
   title: string
@@ -29,7 +30,9 @@ export default function MobileTopBar({ title, onOpenDrawer, hamburgerRef, isDraw
       <h1 className="flex-1 text-center text-base font-semibold text-white truncate px-2">
         {title}
       </h1>
-      <div className="h-11 w-11" />
+      <div className="h-11 w-11 flex items-center justify-center">
+        <DemoPill />
+      </div>
     </div>
   )
 }
