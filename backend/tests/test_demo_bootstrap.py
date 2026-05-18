@@ -9,8 +9,6 @@ Test plan:
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-import pytest
-
 
 def test_sample_doc_file_exists(seed_sample_doc_path: Path) -> None:
     """Sample doc exists, is non-empty, and is markdown text."""
@@ -58,11 +56,61 @@ def test_seed_idempotent() -> None:
     )
 
 
-@pytest.mark.skip(reason="Wave 1 Task 2 stub — implemented later in Plan 08-02")
-def test_seed_skips_permanent_user() -> None:
-    pass
-
-
-@pytest.mark.skip(reason="Wave 1 Task 2 stub — implemented later in Plan 08-02")
 def test_bootstrap_endpoint_calls_seed_and_schedules_purge() -> None:
-    pass
+    """Anon-JWT POST: returns {seeded: True}, calls seed once, schedules purge."""
+    from fastapi.testclient import TestClient
+
+    from auth import get_user_id
+    from main import app
+
+    # Mock the supabase admin call to report the user as anonymous.
+    anon_user_response = MagicMock()
+    anon_user_response.user.is_anonymous = True
+    mock_db = MagicMock()
+    mock_db.auth.admin.get_user_by_id.return_value = anon_user_response
+
+    app.dependency_overrides[get_user_id] = lambda: "anon-uuid"
+    try:
+        with patch("routers.demo.get_supabase", return_value=mock_db), \
+             patch("routers.demo.seed_anon_user_content", return_value=True) as m_seed, \
+             patch("routers.demo.purge_stale_anon_users") as m_purge:
+            resp = TestClient(app).post("/api/demo/bootstrap")
+    finally:
+        app.dependency_overrides.clear()
+
+    assert resp.status_code == 200, f"expected 200, got {resp.status_code}: {resp.text}"
+    assert resp.json() == {"seeded": True}, f"unexpected body: {resp.json()!r}"
+    m_seed.assert_called_once_with("anon-uuid")
+    # purge is dispatched as a BackgroundTask; TestClient runs it after the
+    # response is sent, so it should also have been invoked exactly once.
+    assert m_purge.call_count == 1, (
+        f"purge_stale_anon_users called {m_purge.call_count} times — expected 1"
+    )
+    m_purge.assert_called_once_with(retention_days=7)
+
+
+def test_seed_skips_permanent_user() -> None:
+    """Permanent-JWT POST: returns {seeded: False}, seed NOT called (silent no-op)."""
+    from fastapi.testclient import TestClient
+
+    from auth import get_user_id
+    from main import app
+
+    permanent_user_response = MagicMock()
+    permanent_user_response.user.is_anonymous = False
+    mock_db = MagicMock()
+    mock_db.auth.admin.get_user_by_id.return_value = permanent_user_response
+
+    app.dependency_overrides[get_user_id] = lambda: "perm-uuid"
+    try:
+        with patch("routers.demo.get_supabase", return_value=mock_db), \
+             patch("routers.demo.seed_anon_user_content", return_value=True) as m_seed, \
+             patch("routers.demo.purge_stale_anon_users") as m_purge:
+            resp = TestClient(app).post("/api/demo/bootstrap")
+    finally:
+        app.dependency_overrides.clear()
+
+    assert resp.status_code == 200, f"expected 200, got {resp.status_code}: {resp.text}"
+    assert resp.json() == {"seeded": False}, f"unexpected body: {resp.json()!r}"
+    m_seed.assert_not_called()
+    m_purge.assert_not_called()
