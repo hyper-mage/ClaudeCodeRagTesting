@@ -157,7 +157,7 @@ Plans:
 | 5. Deploy Frontend to Cloudflare Pages | 1/1 | Complete    | 2026-05-07 |
 | 6. Prod Wiring — Auth, CORS, Rate Limiting, Cost Caps | 0/? | Not started | — |
 | 7. Observability Baseline | 5/5 | Complete    | 2026-05-17 |
-| 8. Portfolio Polish | 0/? | Not started | — |
+| 8. Portfolio Polish | 1/8 | In progress | — |
 
 ## Coverage Map
 

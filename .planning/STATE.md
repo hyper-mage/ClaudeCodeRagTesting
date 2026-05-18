@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: milestone
 status: executing
-stopped_at: Phase 8 UI-SPEC approved
-last_updated: "2026-05-17T20:49:01.377Z"
-last_activity: 2026-05-17 -- Phase 8 planning complete
+stopped_at: Phase 8 Wave 1 — 08-03 backend retry-dedup complete (parallel with 08-01 + 08-02)
+last_updated: "2026-05-17T21:30:00.000Z"
+last_activity: 2026-05-17 -- Phase 8 Wave 1 plan 08-03 landed (TDD)
 progress:
   total_phases: 11
   completed_phases: 7
   total_plans: 28
-  completed_plans: 19
-  percent: 68
+  completed_plans: 20
+  percent: 71
 ---
 
 # Project State
@@ -60,6 +60,7 @@ Progress: [██████████] 100% of plans landed for completed/ve
 | Phase 05 P01 | 45min | 5 tasks | 2 files |
 | Phase 06.1 P01 | ~18min | 3 tasks | 6 files |
 | Phase 06.1 P02 | ~12min | 2 of 3 tasks (Task 3 UAT deferred-to-deployed; UAT PASS 2026-05-15) | 2 files |
+| Phase 08 P03 | ~25min | 1 task (TDD: RED+GREEN) | 2 files |
 
 ## Accumulated Context
 
@@ -91,10 +92,13 @@ Recent decisions affecting current work:
 - [Phase 06.1 P02]: ChatPage + DocumentsPage wired with MobileTopBar + MobileDrawer; per-page drawer state (not hoisted); DocumentsPage drawer FolderTree gated on isDrawerOpen to prevent duplicate dnd-kit droppable ids (T-06.1-07); auto-close only on primary select actions, not rename/create/contextMenu/external-drop.
 - [Phase 06.1 P02]: Task 3 (12-point mobile UAT) DEFERRED-TO-DEPLOYED — local `.env` Supabase URL mismatch with prod project made local emulation non-representative. UAT ran on `https://boardgame-rag-prod.pages.dev` 2026-05-15: 14/14 PASS (12 functional + 2 a11y sanity). Phase 06.1 verified.
 - [Phase 06.1 verification]: Goal-backward verification 2026-05-15 — all 12 CONTEXT.md success criteria + 2 a11y sanity checks PASS on deployed CF Pages URL; `git diff frontend/package.json frontend/package-lock.json` empty (zero new deps); `npm run build` succeeds. Phase 06.1 closed.
+- [Phase 08-03]: Retry-aware POST /threads/{id}/messages — backend dedup hook via `?retry=true` Query param + SELECT-then-DELETE prior assistant row + `if not retry:` guard on user-row insert. Strategy A from RESEARCH §Pitfall 3. Supabase-py 2.13.0 verified to lack .order/.limit on the .delete() chain (SyncFilterRequestBuilder introspection) — SELECT-then-DELETE-by-id is the PLAN-sanctioned fallback. 3/3 retry tests pass; chat_cap regression 4/4 pass; full backend suite 123 passed / 8 skipped (Wave-1 stubs for parallel plans 08-01 + 08-02).
 
 ### Pending Todos
 
-None — Phase 06.1 verified. Resume Phase 6 (06-00-PLAN.md → 06-04-PLAN.md).
+- Phase 8 Wave 1 (parallel): 08-01 (backend/auth.py anon JWT) + 08-02 (backend/routers/demo.py + services/demo_service.py) still in flight on sibling worktrees. 08-03 (this plan) complete.
+- Phase 8 Wave 2: 08-04 frontend useChat.retryLastUserMessage — consumes the `?retry=true` contract this plan landed.
+- Pre-existing: `backend/tests/test_record_manager.py::test_check_duplicate_integration` has missing `user_id` fixture (function signature expects fixture; conftest only provides `test_user_id` and `mock_user_id`). Unrelated to 08-03 — log for future plan-checker pass.
 
 ### Blockers/Concerns
 
@@ -106,7 +110,7 @@ None — Phase 06.1 verified. Resume Phase 6 (06-00-PLAN.md → 06-04-PLAN.md).
 
 ## Session Continuity
 
-Last session: 2026-05-17T06:02:27.135Z
-Stopped at: Phase 8 UI-SPEC approved
-Resume file: .planning/phases/08-portfolio-polish/08-UI-SPEC.md
-Next: `/gsd:discuss-phase 8` to start Phase 8 (final phase — Try Demo button, graceful error handling, README polish, deploy badge).
+Last session: 2026-05-17T21:30:00.000Z
+Stopped at: Phase 8 Wave 1 — 08-03 backend retry-dedup complete (running parallel with 08-01 + 08-02)
+Resume file: .planning/phases/08-portfolio-polish/08-03-SUMMARY.md
+Next: Continue Phase 8 Wave 1 — once 08-01 + 08-02 land, proceed to Wave 2 (08-04 frontend useChat.retryLastUserMessage consumes the `?retry=true` contract this plan landed).
