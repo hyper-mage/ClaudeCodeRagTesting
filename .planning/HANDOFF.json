@@ -1,0 +1,84 @@
+{
+  "version": "1.0",
+  "timestamp": "2026-05-18T21:20:42.182Z",
+  "phase": "08",
+  "phase_name": "portfolio-polish",
+  "phase_dir": ".planning/phases/08-portfolio-polish",
+  "plan": "00",
+  "task": 1,
+  "total_tasks": 23,
+  "status": "paused",
+  "resume_mode": "interactive_step_by_step",
+  "completed_plans": [
+    {"id": "08-00", "name": "Wave 0 scaffolding (anon JWT, fixtures, sample doc, credits)", "status": "partial", "tasks_done": ["Task 2 sample doc + CREDITS", "Task 3 conftest fixtures + 4 test stubs"], "tasks_remaining": ["Task 1 anon JWT aud decode (USER ACTION)"], "commits": ["22463f0", "c89c4a2", "43be596"]},
+    {"id": "08-01", "name": "backend auth.py JWT widening", "status": "complete", "commits": ["cb3341b", "60c234b", "633a407"], "notes": "no-op path taken; 4 tests pass; provisional pending 08-00 Task 1 confirmation"},
+    {"id": "08-02", "name": "/api/demo/bootstrap router + demo_service", "status": "complete", "commits": ["7715bb4", "0f81e49", "34b854b", "8662224"]},
+    {"id": "08-03", "name": "retry-aware POST /messages dedup", "status": "complete", "commits": ["1e63e95", "b338632", "b3d465d", "e8c51b4"]},
+    {"id": "08-04", "name": "frontend PORT-01 + PORT-02", "status": "code_complete_uat_pending", "commits": ["a3fbda1", "eb768c7", "94a078c", "f2c486b", "ddd3e4f"], "tasks_remaining": ["Task 4 12-point UAT against deployed CF Pages (USER ACTION)"]}
+  ],
+  "remaining_plans": [
+    {"id": "08-06", "name": "architecture diagram + 4 screenshots + hero GIF", "status": "not_started", "blocked_by": "08-04 Task 4 UAT + deployed app for screenshot capture"},
+    {"id": "08-05", "name": "README rewrite + archive course README", "status": "not_started", "blocked_by": "08-06 assets + 08-07 badge URLs"},
+    {"id": "08-07", "name": "shields.io badges (UptimeRobot + GitHub last-commit)", "status": "not_started", "blocked_by": "USER ACTION: UR monitor key + GitHub repo public"}
+  ],
+  "human_actions_pending": [
+    {
+      "id": "USER-1",
+      "action": "Decode anon JWT in prod Supabase to confirm aud claim",
+      "context": "Plan 08-00 Task 1. Provisional code path assumes aud='authenticated' (Supabase default). If different, one-line patch to backend/auth.py + conftest needed.",
+      "blocking": true,
+      "instructions_at": ".planning/phases/08-portfolio-polish/.continue-here.md#user-action-1"
+    },
+    {
+      "id": "USER-2",
+      "action": "Get UptimeRobot Monitor-Specific API key for /api/health monitor",
+      "context": "Plan 08-07 Task 1. Build shields.io uptime-ratio badge URL.",
+      "blocking": true,
+      "instructions_at": ".planning/phases/08-portfolio-polish/.continue-here.md#user-action-2"
+    },
+    {
+      "id": "USER-3",
+      "action": "Flip GitHub repo to public + report owner/repo path",
+      "context": "Plan 08-07 Task 2. Required for shields.io last-commit badge. Email already redacted from tracked files.",
+      "blocking": true,
+      "instructions_at": ".planning/phases/08-portfolio-polish/.continue-here.md#user-action-3"
+    },
+    {
+      "id": "USER-4",
+      "action": "Deploy backend (flyctl deploy) + frontend (CF Pages auto-deploy on push) then run 12-point browser UAT",
+      "context": "Plan 08-04 Task 4. Verifies PORT-01 + PORT-02 end-to-end on live prod URL. Records results in 08-04-VERIFICATION.md.",
+      "blocking": true,
+      "instructions_at": ".planning/phases/08-portfolio-polish/.continue-here.md#user-action-4"
+    },
+    {
+      "id": "USER-5",
+      "action": "Author Excalidraw architecture diagram + capture 4 screenshots + record hero GIF",
+      "context": "Plan 08-06. Diagram nodes/edges + screenshot list specified in 08-06-PLAN.md.",
+      "blocking": true,
+      "instructions_at": ".planning/phases/08-portfolio-polish/.continue-here.md#user-action-5"
+    }
+  ],
+  "decisions_made": [
+    {"decision": "Plan 08-01 took no-op auth.py path (provisional)", "rationale": "Supabase documented default is aud='authenticated'; if user reports different value, one-line patch", "phase": "08"},
+    {"decision": "Plan 08-02 permanent-user guard returns {seeded:false} silently rather than 403", "rationale": "Minimum friction for prod debugging; not a security-critical decision", "phase": "08"},
+    {"decision": "Plan 08-03 uses SELECT-then-DELETE-by-id rather than chained .delete().order().limit()", "rationale": "supabase-py 2.13.0 postgrest filter builder does not support order/limit on delete chain (verified empirically)", "phase": "08"},
+    {"decision": "Email mlynn808138@gmail.com redacted across .planning/ + HANDOVER.md to '<your-email>'", "rationale": "Repo going public for shields.io last-commit badge; reduces scrape surface at HEAD. Git history still contains email — acceptable trade-off", "phase": "08"},
+    {"decision": "Wave 0 + Wave 1 split execution: code parts auto, dashboard steps user", "rationale": "User explicitly opted to advance code while doing manual dashboard work in parallel", "phase": "08"}
+  ],
+  "uncommitted_files": [],
+  "test_status": {
+    "backend_pytest": "139 passed (2 pre-existing test_record_manager fixture errors documented in deferred-items.md, NOT regression)",
+    "frontend_build": "green, 0 TS errors, 2321 modules",
+    "frontend_lint": "4 pre-existing errors documented in deferred-items.md, NOT regression"
+  },
+  "infrastructure_state": {
+    "supabase_anon_signins": "ENABLED in prod (user confirmed 2026-05-17)",
+    "uptimerobot_public_stats": "user provided status page URL https://stats.uptimerobot.com/mpLu1UQaFy but NOT the monitor-specific API key needed for shields.io",
+    "github_repo_visibility": "PRIVATE (user to flip before badge work)",
+    "fly_backend_deployed": "STALE — does not include Wave 1 backend changes (08-01/02/03) or Wave 2 frontend",
+    "cf_pages_frontend_deployed": "STALE — does not include Wave 2 changes",
+    "worktrees_locked": "4 locked Phase 8 worktrees in .claude/worktrees/ — harness cleans automatically"
+  },
+  "next_action": "Read .planning/phases/08-portfolio-polish/.continue-here.md. Use AskUserQuestion for USER-1 (JWT decode) first since it unblocks final confirmation of provisional path.",
+  "context_notes": "User invoked /gsd:execute-phase 8. 5 of 8 plans fully or partially complete in autonomous mode. Remaining work is overwhelmingly user-driven (dashboard steps, deploy, UAT, screenshots). User explicitly wants step-by-step INTERACTIVE completion in next session — present one action at a time, wait for output, then proceed."
+}
