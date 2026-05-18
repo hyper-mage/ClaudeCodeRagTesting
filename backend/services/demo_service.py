@@ -30,8 +30,17 @@ logger = logging.getLogger(__name__)
 
 # Resolved relative to this file so the path is stable across cwd changes
 # (worktrees, pytest invocations from repo root, uvicorn from backend/).
-SAMPLE_DOC_PATH = os.path.join(
-    os.path.dirname(__file__), "..", "..", "data", "sample-private-docs", "dnd5e-quickref.md"
+# Two layouts supported:
+#   - dev/test:   backend/services/demo_service.py -> ../../data/... (repo root)
+#   - container:  /app/services/demo_service.py    -> ../data/...    (/app/data)
+# Dockerfile copies data/sample-private-docs/ to /app/data/sample-private-docs/.
+_SAMPLE_DOC_CANDIDATES = (
+    os.path.join(os.path.dirname(__file__), "..", "..", "data", "sample-private-docs", "dnd5e-quickref.md"),
+    os.path.join(os.path.dirname(__file__), "..", "data", "sample-private-docs", "dnd5e-quickref.md"),
+)
+SAMPLE_DOC_PATH = next(
+    (p for p in _SAMPLE_DOC_CANDIDATES if os.path.exists(p)),
+    _SAMPLE_DOC_CANDIDATES[0],
 )
 
 # Locked welcome copy (CONTEXT D-02 + PATTERNS.md). NEVER route through an LLM —

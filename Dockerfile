@@ -54,6 +54,10 @@ RUN pip install -r requirements.txt --extra-index-url https://download.pytorch.o
 # backend/scripts/docker_smoke.sh via HTTP POST, not via in-image filesystem.
 COPY --chown=appuser:appuser backend/ ./
 
+# Sample seed data for anon-user demo bootstrap (Plan 08-02 + 08-04 gap-fix).
+# demo_service.SAMPLE_DOC_PATH resolves either layout: repo-root (dev/test) OR /app/data (container).
+COPY --chown=appuser:appuser data/sample-private-docs ./data/sample-private-docs
+
 # Switch to non-root BEFORE model preload so cache lands in /home/appuser/.cache/docling
 # (not /root/.cache/docling which appuser cannot read). See PITFALLS.md #2.
 USER appuser
