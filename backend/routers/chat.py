@@ -1,6 +1,6 @@
 import json
 import logging
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sse_starlette.sse import EventSourceResponse
 from auth import get_user_id
 from limiter import limiter
@@ -471,6 +471,7 @@ async def send_message(
     request: Request,                            # SEC-04: REQUIRED by slowapi (RESEARCH Pitfall 1)
     thread_id: str,
     body: MessageCreate,
+    retry: bool = Query(False),                  # PORT-02 / T-08-03: retry-aware dedup hook
     user_id: str = Depends(get_user_id),
 ):
     db = get_supabase()
@@ -487,13 +488,48 @@ async def send_message(
     if not thread.data:
         raise HTTPException(status_code=404, detail="Thread not found")
 
+    # Phase 8 PORT-02 / T-08-03 / RESEARCH Pitfall 3 — retry cleanup.
+    # On retry, the prior failed turn left an orphan assistant row in messages
+    # (empty content, or the "[An error occurred...]" / "[Response interrupted]"
+    # placeholder set by the chat handler's except/finally blocks). Delete the
+    # most-recent assistant row for this thread+user BEFORE inserting the new
+    # placeholder so the thread doesn't accumulate orphan rows on reload.
+    #
+    # supabase-py 2.13.0 does NOT support .delete().order().limit() chained
+    # (postgrest SyncFilterRequestBuilder lacks order/limit on the delete path).
+    # Fallback: SELECT id of latest assistant row, then DELETE by id.
+    # Scope guards: thread_id + user_id + role='assistant' prevent cross-user
+    # or cross-thread deletion even if the JWT/path were tampered with (the
+    # thread-ownership check above already proved the thread belongs to user).
+    if retry:
+        prior = (
+            db.table("messages")
+            .select("id")
+            .eq("thread_id", thread_id)
+            .eq("user_id", user_id)
+            .eq("role", "assistant")
+            .order("created_at", desc=True)
+            .limit(1)
+            .execute()
+        )
+        if prior.data:
+            db.table("messages").delete().eq("id", prior.data[0]["id"]).execute()
+            logger.info(
+                f"Retry cleanup: deleted prior assistant row {prior.data[0]['id']} "
+                f"for thread {thread_id}, user {user_id}"
+            )
+
     # Store user message
-    db.table("messages").insert({
-        "thread_id": thread_id,
-        "user_id": user_id,
-        "role": "user",
-        "content": body.content,
-    }).execute()
+    # PORT-02 / T-08-03: on retry the original user message is preserved from
+    # the prior failed send (frontend re-sends the SAME content). Skip the
+    # insert to avoid duplicating the user turn in the thread.
+    if not retry:
+        db.table("messages").insert({
+            "thread_id": thread_id,
+            "user_id": user_id,
+            "role": "user",
+            "content": body.content,
+        }).execute()
 
     # Load all messages for this thread
     history = (
