@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: milestone
 status: executing
-stopped_at: Phase 8 Wave 1 — 08-03 backend retry-dedup complete (parallel with 08-01 + 08-02)
-last_updated: "2026-05-17T21:30:00.000Z"
-last_activity: 2026-05-17 -- Phase 8 Wave 1 plan 08-03 landed (TDD)
+stopped_at: Phase 8 Wave 1 complete; Wave 0 partial (08-00 Task 1 + 08-07 awaiting user manual steps)
+last_updated: "2026-05-18T00:00:00.000Z"
+last_activity: 2026-05-18 -- Phase 8 Wave 1 merged to master (08-01 + 08-02 + 08-03)
 progress:
   total_phases: 11
   completed_phases: 7
   total_plans: 28
-  completed_plans: 20
-  percent: 71
+  completed_plans: 22
+  percent: 79
 ---
 
 # Project State
@@ -21,14 +21,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-23 after v1.0 completion)
 
 **Core value:** The agent can intelligently search and reason across a structured board game knowledge base -- finding rules, comparing mechanics, and recommending games -- using the right tool for the job, transparently.
-**Current focus:** Phase 7 — Observability Baseline (next). Phase 6 (Prod Wiring) and Phase 06.1 (mobile responsive) both verified and closed.
+**Current focus:** Phase 8 — Portfolio Polish. Wave 1 backend (08-01/02/03) merged. Wave 0 has 2 blockers awaiting user manual steps (anon JWT decode + UR monitor key + GitHub repo public flip).
 
 ## Current Position
 
-Phase: 06.1
-Plan: 02 (verified via deployed UAT 14/14 PASS)
-Status: Ready to execute
-Last activity: 2026-05-17 -- Phase 8 planning complete
+Phase: 08
+Wave: 1 complete; Wave 0 partial (08-00 Task 1 + 08-07 Tasks 1-3 awaiting user signals)
+Status: Wave 2 (08-04 frontend) blocked on Wave 0 manual checkpoints
+Last activity: 2026-05-18 -- Phase 8 Wave 1 merged to master (08-01 + 08-02 + 08-03)
 
 Progress: [██████████] 100% of plans landed for completed/verified phases
 
