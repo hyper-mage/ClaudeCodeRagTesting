@@ -1,5 +1,7 @@
 import { useState, useCallback, useRef } from 'react'
 import { apiFetch, apiStream } from '../lib/api'
+import * as Sentry from '@sentry/react'
+import { useToast } from '../contexts/ToastContext'
 
 export interface SubEvent {
   type: 'sub_iteration' | 'sub_tool_start' | 'sub_tool_result'
@@ -22,7 +24,7 @@ export interface ToolEvent {
 
 export interface Message {
   id: string
-  role: 'user' | 'assistant'
+  role: 'user' | 'assistant' | 'error'
   content: string
   toolsUsed?: ToolEvent[]
 }
@@ -31,6 +33,7 @@ export function useChat(threadId: string | null) {
   const [messages, setMessages] = useState<Message[]>([])
   const [isStreaming, setIsStreaming] = useState(false)
   const abortRef = useRef<AbortController | null>(null)
+  const { showToast } = useToast()
 
   const loadMessages = useCallback(async () => {
     if (!threadId) {
@@ -48,16 +51,21 @@ export function useChat(threadId: string | null) {
     }
   }, [threadId])
 
-  const sendMessage = useCallback(async (content: string) => {
+  const sendMessage = useCallback(async (content: string, opts?: { retry?: boolean }) => {
     if (!threadId || isStreaming) return
+    const isRetry = opts?.retry === true
 
-    // Add user message optimistically
-    const userMsg: Message = {
-      id: crypto.randomUUID(),
-      role: 'user',
-      content,
+    // Add user message optimistically (skip on retry — the prior user row is preserved on the backend
+    // via POST /api/threads/{id}/messages?retry=true; the prior optimistic user message also remains
+    // in client state since retry callers strip only role==='error' messages).
+    if (!isRetry) {
+      const userMsg: Message = {
+        id: crypto.randomUUID(),
+        role: 'user',
+        content,
+      }
+      setMessages(prev => [...prev, userMsg])
     }
-    setMessages(prev => [...prev, userMsg])
 
     // Add placeholder assistant message
     const assistantId = crypto.randomUUID()
@@ -71,7 +79,10 @@ export function useChat(threadId: string | null) {
       const controller = new AbortController()
       abortRef.current = controller
 
-      const res = await apiStream(`/api/threads/${threadId}/messages`, {
+      const url = isRetry
+        ? `/api/threads/${threadId}/messages?retry=true`
+        : `/api/threads/${threadId}/messages`
+      const res = await apiStream(url, {
         method: 'POST',
         body: JSON.stringify({ content }),
         signal: controller.signal,
@@ -191,18 +202,60 @@ export function useChat(threadId: string | null) {
         return
       }
       console.error('Chat error:', err)
-      // Remove the empty assistant message on error
-      setMessages(prev => prev.filter(m => m.id !== assistantId || m.content))
+      // Sentry global handlers only capture UNCAUGHT errors — explicit capture for caught ones
+      // (RESEARCH § Pitfall 4 / Standard Stack).
+      Sentry.captureException(err)
+
+      // Replace the empty assistant placeholder with an in-thread error bubble.
+      // Locked copy per UI-SPEC § Surface 2 + § Copywriting Contract.
+      setMessages(prev =>
+        prev.map(m =>
+          m.id === assistantId
+            ? {
+                ...m,
+                role: 'error' as const,
+                content:
+                  'The assistant ran into a problem. Try again, or rephrase your question.',
+              }
+            : m
+        )
+      )
+
+      // Simultaneous 4s red toast (UI-SPEC § Surface 2 dual-surface).
+      showToast(
+        "The assistant didn't respond. Tap the message to retry.",
+        'error'
+      )
     } finally {
       abortRef.current = null
       setIsStreaming(false)
     }
-  }, [threadId, isStreaming])
+  }, [threadId, isStreaming, showToast])
 
   const cancel = useCallback(() => {
     abortRef.current?.abort()
     abortRef.current = null
   }, [])
 
-  return { messages, setMessages, isStreaming, sendMessage, loadMessages, cancel }
+  // Re-send the most recent user message after a failure. Disabled while a fresh
+  // attempt is mid-stream (UI-SPEC § Surface 2 Retry behavior, locked by D-07).
+  // Strips any role==='error' bubbles before retrying so the failed turn
+  // disappears from the thread the moment the new attempt starts.
+  const retryLastUserMessage = useCallback(() => {
+    if (isStreaming) return
+    const lastUser = [...messages].reverse().find(m => m.role === 'user')
+    if (!lastUser) return
+    setMessages(prev => prev.filter(m => m.role !== 'error'))
+    void sendMessage(lastUser.content, { retry: true })
+  }, [messages, isStreaming, sendMessage])
+
+  return {
+    messages,
+    setMessages,
+    isStreaming,
+    sendMessage,
+    loadMessages,
+    cancel,
+    retryLastUserMessage,
+  }
 }
