@@ -3,9 +3,9 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: milestone
 status: executing
-stopped_at: Phase 8 Wave 1 complete; Wave 0 partial (08-00 Task 1 + 08-07 awaiting user manual steps)
-last_updated: "2026-05-18T00:00:00.000Z"
-last_activity: 2026-05-18 -- Phase 8 Wave 1 merged to master (08-01 + 08-02 + 08-03)
+stopped_at: Phase 8 Wave 1 complete; Wave 0 Task 1 RESOLVED 2026-05-18 (aud="authenticated" empirically confirmed); 4 user-actions remain (USER-2/3/4/5)
+last_updated: "2026-05-18T22:00:00.000Z"
+last_activity: 2026-05-18 -- USER-1 resolved: anon JWT aud="authenticated" confirmed via REST decode against prod project; 08-00 + 08-01 SUMMARY upgraded to complete
 progress:
   total_phases: 11
   completed_phases: 7
@@ -110,7 +110,7 @@ Recent decisions affecting current work:
 
 ## Session Continuity
 
-Last session: 2026-05-17T21:30:00.000Z
-Stopped at: Phase 8 Wave 1 — 08-03 backend retry-dedup complete (running parallel with 08-01 + 08-02)
-Resume file: .planning/phases/08-portfolio-polish/08-03-SUMMARY.md
-Next: Continue Phase 8 Wave 1 — once 08-01 + 08-02 land, proceed to Wave 2 (08-04 frontend useChat.retryLastUserMessage consumes the `?retry=true` contract this plan landed).
+Last session: 2026-05-18T22:00:00.000Z
+Stopped at: Phase 8 Wave 0 USER-1 resolved (aud="authenticated"); 4 user-actions remain
+Resume file: .planning/phases/08-portfolio-polish/.continue-here.md
+Next: Present USER-2 (UptimeRobot monitor-specific API key for Plan 08-07 shields.io badge).

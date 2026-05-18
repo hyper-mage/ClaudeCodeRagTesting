@@ -111,15 +111,9 @@ _Note: TDD RED/GREEN/REFACTOR collapsed to a single commit because the function 
 
 None — purely backend test surface. No env vars, no migrations, no external service config.
 
-## Revisit-Needed Marker
+## Revisit-Needed Marker — CLEARED 2026-05-18
 
-**Provisional status:** Plan 08-00 Task 1 (empirical anon `aud` decode) is still PENDING USER ACTION. If the user later reports `aud != "authenticated"`:
-
-1. Update `_ANON_AUD_CLAIM` in `backend/tests/conftest.py` (anon_jwt fixture payload only).
-2. Widen `backend/auth.py:42` to `audience=["authenticated", "<reported>"]` per RESEARCH §Pitfall 7.
-3. Re-run `pytest tests/test_auth_anon.py -x` — all 4 tests should still pass without modification (the anon test exercises the same code path; the patched payload's `aud` value is irrelevant because `jwt.decode` is mocked to return the payload directly).
-
-The 4 tests are robust to the eventual empirical resolution because they mock `jwt.decode` rather than letting it execute real audience validation. The real audience-validation path is exercised end-to-end by Plan 08-04 (frontend Try-demo CTA) where an actual anon JWT hits the real verifier.
+**Provisional status RESOLVED.** Plan 08-00 Task 1 empirical decode confirmed `aud="authenticated"`, `role="authenticated"` against prod Supabase project via REST `/auth/v1/signup` (see updated `08-00-SUMMARY.md`). No code change to `backend/auth.py` required — provisional no-op path locked permanent. The 4 tests run against the correct claim shape.
 
 ## Self-Check: PASSED
 

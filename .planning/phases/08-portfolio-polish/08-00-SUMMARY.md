@@ -1,30 +1,30 @@
 ---
 phase: "08"
 plan: "00"
-status: partial
-date: 2026-05-17
-provisional: true
+status: complete
+date: 2026-05-18
+provisional: false
 ---
 
-# Plan 08-00 — Wave 0 Scaffolding (PARTIAL — Task 1 PENDING)
+# Plan 08-00 — Wave 0 Scaffolding (COMPLETE)
 
 ## Status
 
-- **Task 1 (anon JWT `aud` verification):** ⏸ **PENDING USER ACTION**. Supabase anon sign-ins toggled ON in prod (user confirmed 2026-05-17). User has not yet decoded a minted anon JWT to report empirical `aud` claim value.
+- **Task 1 (anon JWT `aud` verification):** ✅ **CONFIRMED 2026-05-18**. Empirical anon JWT minted against prod Supabase project via REST POST `/auth/v1/signup` (apikey=anon). Decoded payload returns `aud="authenticated"`, `role="authenticated"` — matches Supabase documented default (see RESEARCH §Common Pitfalls Pitfall 1) and dashboard text "Anonymous users will use the `authenticated` role when signing in". No code change needed in `backend/auth.py` — provisional no-op path confirmed.
 - **Task 2 (sample doc + credits):** ✅ Done. Commit: `22463f0`.
 - **Task 3 (pytest scaffolding):** ✅ Done. Commit: `c89c4a2`.
 
-## Provisional Decision Used by Downstream Wave 1 Plans
+## Confirmed Decision — Wave 1 No-Op Path Locked
 
-Until Task 1 resume signal lands, downstream plans (08-01 in particular) assume the **no-op path**:
+Empirical decode 2026-05-18 against prod Supabase project confirms documented default:
 
-> **Provisional assumption:** anon JWT `aud == "authenticated"` (matches Supabase documented default — see RESEARCH §Common Pitfalls Pitfall 1).
+> **Confirmed:** anon JWT `aud == "authenticated"`, `role == "authenticated"`.
 >
-> **→ Plan 08-01 keeps `backend/auth.py` line 42 `audience="authenticated"` unchanged.**
+> **→ Plan 08-01 `backend/auth.py:42` `audience="authenticated"` unchanged.**
 >
-> **Risk:** if Task 1 resume signal reports `aud == "anon"` or any other value, Plan 08-01 must widen to `audience=["authenticated", "anon"]` per RESEARCH Pitfall 7. One-line patch + re-run of `test_auth_anon.py`.
+> **Verification method:** REST POST `/auth/v1/signup` with empty body + anon-key apikey against prod project → returned `access_token` decoded at jwt.io → both claims read `authenticated`.
 
-This is consistent with conftest fixture default: `_ANON_AUD_CLAIM = "authenticated"` in `backend/tests/conftest.py` (Plan 08-00 Task 3 output, commit `c89c4a2`).
+Conftest fixture default `_ANON_AUD_CLAIM = "authenticated"` in `backend/tests/conftest.py` (commit `c89c4a2`) matches empirical value — Wave 1 tests run against the correct claim.
 
 ## Artifacts Created (Tasks 2 + 3)
 
@@ -53,16 +53,8 @@ $ cd backend && venv/Scripts/python -m pytest --collect-only -q | tail -3
 ... 138 tests collected in 3.96s  (no regression)
 ```
 
-## When Task 1 Resume Signal Arrives
-
-1. If `aud == "authenticated"`: this SUMMARY upgrades to `status: complete`, `provisional: false`. No code change needed.
-2. If `aud != "authenticated"`:
-   - Patch `_ANON_AUD_CLAIM = "<reported value>"` in `backend/tests/conftest.py`.
-   - Plan 08-01 widens `audience=["authenticated", "<reported value>"]` in `backend/auth.py`.
-   - Re-run `pytest tests/test_auth_anon.py -x` to confirm.
-   - Update this SUMMARY with the resolved value + remove `provisional: true` marker.
-
 ## Files Committed
 
 - `22463f0` feat(08-00): sample D&D 5e quickref + CREDITS attribution (Task 2)
 - `c89c4a2` test(08-00): pytest scaffolding — conftest fixtures + 4 stub files (Task 3)
+- `43be596` docs(08-00): provisional SUMMARY (later upgraded to complete on 2026-05-18)
