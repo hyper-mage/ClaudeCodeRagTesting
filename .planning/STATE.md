@@ -3,9 +3,9 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: milestone
 status: executing
-stopped_at: Phase 8 Wave 0 + Wave 1 closed; Plan 08-07 badges live; 2 user-actions remain (USER-4 deploy+UAT, USER-5 assets)
-last_updated: "2026-05-18T22:50:00.000Z"
-last_activity: 2026-05-18 -- USER-2 + USER-3 resolved: UR uptime badge (97.194%) + GitHub last-commit badge (hyper-mage/ClaudeCodeRagTesting) live + verified; Plan 08-07 complete
+stopped_at: Phase 8 Plans 00/01/02/03/04/07 closed; Plan 08-04 UAT 11/11 PASS over 3 runs; 1 user-action remains (USER-5 assets)
+last_updated: "2026-05-18T23:50:00.000Z"
+last_activity: 2026-05-18 -- USER-4 resolved: 11/11 UAT PASS on deployed CF Pages after 2 gap-fixes (Dockerfile data/ bundle + useChat SSE error-handler); Plan 08-04 complete
 progress:
   total_phases: 11
   completed_phases: 7
@@ -110,7 +110,7 @@ Recent decisions affecting current work:
 
 ## Session Continuity
 
-Last session: 2026-05-18T22:50:00.000Z
-Stopped at: Phase 8 — Plan 08-07 complete (UR + GitHub badges live); 2 user-actions remain (USER-4, USER-5)
+Last session: 2026-05-18T23:50:00.000Z
+Stopped at: Phase 8 — Plan 08-04 complete (11/11 UAT PASS); 1 user-action remains (USER-5 asset capture)
 Resume file: .planning/phases/08-portfolio-polish/.continue-here.md
-Next: Present USER-4 (deploy backend+frontend, run 12-point UAT against deployed CF Pages URL).
+Next: Present USER-5 (Excalidraw diagram + 4 screenshots + hero GIF — unblocks Plan 08-06 + 08-05 README).

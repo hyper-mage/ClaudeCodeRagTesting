@@ -1,12 +1,32 @@
 ---
 phase: "08"
 plan: "04"
-status: in_progress
+status: complete
 date: 2026-05-18
-uat_run: 1
+uat_run: 3
+final_outcome: 11/11 PASS
 ---
 
-# Plan 08-04 — Deployed UAT Run #1 (PARTIAL PASS — gap-fix landed)
+# Plan 08-04 — Deployed UAT (COMPLETE — 11/11 PASS over 3 runs)
+
+## Final Outcome — Run #3 (2026-05-18)
+
+All 11 in-scope items PASS on https://boardgame-rag-prod.pages.dev. Item 11 officially DROPPED (Tavily not provisioned in prod). Two backend/path gap-fixes + one frontend SSE error-handler gap-fix landed during UAT cycle.
+
+| # | Result |
+|---|--------|
+| 1, 2, 5, 6, 12 | ✅ PASS (Run #1) |
+| 3, 4 | ✅ PASS (Run #2 — after Dockerfile + SAMPLE_DOC_PATH patch) |
+| 7, 8, 9, 10 | ✅ PASS (Run #3 — after useChat SSE error-handler patch) |
+| 11 | DROPPED — Tavily not configured in prod |
+
+Wave 3 (USER-5 asset capture) unblocked.
+
+---
+
+# Historical Run Detail (preserved for audit trail)
+
+## Run #1 — Initial UAT (PARTIAL — exposed gaps)
 
 ## Outcome (Run #1, 2026-05-18, post-flyctl-deploy + git push)
 
@@ -79,13 +99,19 @@ This reinforces the USER-1 lock — provisional 08-01 no-op path is now empirica
 
 **Verification:** `npm run build` passes (0 TS errors, 2321 modules transformed). Manual UI re-test pending Run #3.
 
-## Run #3 — What to redo
+## Run #3 (2026-05-18) — ALL PASS
 
-After frontend redeploy (git push → CF Pages auto-deploy; backend redeploy NOT needed since Run #3 patch is frontend-only):
+| # | Result |
+|---|--------|
+| 7 | ✅ PASS — LLM_API_KEY=invalid_for_uat broke LLM correctly |
+| 8 | ✅ PASS — red error bubble + 4s toast rendered (useChat SSE error-handler patch wired) |
+| 9 | ✅ PASS — Sentry event captured |
+| 10 | ✅ PASS — Retry button worked + fresh SSE + DB dedup (Plan 08-03 retry-clean confirmed in prod) |
+| 12 (Retry) | ✅ PASS — mobile Retry button tap-target met |
 
-1. Re-test items 7-10 only — expect red error bubble + toast on item 8, Sentry event on item 9, working Retry button + DB dedup on item 10.
-2. Item 12 Retry-mobile parity becomes verifiable once item 10 yields a visible Retry button.
+Plan 08-04 closed. Cumulative 11/11 across runs.
 
-Items 1, 2, 3, 4, 5, 6, 12-non-Retry already PASS from prior runs — do NOT need re-test.
+## Gap-Fix Commits
 
-Run #3 results overwrite Run #2 section; if 11/11 PASS, mark `status: complete` and proceed to USER-5.
+- `b5392f7` — fix(08-04): bundle sample doc into Docker image + robust SAMPLE_DOC_PATH (items 3+4 + PLAN.md items 7/10/11 corrections)
+- `cb1a0d7` — fix(08-04): useChat handles SSE `event: error` in-band data (item 8 silent-swallow)

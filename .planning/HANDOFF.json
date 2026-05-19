@@ -1,6 +1,6 @@
 {
   "version": "1.0",
-  "timestamp": "2026-05-18T22:50:00.000Z",
+  "timestamp": "2026-05-18T23:50:00.000Z",
   "phase": "08",
   "phase_name": "portfolio-polish",
   "phase_dir": ".planning/phases/08-portfolio-polish",
@@ -14,10 +14,10 @@
     {"id": "08-01", "name": "backend auth.py JWT widening", "status": "complete", "commits": ["cb3341b", "60c234b", "633a407"], "notes": "no-op path confirmed permanent (aud=authenticated empirically locked); 4 tests pass"},
     {"id": "08-02", "name": "/api/demo/bootstrap router + demo_service", "status": "complete", "commits": ["7715bb4", "0f81e49", "34b854b", "8662224"]},
     {"id": "08-03", "name": "retry-aware POST /messages dedup", "status": "complete", "commits": ["1e63e95", "b338632", "b3d465d", "e8c51b4"]},
-    {"id": "08-04", "name": "frontend PORT-01 + PORT-02", "status": "code_complete_uat_pending", "commits": ["a3fbda1", "eb768c7", "94a078c", "f2c486b", "ddd3e4f"], "tasks_remaining": ["Task 4 12-point UAT against deployed CF Pages (USER ACTION)"]}
+    {"id": "08-04", "name": "frontend PORT-01 + PORT-02", "status": "complete", "commits": ["a3fbda1", "eb768c7", "94a078c", "f2c486b", "ddd3e4f", "b5392f7", "cb1a0d7"], "notes": "11/11 UAT PASS over 3 runs (item 11 DROPPED — Tavily not configured). Two gap-fixes landed during UAT: b5392f7 (Dockerfile data/ bundle + SAMPLE_DOC_PATH robust) + cb1a0d7 (useChat SSE event:error in-band data handler)."}
   ],
   "remaining_plans": [
-    {"id": "08-06", "name": "architecture diagram + 4 screenshots + hero GIF", "status": "not_started", "blocked_by": "08-04 Task 4 UAT + deployed app for screenshot capture"},
+    {"id": "08-06", "name": "architecture diagram + 4 screenshots + hero GIF", "status": "not_started", "blocked_by": "USER-5 (Excalidraw + screenshot + GIF capture)"},
     {"id": "08-05", "name": "README rewrite + archive course README", "status": "not_started", "blocked_by": "08-06 assets + 08-07 badge URLs"},
     {"id": "08-07", "name": "shields.io badges (UptimeRobot + GitHub last-commit)", "status": "complete", "notes": "UR uptime-ratio badge (m803088267-..., last-7-day ratio 97.194%) + GitHub last-commit badge (hyper-mage/ClaudeCodeRagTesting) — both HTTP 200 + valid SVG verified 2026-05-18"}
   ],
@@ -39,16 +39,15 @@
       "action": "Flip GitHub repo to public + report owner/repo path",
       "resolution": "2026-05-18: repo flipped to public; path = hyper-mage/ClaudeCodeRagTesting. shields.io last-commit endpoint returns HTTP 200 + SVG ('last commit: yesterday'). URL stored in 08-07-SUMMARY.md.",
       "resolved_at": "2026-05-18T22:50:00.000Z"
-    }
-  ],
-  "human_actions_pending": [
+    },
     {
       "id": "USER-4",
       "action": "Deploy backend (flyctl deploy) + frontend (CF Pages auto-deploy on push) then run 12-point browser UAT",
-      "context": "Plan 08-04 Task 4. Verifies PORT-01 + PORT-02 end-to-end on live prod URL. Records results in 08-04-VERIFICATION.md.",
-      "blocking": true,
-      "instructions_at": ".planning/phases/08-portfolio-polish/.continue-here.md#user-action-4"
-    },
+      "resolution": "2026-05-18: 11/11 UAT PASS over 3 runs (item 11 DROPPED — Tavily not provisioned). Two gap-fixes landed during cycle: b5392f7 (Dockerfile data/ bundle + SAMPLE_DOC_PATH robust) + cb1a0d7 (useChat SSE event:error in-band data handler). See 08-04-VERIFICATION.md for run-by-run detail.",
+      "resolved_at": "2026-05-18T23:50:00.000Z"
+    }
+  ],
+  "human_actions_pending": [
     {
       "id": "USER-5",
       "action": "Author Excalidraw architecture diagram + capture 4 screenshots + record hero GIF",
@@ -74,10 +73,10 @@
     "supabase_anon_signins": "ENABLED in prod (user confirmed 2026-05-17)",
     "uptimerobot_public_stats": "monitor-specific API key m803088267-8382641d8fc775dcd3c6e7cd resolved 2026-05-18; uptime-ratio badge live (97.194% over 7d)",
     "github_repo_visibility": "PUBLIC (flipped 2026-05-18 — hyper-mage/ClaudeCodeRagTesting)",
-    "fly_backend_deployed": "STALE — does not include Wave 1 backend changes (08-01/02/03) or Wave 2 frontend",
-    "cf_pages_frontend_deployed": "STALE — does not include Wave 2 changes",
+    "fly_backend_deployed": "CURRENT — flyctl deploy lands Wave 1 + b5392f7 gap-fix 2026-05-18; UAT 11/11 PASS",
+    "cf_pages_frontend_deployed": "CURRENT — git push master triggers CF Pages auto-build incl. Wave 2 + cb1a0d7 useChat patch 2026-05-18; UAT 11/11 PASS",
     "worktrees_locked": "4 locked Phase 8 worktrees in .claude/worktrees/ — harness cleans automatically"
   },
-  "next_action": "Present USER-4 (deploy backend + frontend + run 12-point UAT against deployed CF Pages URL). USER-1/2/3 resolved 2026-05-18; Plan 08-07 complete.",
+  "next_action": "Present USER-5 (Excalidraw architecture diagram + 4 portfolio screenshots + hero GIF — unblocks Plan 08-06 + downstream Plan 08-05 README). USER-1/2/3/4 resolved 2026-05-18; Plans 00/01/02/03/04/07 complete.",
   "context_notes": "User invoked /gsd:execute-phase 8. 5 of 8 plans fully or partially complete in autonomous mode. Remaining work is overwhelmingly user-driven (dashboard steps, deploy, UAT, screenshots). User explicitly wants step-by-step INTERACTIVE completion in next session — present one action at a time, wait for output, then proceed."
 }

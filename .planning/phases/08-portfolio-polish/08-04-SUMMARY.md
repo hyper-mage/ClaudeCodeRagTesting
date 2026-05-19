@@ -57,7 +57,9 @@ One-liner: Anonymous Supabase auth onboarding (Try-demo CTA + Demo identity pill
 
 ## What Was Built
 
-**Tasks 1, 2, 3 of Plan 08-04 — code complete. Task 4 (deployed UAT) deferred** per orchestrator dispatch instructions: the 12-point browser UAT requires deployed CF Pages + manual eval and will be run by the user after they decode the prod anon JWT (Plan 08-00 Task 1), flip the GitHub repo public (Plan 08-07), and deploy backend → Fly + frontend → CF Pages.
+**ALL TASKS COMPLETE (2026-05-18).** Tasks 1-3 code merged 2026-05-17. Task 4 (deployed UAT) completed 2026-05-18 across 3 runs against deployed CF Pages — final outcome **11/11 PASS** (item 11 DROPPED per Tavily-not-configured gap-fix). See `08-04-VERIFICATION.md` for full run-by-run record. Two gap-fixes landed during UAT cycle:
+- `b5392f7` — bundle sample doc into Docker image + robust SAMPLE_DOC_PATH (items 3+4)
+- `cb1a0d7` — useChat handles SSE `event: error` in-band data (item 8)
 
 ### Task 1 — AuthContext.isAnon + DemoPill + sidebar/topbar wiring (commit `a3fbda1`)
 
@@ -116,16 +118,15 @@ One-liner: Anonymous Supabase auth onboarding (Try-demo CTA + Demo identity pill
   - Destructure now pulls `retryLastUserMessage` out of `useChat(activeThreadId)`.
   - `<ChatContainer ... onRetry={retryLastUserMessage} />` threads the callback down.
 
-### Task 4 (DEFERRED — not executed this dispatch)
+### Task 4 (COMPLETE 2026-05-18 — 11/11 PASS over 3 UAT runs)
 
-**12-point browser UAT against deployed CF Pages.** Reserved for the user, per orchestrator dispatch:
+12-point browser UAT executed against https://boardgame-rag-prod.pages.dev. Item 11 officially DROPPED (Tavily not provisioned). Final outcome **11/11 PASS**. Two gap-fixes landed during UAT cycle (committed before progressing):
 
-> The user has explicitly opted to advance the auto code tasks now and reserve the deployed UAT for later. The browser UAT will be run by the user after they:
-> - decode an anon JWT in prod (Plan 08-00 Task 1 — still pending),
-> - flip the GitHub repo to public (Plan 08-07),
-> - deploy backend changes to Fly + frontend changes to CF Pages.
+- **Run #1 (initial):** items 1, 2, 5, 6 PASS; items 3, 4, 7, 8, 9, 10, 11 FAIL. Three root causes surfaced.
+- **Run #2 (post Dockerfile + path patch `b5392f7`):** items 3, 4 PASS; item 8 still failed (frontend silent-swallow of SSE error event).
+- **Run #3 (post useChat patch `cb1a0d7`):** items 7, 8, 9, 10 PASS — full 11/11 achieved.
 
-When the user runs the 12-point UAT (PLAN.md Task 4 §how-to-verify), record results in `.planning/phases/08-portfolio-polish/08-04-VERIFICATION.md`. **Plan 08-04 should NOT be marked complete in STATE.md until 12/12 UAT items PASS.** Wave 3 plans remain blocked on this gate per PLAN.md success-criteria.
+See `08-04-VERIFICATION.md` for run-by-run detail + root-cause analysis. Wave 3 (Plan 08-06 asset capture) unblocked.
 
 ## Verification
 
