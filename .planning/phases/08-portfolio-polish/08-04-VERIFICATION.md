@@ -62,13 +62,30 @@ Fly Network-tab capture of the bootstrap request body confirmed anon JWT claims 
 
 This reinforces the USER-1 lock — provisional 08-01 no-op path is now empirically validated against two distinct decode paths.
 
-## Run #2 — What to redo
+## Run #2 (2026-05-18, partial)
 
-After backend redeploy with the Dockerfile + path patch:
+| # | Result | Notes |
+|---|--------|-------|
+| 3 | ✅ PASS | Welcome thread + D&D doc seeded after Dockerfile + path patch redeploy |
+| 4 | ✅ PASS | (same redeploy) |
+| 7 | ✅ PASS | LLM_API_KEY=invalid_for_uat with corrected env var; backend logged `AuthenticationError: 401 Missing Authentication header` (LangSmith trace captured) |
+| 8 | ❌ FAIL | Backend errored correctly but **frontend UI did NOT render red error bubble**. Two assistant placeholder skeletons remained empty/stuck. Toast did not fire. |
 
-1. Re-test items 3 + 4 only (expect PASS — welcome thread + doc visible after Try-demo click on fresh anon user).
-2. Run items 7-10 against the corrected `LLM_API_KEY` env var.
-3. Skip item 11 (officially dropped).
-4. Re-confirm item 12 Retry button mobile parity once item 10 yields a visible Retry button.
+### Root Cause #4 — Item 8 frontend silent-swallow
 
-Run #2 results overwrite this VERIFICATION; if 11/11 PASS, mark `status: complete` and proceed to USER-5.
+**Cause:** Backend `chat.py:905-908` yields `{event: "error", data: {"error": "..."}}` as an in-band SSE event. Frontend `useChat.ts` (line 109-196) parsed `data: ...` lines and dispatched only on `parsed.tool_event === true`, `parsed.text !== undefined`, or `parsed.message_id`. The `parsed.error` field had no branch — silently dropped. Stream then ended normally (`done=true`) → outer `try/catch` at L199 never fired → no role='error' bubble, no toast, no Sentry capture, no Retry button rendered.
+
+**Fix landed:** `useChat.ts` adds an `else if (parsed.error !== undefined)` branch that `throw new Error(parsed.error)`. The inner JSON.parse catch re-throws non-SyntaxError exceptions so the outer catch handles bubble + toast + Sentry uniformly.
+
+**Verification:** `npm run build` passes (0 TS errors, 2321 modules transformed). Manual UI re-test pending Run #3.
+
+## Run #3 — What to redo
+
+After frontend redeploy (git push → CF Pages auto-deploy; backend redeploy NOT needed since Run #3 patch is frontend-only):
+
+1. Re-test items 7-10 only — expect red error bubble + toast on item 8, Sentry event on item 9, working Retry button + DB dedup on item 10.
+2. Item 12 Retry-mobile parity becomes verifiable once item 10 yields a visible Retry button.
+
+Items 1, 2, 3, 4, 5, 6, 12-non-Retry already PASS from prior runs — do NOT need re-test.
+
+Run #3 results overwrite Run #2 section; if 11/11 PASS, mark `status: complete` and proceed to USER-5.

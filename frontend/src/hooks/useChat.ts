@@ -189,8 +189,17 @@ export function useChat(threadId: string | null) {
                     m.id === assistantId ? { ...m, id: parsed.message_id } : m
                   )
                 )
+              } else if (parsed.error !== undefined) {
+                // Backend yielded `event: error / data: {error}` — in-band SSE error path
+                // (e.g. upstream LLM 401). Throw so the outer catch handles
+                // bubble + toast + Sentry uniformly (UI-SPEC Surface 2).
+                throw new Error(typeof parsed.error === 'string' ? parsed.error : 'Chat stream error')
               }
-            } catch {
+            } catch (parseErr) {
+              // Re-throw structured chat errors; swallow JSON.parse failures on truncated lines.
+              if (parseErr instanceof Error && parseErr.message && !(parseErr instanceof SyntaxError)) {
+                throw parseErr
+              }
               // skip unparseable lines
             }
           }
