@@ -3,6 +3,7 @@ phase: 06-prod-wiring-auth-cors-rate-limiting-cost-caps
 plan: 01
 subsystem: backend-security
 tags: [SEC-04, rate-limiting, slowapi, fastapi]
+requirements-completed: [SEC-04]
 requires:
   - SEC-04 placeholder tests (06-00 — bootstrapped inline because the sibling
     wave-0 plan had not landed in this worktree at agent spawn time)
