@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: milestone
 status: executing
-stopped_at: Phase 8 Plans 00/01/02/03/04/07 closed; Plan 08-04 UAT 11/11 PASS over 3 runs; 1 user-action remains (USER-5 assets)
-last_updated: "2026-05-18T23:50:00.000Z"
-last_activity: 2026-05-18 -- USER-4 resolved: 11/11 UAT PASS on deployed CF Pages after 2 gap-fixes (Dockerfile data/ bundle + useChat SSE error-handler); Plan 08-04 complete
+stopped_at: Phase 8 ALL 8 plans complete (00-07); awaiting formal /gsd:verify-work 8 closure
+last_updated: "2026-05-20T10:30:00.000Z"
+last_activity: 2026-05-20 -- USER-5 + Plan 08-05 complete: 6 portfolio assets captured + README rewrite; Phase 8 fully executed, all 5 user-actions resolved
 progress:
   total_phases: 11
-  completed_phases: 7
-  total_plans: 28
-  completed_plans: 22
-  percent: 79
+  completed_phases: 8
+  total_plans: 30
+  completed_plans: 30
+  percent: 100
 ---
 
 # Project State
@@ -21,16 +21,15 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-23 after v1.0 completion)
 
 **Core value:** The agent can intelligently search and reason across a structured board game knowledge base -- finding rules, comparing mechanics, and recommending games -- using the right tool for the job, transparently.
-**Current focus:** Phase 8 — Portfolio Polish. Wave 1 backend (08-01/02/03) merged. Wave 0 has 2 blockers awaiting user manual steps (anon JWT decode + UR monitor key + GitHub repo public flip).
+**Current focus:** Phase 8 — Portfolio Polish. ALL 8 plans complete (00-07). 5 user-actions resolved 2026-05-18..20. Awaiting formal `/gsd:verify-work 8` closure.
 
 ## Current Position
 
-Phase: 08
-Wave: 1 complete; Wave 0 partial (08-00 Task 1 + 08-07 Tasks 1-3 awaiting user signals)
-Status: Wave 2 (08-04 frontend) blocked on Wave 0 manual checkpoints
-Last activity: 2026-05-18 -- Phase 8 Wave 1 merged to master (08-01 + 08-02 + 08-03)
+Phase: 08 — all plans executed
+Status: Phase 8 fully executed; pending formal verification (`/gsd:verify-work 8`)
+Last activity: 2026-05-20 -- USER-5 assets + Plan 08-05 README rewrite landed
 
-Progress: [██████████] 100% of plans landed for completed/verified phases
+Progress: [██████████] 100% — Phase 8 plans 00-07 all complete
 
 ## Performance Metrics
 
@@ -110,7 +109,7 @@ Recent decisions affecting current work:
 
 ## Session Continuity
 
-Last session: 2026-05-18T23:50:00.000Z
-Stopped at: Phase 8 — Plan 08-04 complete (11/11 UAT PASS); 1 user-action remains (USER-5 asset capture)
-Resume file: .planning/phases/08-portfolio-polish/.continue-here.md
-Next: Present USER-5 (Excalidraw diagram + 4 screenshots + hero GIF — unblocks Plan 08-06 + 08-05 README).
+Last session: 2026-05-20T10:30:00.000Z
+Stopped at: Phase 8 ALL 8 plans complete; all 5 user-actions resolved
+Resume file: none — Phase 8 fully executed
+Next: Run `/gsd:verify-work 8` for formal phase-goal verification + roadmap closure.
