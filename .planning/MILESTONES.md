@@ -1,5 +1,26 @@
 # Milestones
 
+## v1.1 Portfolio Deployment (Shipped: 2026-05-20)
+
+**Phases completed:** 9 phases (1-8 + inserted 6.1), 28 plans, 53 tasks
+**Audit:** passed — 23/23 requirements satisfied (see `milestones/v1.1-MILESTONE-AUDIT.md`)
+
+**Delivered:** Board Game KB RAG shipped as a public portfolio piece — live at https://boardgame-rag-prod.pages.dev — running on free-tier Fly.io + Cloudflare Pages + a dedicated prod Supabase project, with auth, CORS, rate limiting, observability, and a portfolio README hardened for a shared demo URL.
+
+**Key accomplishments:**
+
+- **Dockerized backend** — repo-root single-stage image (FastAPI + Docling + poppler/tesseract native deps, non-root appuser, CPU-only torch, preloaded Docling models) validated by an end-to-end build/boot/ingest smoke script.
+- **Prod Supabase project** — dedicated project with all migrations, pgvector, RLS policies, Storage bucket config, and the default board-game KB seeded (10 documents, 11 folders, 62 chunks) with content-hash idempotency.
+- **Public deployment** — backend on Fly.io (free-tier suspend defaults), Vite SPA on Cloudflare Pages with SPA deep-link routing; public end-to-end login + SSE chat verified live.
+- **Production hardening** — env-driven CORS allowlist, per-user chat rate limit, max-iterations cap on the agentic tool loop, anonymous-JWT auth, all secrets in Fly/CF env (zero secrets in image or bundle).
+- **Mobile-responsive chat** (Phase 6.1) — hamburger-drawer shell with reusable mobile primitives (body-scroll-lock, swipe-to-close, focus-trapped MobileDrawer), sidebars hidden below 768px.
+- **Observability baseline** — Sentry with source maps + JWT/email/UUID scrub, dedicated prod LangSmith project, two UptimeRobot monitors at 5-min interval, DB-reachability `/api/health` probe.
+- **Portfolio polish** — one-click Try-demo anon onboarding, graceful chat error + retry UX, architecture diagram + 4 screenshots + hero GIF, portfolio README, live shields.io uptime + last-commit badges.
+
+**Known deferred items at close:** Nyquist test-coverage validation incomplete (tracked tech debt — run `/gsd:validate-phase`); SEC-06 OpenRouter cost-cap live trip-test deferred to backlog `999.2`.
+
+---
+
 ## v1.0 KB Navigation & Agentic RAG (Shipped: 2026-04-23)
 
 **Phases completed:** 7 phases, 21 plans, 40 tasks

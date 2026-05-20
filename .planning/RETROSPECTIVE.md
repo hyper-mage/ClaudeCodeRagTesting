@@ -50,6 +50,52 @@
 
 ---
 
+## Milestone: v1.1 — Portfolio Deployment
+
+**Shipped:** 2026-05-20
+**Phases:** 9 (01, 02, 03, 04, 05, 06, 06.1, 07, 08) | **Plans:** 28 | **Tasks:** 53
+**Timeline:** 2026-04-22 → 2026-05-20 (~4 weeks) | **Commits:** 179
+
+### What Was Built
+- Repo-root single-stage Docker image — FastAPI + Docling + native deps, non-root, CPU torch, preloaded models — with an end-to-end build/boot/ingest smoke script
+- Dedicated prod Supabase project — migrations, pgvector, RLS, Storage, default KB seeded (10 docs / 11 folders / 62 chunks)
+- Public deploy — backend on Fly.io (free-tier suspend), Vite SPA on Cloudflare Pages with SPA deep-link routing
+- Production hardening — env CORS allowlist, per-user chat rate limit, tool-loop max-iterations cap, anon-JWT auth, secrets in host env stores
+- Mobile-responsive chat shell (Phase 6.1, inserted) — hamburger drawer + reusable mobile primitives
+- Observability baseline — Sentry (source maps + PII scrub), prod LangSmith project, 2 UptimeRobot monitors, DB-probing `/api/health`
+- Portfolio polish — Try-demo anon onboarding, graceful error/retry UX, architecture diagram + screenshots + hero GIF, portfolio README, shields.io badges
+
+### What Worked
+- **Interactive resume for user-driven work** — Phase 8 had 5 dashboard/deploy/capture actions only the human could do; one-action-at-a-time resume with paste-ready instructions kept it unambiguous.
+- **UAT caught real prod bugs** — the Phase 8 deployed UAT surfaced two genuine deploy bugs (Docker missing `data/` bundle; useChat silently swallowing SSE `event: error`) that unit tests + code-only verification missed.
+- **Gap-fix during UAT, not after** — both bugs were root-caused, patched, committed, and re-tested inside the UAT loop (3 runs) rather than deferred.
+- **Milestone audit caught stale bookkeeping** — re-audit cross-referenced VERIFICATION + SUMMARY frontmatter + traceability; surfaced 2 phases missing verification artifacts + a traceability table frozen at planning time.
+
+### What Was Inefficient
+- **Verification artifacts inconsistent** — Phases 03 and 07 reached milestone audit with no phase-level VERIFICATION.md; closed retroactively via `/gsd:verify-work`. Phase 06's 4 SUMMARYs all had empty `requirements-completed` frontmatter.
+- **REQUIREMENTS.md traceability went stale** — Status column + checkboxes were never updated during execution; all 23 rows had to be refreshed at milestone close.
+- **UAT env-var mismatch** — Phase 8 UAT spec said break `OPENROUTER_API_KEY`, but the backend reads `LLM_API_KEY` (resolved-key chain) — a false-negative test run before the spec was corrected.
+- **Wrong-Supabase-project round-trip** — a verification REST call sourced from `.env` (dev project) instead of `.env.prod`, hit the wrong project. Now captured as a project memory.
+
+### Patterns Established
+- **Two-env Supabase split** — `.env` = dev project, `.env.prod` = prod; verify prod work against `.env.prod`
+- **Two-candidate path resolution** — `SAMPLE_DOC_PATH` resolves both repo-root (dev/test) and `/app` (container) layouts via an existence-checked candidate list
+- **ffmpeg two-pass palette GIF** — speed-ramped MP4 → palettegen → paletteuse for sub-5 MB hero GIFs
+- **Decimal phase insertion mid-milestone** (06.1) — same pattern as v1.0's 03.1, used here for an urgent mobile fix
+
+### Key Lessons
+1. Run `/gsd:verify-work` at every phase boundary — same lesson as v1.0, and v1.1 repeated the mistake on Phases 03 + 07. The retroactive close works but the milestone audit pays for it.
+2. Deployed UAT is non-negotiable for deploy phases — code-only verification passed both Phase 8 bugs; only a live browser test caught them.
+3. Keep `requirements-completed` frontmatter populated as plans land — empty frontmatter forced a manual 3-source cross-reference at milestone close.
+4. UAT instructions that name env vars / secrets must be checked against the actual config resolution chain before the run.
+
+### Cost Observations
+- Model mix: primarily Opus (gsd agents inherit; agents not installed → workflows ran inline in the orchestrator)
+- Sessions: ~15-25 across 4 weeks
+- Notable: 179 commits, +34.5k LOC; free-tier LLM during Phase 8 made the hero-GIF capture slow (114 s raw → 6.4× sped to 18 s)
+
+---
+
 ## Cross-Milestone Trends
 
 ### Process Evolution
@@ -57,13 +103,17 @@
 | Milestone | Plans | Phases | Key Change |
 |-----------|-------|--------|------------|
 | v1.0 | 21 | 7 (incl. 03.1) | Baseline — gsd workflow + decimal gap closure |
+| v1.1 | 28 | 9 (incl. 06.1) | Deploy milestone — interactive resume for human-driven work; UAT-driven gap-fix loop |
 
 ### Cumulative Quality
 
 | Milestone | REQ Coverage | Integration | Nyquist |
 |-----------|--------------|-------------|---------|
 | v1.0 | 39/39 (100%) | 0 orphans, 0 broken | 1/7 compliant |
+| v1.1 | 23/23 (100%) | 0 orphans, 0 broken (live E2E) | 0/9 compliant — tech debt |
 
 ### Top Lessons (Verified Across Milestones)
 
-1. *(Needs v1.1+ to cross-validate)*
+1. **Run `/gsd:verify-work` at every phase boundary.** Verified across v1.0 (Phase 03 → 03.1) and v1.1 (Phases 03 + 07 retroactive). Skipping it always costs at milestone-audit time.
+2. **Nyquist validation slips to tech debt every milestone** (v1.0: 1/7, v1.1: 0/9). Either enforce it per-phase or formally accept it as a recurring deferral — the current middle ground just accumulates.
+3. **A well-designed SSE / contract layer compounds** — v1.0's tool_start/tool_result/sub_event protocol carried into v1.1's error-event handling (the one gap was the frontend not handling `event: error`, fixed in Phase 8).

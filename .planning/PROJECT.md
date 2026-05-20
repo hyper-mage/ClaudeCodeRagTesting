@@ -55,21 +55,22 @@ The agent can intelligently search and reason across a structured board game kno
 - ✓ Update existing sub-agent system for consistency with new explorer agent — v1.0 (Phase 6 analyze_document alignment)
 - ✓ Frontend deployed to Cloudflare Pages with prod API base URL — Validated in v1.1 Phase 5 (https://boardgame-rag-prod.pages.dev)
 
+**v1.1 Portfolio Deployment (shipped 2026-05-20 — 23/23 requirements):**
+
+- ✓ Backend containerized — repo-root Docker image, FastAPI + Docling + native deps — v1.1 (Phase 2)
+- ✓ Backend deployed to Fly.io, public `*.fly.dev` URL serving `/api/health` + SSE chat — v1.1 (Phase 4)
+- ✓ Dedicated prod Supabase project — migrations, pgvector, RLS, Storage, default KB seeded — v1.1 (Phase 3)
+- ✓ Auth redirect URLs + env-driven CORS allowlist hardened for prod origin — v1.1 (Phases 1, 6)
+- ✓ Per-user chat rate limit + agentic tool-loop max-iterations cap — v1.1 (Phase 6)
+- ✓ Secrets in Fly/CF env stores; zero secrets in image or frontend bundle — v1.1 (Phases 1, 4)
+- ✓ Observability baseline — Sentry (source maps + PII scrub), prod LangSmith project, UptimeRobot monitors, DB-probing `/api/health` — v1.1 (Phase 7)
+- ✓ Mobile-responsive chat — hamburger drawer + mobile shell primitives — v1.1 (Phase 6.1)
+- ✓ One-click Try-demo anon onboarding + graceful chat error/retry UX — v1.1 (Phase 8)
+- ✓ Portfolio README + architecture diagram + screenshots + hero GIF + shields.io badges — v1.1 (Phase 8)
+
 ### Active
 
-## Current Milestone: v1.1 Portfolio Deployment
-
-**Goal:** Ship Board Game KB RAG as publicly accessible portfolio piece — reachable from any machine via URL.
-
-**Target features:**
-- Backend containerized (Docker) for portable deploy
-- Backend deployed (Fly.io) with Docling native deps
-- Frontend deployed (Vercel/CF Pages) with prod API base URL
-- Supabase prod project (separate from dev) with migrations + seed applied
-- Auth redirect URLs + CORS hardened for prod origin
-- Secrets in host secret stores (no .env leaked)
-- Observability baseline — LangSmith prod project, Sentry frontend, uptime monitor
-- Demo credentials + README + deployed URL for portfolio
+(None — v1.1 shipped 2026-05-20. Next milestone scope defined via `/gsd:new-milestone`.)
 
 ### Out of Scope
 
@@ -115,6 +116,11 @@ The agent can intelligently search and reason across a structured board game kno
 | ltree for folder hierarchy | GiST-indexed, recursive queries, matches agent traversal patterns | ✓ Phase 1 |
 | Mixed-visibility RLS (public default + private uploads) | Single table, single query path; `visibility='public'` + `user_id=auth.uid()` OR filter | ✓ Phase 1 |
 | Retroactive verification via decimal phase (03.1) | Phase 3 shipped before VERIFICATION.md step existed — 03.1 closed gap without rework | ✓ Phase 03.1 |
+| Free-tier deploy (Fly suspend, no keep-warm) | Portfolio traffic is sparse; accept cold-start cost, document one-line keep-warm toggle | ✓ v1.1 Phase 4 |
+| Two Supabase projects — dev (`.env`) + prod (`.env.prod`) | Isolate prod data + keys from local dev; one env file per environment | ✓ v1.1 Phase 3 |
+| Anonymous Supabase auth for Try-demo | One-click demo with no signup; 7-day cleanup sweep; `aud="authenticated"` (Supabase default) | ✓ v1.1 Phase 8 |
+| Insert Phase 6.1 (mobile) mid-milestone | Always-visible sidebar broke mobile viewport — urgent fix, decimal phase kept numbering clean | ✓ v1.1 Phase 6.1 |
+| OpenRouter Guardrail as cost cap | Guardrails replaced spend-alert toggle ($0.10 min threshold); live trip-test deferred to backlog 999.2 | ⚠️ v1.1 Phase 6 (SEC-06 trip-test deferred) |
 
 ## Evolution
 
@@ -136,15 +142,18 @@ This document evolves at phase transitions and milestone boundaries.
 ---
 ## Current State
 
-**Shipped:** v1.0 KB Navigation & Agentic RAG (2026-04-23) — 7 phases, 21 plans, 39/39 requirements satisfied, full cross-phase integration verified. See [milestones/v1.0-ROADMAP.md](milestones/v1.0-ROADMAP.md).
+**Shipped:** v1.1 Portfolio Deployment (2026-05-20) — 9 phases, 28 plans, 53 tasks, 23/23 requirements satisfied. Milestone audit passed. The Board Game KB RAG is live and public at **https://boardgame-rag-prod.pages.dev** — backend on Fly.io, frontend on Cloudflare Pages, dedicated prod Supabase project — with auth, CORS, rate limiting, observability, and a portfolio README hardened for a shared demo URL. See [milestones/v1.1-ROADMAP.md](milestones/v1.1-ROADMAP.md).
 
-**Active Milestone:** v1.1 Portfolio Deployment — ship app to public URL on free-tier hosts (Fly.io backend, Vercel frontend, Supabase prod project).
+**Prior:** v1.0 KB Navigation & Agentic RAG (2026-04-23) — 7 phases, 21 plans, 39/39 requirements. See [milestones/v1.0-ROADMAP.md](milestones/v1.0-ROADMAP.md).
 
-**Progress:** Phases 01-04 complete.
-- Phase 01 (secrets-repo-hygiene): env-driven CORS allowlist, `.dockerignore`, pinned `requirements.txt` (`docling==2.82.0`), frontend API centralized through `apiFetch`/`apiStream` with `VITE_API_BASE_URL`. DEPLOY-02, DEPLOY-06, DEPLOY-08, SEC-02, SEC-07 satisfied.
-- Phase 02 (dockerize-backend): Dockerfile + docker_smoke.sh; CPU torch + Docling models baked. DEPLOY-01 satisfied.
-- Phase 03 (prod-supabase-project): Supabase CLI link + db push; pgvector + ltree; storage bucket; default KB seeded (10 games). DEPLOY-03 satisfied.
-- Phase 04 (deploy-backend-to-fly-io): Live at https://boardgame-rag-prod.fly.dev — `/api/health` 200, SSE chat verified ≥3 chunks, 24 secrets in flyctl, image purity verified. DEPLOY-04, DEPLOY-07, SEC-03 satisfied.
+**Tech stack:** React 19 + Vite 6 + Tailwind 4 frontend; Python 3.11 + FastAPI backend; Supabase (Postgres + pgvector + Auth + Storage + Realtime); OpenRouter LLM; Docling parsing; Sentry + LangSmith + UptimeRobot observability.
+
+**Known tech debt carried into next milestone:**
+- Nyquist test-coverage validation incomplete for several phases — run `/gsd:validate-phase N`.
+- SEC-06 OpenRouter cost-cap live trip-test deferred to backlog `999.2`.
+- Backlog: `999.1` chat empty-state UX, `999.2` cost-guardrail burn script.
+
+**Next milestone:** not yet scoped — start with `/gsd:new-milestone`.
 
 ---
-*Last updated: 2026-05-07 — Phase 05 deploy-frontend-to-cloudflare-pages complete; SPA live at https://boardgame-rag-prod.pages.dev*
+*Last updated: 2026-05-20 — v1.1 Portfolio Deployment milestone complete and archived.*
