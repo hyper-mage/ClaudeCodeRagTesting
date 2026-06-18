@@ -2,11 +2,12 @@
 gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: User Options & BYOK
-status: roadmapped
-last_updated: "2026-06-18T16:10:00.000Z"
-last_activity: 2026-06-18
+status: "Roadmapped — awaiting `/gsd:plan-phase 9`"
+stopped_at: Phase 9 context gathered
+last_updated: "2026-06-18T18:58:24.824Z"
+last_activity: 2026-06-18 — v1.2 roadmap created (7 phases, continuing numbering from v1.1)
 progress:
-  total_phases: 7
+  total_phases: 9
   completed_phases: 0
   total_plans: 0
   completed_plans: 0
@@ -49,6 +50,7 @@ Last activity: 2026-06-18 — v1.2 roadmap created (7 phases, continuing numberi
 Full decision log lives in PROJECT.md Key Decisions table. v1.1 decisions folded in at milestone close.
 
 v1.2 roadmap-shaping decisions (to be promoted to PROJECT.md at phase transitions as they harden):
+
 - Security findings treated as release blockers, front-loaded: SQL-tool lockdown + encryption hygiene in Phase 9; LangSmith/Sentry/SSE scrub + fail-closed resolution + cross-user isolation at the Phase 11 chat-loop seam.
 - Demo-fallback flag enablement is deliberately LAST (Phase 15) and hard-gated on the SEC-06 cost guardrail (backlog 999.2) being trip-tested with a kill switch — the fail-closed *shape* lands earlier in Phase 11.
 - Model-list refresh is lazy TTL refresh-if-stale + deploy seed (NOT an in-process scheduler — Fly free-tier suspend kills timers).
@@ -69,9 +71,9 @@ v1.2 roadmap-shaping decisions (to be promoted to PROJECT.md at phase transition
 
 ## Session Continuity
 
-Last session: 2026-06-18T16:10:00.000Z
-Stopped at: v1.2 roadmap created — ROADMAP.md, REQUIREMENTS.md traceability, STATE.md written
-Resume file: .planning/ROADMAP.md
+Last session: 2026-06-18T18:58:24.818Z
+Stopped at: Phase 9 context gathered
+Resume file: .planning/phases/09-crypto-encrypted-key-storage-foundation/09-CONTEXT.md
 Next: Plan the first phase with `/gsd:plan-phase 9`.
 
 ## Operator Next Steps
