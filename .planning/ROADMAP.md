@@ -48,10 +48,12 @@ Full phase detail archived in `milestones/v1.1-ROADMAP.md`. Audit: passed, 23/23
   2. The `user_api_keys` migration (table + per-user RLS + `key_version` column) applies cleanly to both the dev and prod Supabase projects, storing ciphertext only — a raw DB dump leaks nothing usable.
   3. A prompt-injected `select * from user_api_keys` through the chat's Text-to-SQL tool returns nothing — the secret column is `REVOKE`'d from the `authenticated` role and the RPC enforces a FROM-table allowlist.
   4. A second master key can decrypt and lazily re-encrypt a stored row, proving the rotation path works; the rotation runbook is documented.
-**Plans**: TBD
+**Plans**: 3 plans
 
 Plans:
-- [ ] TBD (refined during /gsd:plan-phase 9)
+- [ ] 09-01-PLAN.md — crypto_service (MultiFernet encrypt/decrypt/rotate) + KEY_ENCRYPTION_SECRET config + round-trip/rotation tests + rotation runbook
+- [ ] 09-02-PLAN.md — user_api_keys migration (table + RLS + REVOKE) + execute_readonly_query FROM-table allowlist + SEC-02 lockdown unit test
+- [ ] 09-03-PLAN.md — [BLOCKING] apply migrations 025/026 to dev Supabase + live REVOKE/allowlist probe (dev only per D-03)
 
 ### Phase 10: OAuth PKCE — Backend Exchange + Frontend Connect
 **Goal**: A user can connect their OpenRouter account through a secure OAuth (PKCE) round-trip with no manual key paste, see their connection status, and disconnect/reconnect — with the key landing encrypted server-side and never crossing the wire to the browser.
@@ -168,7 +170,7 @@ Phases execute in numeric order: 9 → 10 → 11 → 12 → 13 → 14 → 15 (Ph
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
-| 9. Crypto + Encrypted Key Storage | v1.2 | 0/TBD | Not started | - |
+| 9. Crypto + Encrypted Key Storage | v1.2 | 0/3 | Not started | - |
 | 10. OAuth PKCE Connect | v1.2 | 0/TBD | Not started | - |
 | 11. Per-Request Key + Model Resolution | v1.2 | 0/TBD | Not started | - |
 | 12. Model Cache + Catalog | v1.2 | 0/TBD | Not started | - |
