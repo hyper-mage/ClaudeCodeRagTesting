@@ -4,13 +4,13 @@ milestone: v1.2
 milestone_name: User Options & BYOK
 status: executing
 stopped_at: Phase 9 context gathered
-last_updated: "2026-06-18T19:46:05.323Z"
-last_activity: 2026-06-18 -- Phase 09 planning complete
+last_updated: "2026-06-18T23:25:08.516Z"
+last_activity: 2026-06-18
 progress:
   total_phases: 9
   completed_phases: 0
   total_plans: 3
-  completed_plans: 0
+  completed_plans: 1
   percent: 0
 ---
 
@@ -21,15 +21,15 @@ progress:
 See: .planning/PROJECT.md (updated 2026-05-20 after v1.1 completion)
 
 **Core value:** The agent can intelligently search and reason across a structured board game knowledge base -- finding rules, comparing mechanics, and recommending games -- using the right tool for the job, transparently.
-**Current focus:** v1.2 User Options & BYOK — roadmap created (Phases 9-15, 26/26 requirements mapped). Ready to plan Phase 9.
+**Current focus:** Phase 09 — crypto-encrypted-key-storage-foundation
 
 ## Current Position
 
-Phase: 9 — Crypto + Encrypted Key Storage Foundation (not started)
-Plan: —
+Phase: 09 (crypto-encrypted-key-storage-foundation) — EXECUTING
+Plan: 2 of 3
 Status: Ready to execute
-Progress: [          ] 0/7 phases complete
-Last activity: 2026-06-18 -- Phase 09 planning complete
+Progress: [███░░░░░░░] 33%
+Last activity: 2026-06-18
 
 ## Performance Metrics
 
@@ -55,6 +55,8 @@ v1.2 roadmap-shaping decisions (to be promoted to PROJECT.md at phase transition
 - Demo-fallback flag enablement is deliberately LAST (Phase 15) and hard-gated on the SEC-06 cost guardrail (backlog 999.2) being trip-tested with a kill switch — the fail-closed *shape* lands earlier in Phase 11.
 - Model-list refresh is lazy TTL refresh-if-stale + deploy seed (NOT an in-process scheduler — Fly free-tier suspend kills timers).
 - BYOK is additive-by-reuse: Fernet (already-pinned `cryptography`), `httpx` for all OpenRouter calls, Web Crypto PKCE (no lib); only new frontend dep surface is shadcn/ui Combobox.
+- [Phase ?]: Phase 9 BYOK encryption uses MultiFernet from day one (D-02): KEY_ENCRYPTION_SECRET is a comma-separated NEW-KEY-FIRST list; encrypt uses keys[0], decrypt tries all, rotate re-encrypts under keys[0].
+- [Phase ?]: crypto_service reads KEY_ENCRYPTION_SECRET at call-time via get_settings() so @lru_cache is test-clearable; secret/plaintext/ciphertext never logged, traced, or returned (D-04, T-09-01).
 
 ### Pending Todos
 
@@ -71,9 +73,9 @@ v1.2 roadmap-shaping decisions (to be promoted to PROJECT.md at phase transition
 
 ## Session Continuity
 
-Last session: 2026-06-18T18:58:24.818Z
+Last session: 2026-06-18T23:24:57.250Z
 Stopped at: Phase 9 context gathered
-Resume file: .planning/phases/09-crypto-encrypted-key-storage-foundation/09-CONTEXT.md
+Resume file: None
 Next: Plan the first phase with `/gsd:plan-phase 9`.
 
 ## Operator Next Steps

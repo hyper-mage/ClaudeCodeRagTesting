@@ -56,7 +56,7 @@ Full phase detail archived in `milestones/v1.1-ROADMAP.md`. Audit: passed, 23/23
 Plans:
 **Wave 1**
 
-- [ ] 09-01-PLAN.md — crypto_service (MultiFernet encrypt/decrypt/rotate) + KEY_ENCRYPTION_SECRET config + round-trip/rotation tests + rotation runbook
+- [x] 09-01-PLAN.md — crypto_service (MultiFernet encrypt/decrypt/rotate) + KEY_ENCRYPTION_SECRET config + round-trip/rotation tests + rotation runbook
 - [ ] 09-02-PLAN.md — user_api_keys migration (table + RLS + REVOKE) + execute_readonly_query FROM-table allowlist + SEC-02 lockdown unit test
 
 **Wave 2** *(blocked on Wave 1 completion)*
@@ -204,7 +204,7 @@ Phases execute in numeric order: 9 → 10 → 11 → 12 → 13 → 14 → 15 (Ph
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
-| 9. Crypto + Encrypted Key Storage | v1.2 | 0/3 | Not started | - |
+| 9. Crypto + Encrypted Key Storage | v1.2 | 1/3 | In Progress|  |
 | 10. OAuth PKCE Connect | v1.2 | 0/TBD | Not started | - |
 | 11. Per-Request Key + Model Resolution | v1.2 | 0/TBD | Not started | - |
 | 12. Model Cache + Catalog | v1.2 | 0/TBD | Not started | - |
