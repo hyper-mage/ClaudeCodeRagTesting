@@ -17,7 +17,8 @@ Backend foundation for BYOK: a user's OpenRouter key can be safely persisted ser
 ## Implementation Decisions
 
 ### SQL-tool lockdown (SEC-02)
-- **D-01:** Defense-in-depth — BOTH `REVOKE SELECT ON user_api_keys FROM authenticated` AND add an explicit FROM-table allowlist to `execute_readonly_query` so the Text-to-SQL tool can only query `documents`, `document_chunks`, `folders`. The keys table (and the future `user_preferences` table) are excluded by default, not by enumeration.
+- **D-01:** Defense-in-depth — BOTH `REVOKE SELECT ON user_api_keys FROM authenticated` AND add an explicit FROM-table allowlist to `execute_readonly_query` so the Text-to-SQL tool can only query `threads`, `messages`, `documents`, `document_chunks`. The keys table (and the future `user_preferences` table) are excluded by default, not by enumeration.
+  - **Reconciled 2026-06-18 (plan-phase research):** original list `{documents, document_chunks, folders}` conflicted with the live advertised surface. The allowlist now matches `QUERYABLE_SCHEMA` in `backend/services/sql_service.py` exactly (`threads, messages, documents, document_chunks`) — enforcing the old list would have dropped legitimate `threads`/`messages` queries (regression) and added `folders`, which is navigated via the KB tree/grep/glob tools, not Text-to-SQL. Security intent (exclude `user_api_keys`) is unchanged.
 - Rationale: `execute_readonly_query` does `SET LOCAL role = 'authenticated'` (verified in `supabase/migrations/20240301000015_execute_readonly_query.sql`), so RLS is active during execution — but a user's OWN-row ciphertext would still be returnable to the model under their JWT. REVOKE removes that path; the allowlist is a second independent gate.
 
 ### Key rotation (KEY-02)
@@ -87,7 +88,7 @@ Backend foundation for BYOK: a user's OpenRouter key can be safely persisted ser
 <specifics>
 ## Specific Ideas
 
-- SQL-tool allowlist should be exactly `{documents, document_chunks, folders}` — the legitimate Text-to-SQL surface today. Anything new (keys, preferences) is excluded unless explicitly added later.
+- SQL-tool allowlist should be exactly `{threads, messages, documents, document_chunks}` — the legitimate Text-to-SQL surface today, matching `QUERYABLE_SCHEMA`. Anything new (keys, preferences) is excluded unless explicitly added later. (`folders` is intentionally NOT in the SQL allowlist — it's reached via the KB navigation tools, not Text-to-SQL.)
 - Rotation runbook lives with the phase docs; MultiFernet key order = `[new_key, old_key]` for decrypt, encrypt always with `new_key`.
 
 </specifics>
