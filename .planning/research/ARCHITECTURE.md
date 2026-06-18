@@ -1,374 +1,640 @@
-# Architecture Research — v1.1 Portfolio Deployment
+# Architecture Research — v1.2 User Options & BYOK
 
-**Domain:** Public deployment of existing FastAPI + Vite + Supabase RAG app
-**Researched:** 2026-04-22
-**Confidence:** HIGH (integration shape), MEDIUM (exact Docling system package list, Fly.io body-size behavior — verify at build time)
+**Domain:** BYOK (bring-your-own-key) integration into a shipped agentic RAG app
+**Researched:** 2026-06-18
+**Confidence:** HIGH (existing code read directly; OpenRouter OAuth + models API verified against official docs)
+
+> Scope: this is an **integration** study for a subsequent milestone, not greenfield
+> domain research. It maps the v1.2 BYOK + user-options features onto the existing,
+> shipped architecture (React SPA + FastAPI + Supabase). Every section explicitly
+> labels components as **NEW** or **MODIFIED** and identifies the exact files/tables
+> that change. Downstream consumer: requirements + roadmap.
 
 ---
 
-## Standard Architecture (Target State)
+## Standard Architecture (current + v1.2 deltas)
 
 ### System Overview
 
 ```
-┌──────────────────────────────────────────────────────────────────────┐
-│                         Browser (any machine)                         │
-│                                                                       │
-│   ┌─────────────────────────────────────────────────────────────┐    │
-│   │                    Frontend SPA (Vite build)                 │    │
-│   │  - AuthContext (Supabase JS, anon key)                       │    │
-│   │  - useChat / useDocuments hooks                              │    │
-│   │  - apiFetch(`${API_BASE}/api/...`)  ← NEW: absolute URL      │    │
-│   │  - Sentry browser SDK              ← NEW                     │    │
-│   └─────────────────────────────────────────────────────────────┘    │
-└──────────────────┬────────────────────────┬──────────────────────────┘
-                   │                        │
-              HTTPS│ REST + SSE             │ HTTPS (auth, realtime)
-                   ▼                        ▼
-┌──────────────────────────────┐   ┌──────────────────────────────────┐
-│  Vercel (frontend static)    │   │  Supabase PROD project           │
-│  - SPA rewrite → index.html  │   │  - Postgres + pgvector           │
-│  - Env: VITE_API_BASE_URL    │   │  - Auth (JWT, redirect allowlist)│
-│  - Env: VITE_SUPABASE_URL    │   │  - Storage (documents bucket)    │
-│  - Env: VITE_SUPABASE_ANON   │   │  - Realtime (ingestion status)   │
-│  - Env: VITE_SENTRY_DSN      │   │  - RLS policies                  │
-└──────────────────────────────┘   └──────────────┬───────────────────┘
-                                                  │ service-role key
-                                                  │ (server-side only)
-┌──────────────────────────────────────────────────┼───────────────────┐
-│  Fly.io machine (backend)                        │                   │
-│  ┌─────────────────────────────────────────────┐ │                   │
-│  │  Docker image (multi-stage)                 │ │                   │
-│  │  Stage 1: builder — pip install deps        │ │                   │
-│  │  Stage 2: runtime — slim python + OS pkgs   │ │                   │
-│  │    - poppler-utils, tesseract-ocr,          │ │                   │
-│  │      libgl1 (or opencv-headless only),      │ │                   │
-│  │      libglib2.0-0, fonts                    │ │                   │
-│  │  uvicorn main:app --host 0.0.0.0 --port 8080│─┘                   │
-│  │  - CORSMiddleware: allow Vercel origin ONLY │                     │
-│  │  - /api/health                              │                     │
-│  │  - Sentry python SDK  ← NEW                 │                     │
-│  └─────────────────────────────────────────────┘                     │
-│  Secrets: flyctl secrets set (no .env in image)                      │
-│  fly.toml: http_service, concurrency, health_check                   │
-└──────────────────────────────────────────────────────────────────────┘
-         │
-         ▼
-┌──────────────────────────────────────────────────────────────────────┐
-│  Observability                                                        │
-│  - LangSmith prod project (LANGCHAIN_PROJECT=rag-prod)                │
-│  - Sentry (frontend + backend DSNs, separate projects)                │
-│  - UptimeRobot / BetterStack → GET /api/health every 5 min            │
-└──────────────────────────────────────────────────────────────────────┘
+┌───────────────────────────────────────────────────────────────────────┐
+│                         FRONTEND (React SPA, Vite)                      │
+│  ┌──────────┐  ┌──────────┐  ┌───────────────┐  ┌──────────────────┐   │
+│  │ ChatPage │  │ Settings │  │ ModelPicker   │  │ ThemeToggle      │   │
+│  │ (MOD)    │  │ Page(NEW)│  │ (NEW)         │  │ (NEW)            │   │
+│  └────┬─────┘  └────┬─────┘  └──────┬────────┘  └────────┬─────────┘   │
+│       │  OAuthCallback route (NEW)  │  useUserKey/useModels (NEW hooks) │
+├───────┴─────────────┴───────────────┴────────────────────┴────────────┤
+│   apiFetch / apiStream (api.ts, unchanged) + Supabase anon (auth only) │
+├───────────────────────────────────────────────────────────────────────┤
+│                       BACKEND (FastAPI, stateless)                      │
+│  ┌────────────┐ ┌────────────┐ ┌────────────┐ ┌────────────────────┐   │
+│  │ chat.py    │ │ keys.py    │ │ models.py  │ │ preferences.py     │   │
+│  │ (MODIFIED) │ │ (NEW)      │ │ (NEW)      │ │ (NEW)             │   │
+│  └─────┬──────┘ └─────┬──────┘ └─────┬──────┘ └─────────┬──────────┘   │
+│        │              │              │                  │               │
+│  ┌─────┴──────────────┴──────────────┴──────────────────┴───────────┐  │
+│  │ services: llm_service(MOD) · crypto_service(NEW)                  │  │
+│  │           openrouter_service(NEW) · model_cache_service(NEW)      │  │
+│  └──────────────────────────────────────────────────────────────────┘ │
+├───────────────────────────────────────────────────────────────────────┤
+│                         DATA (Supabase Postgres)                        │
+│  ┌──────────────┐ ┌──────────────┐ ┌──────────────┐ ┌──────────────┐   │
+│  │ user_api_keys│ │ user_prefs   │ │ model_cache  │ │ threads      │   │
+│  │ (NEW, RLS)   │ │ (NEW, RLS)   │ │ (NEW, public)│ │ +model col   │   │
+│  └──────────────┘ └──────────────┘ └──────────────┘ │ (MODIFIED)   │   │
+│                                                       └──────────────┘   │
+└───────────────────────────────────────────────────────────────────────┘
+         │ HTTPS                                  │ pg_cron / manual refresh
+         ▼                                        ▼
+   OpenRouter OAuth (/auth, /api/v1/auth/keys)   OpenRouter /api/v1/models
+   OpenRouter chat completions (per-user key)    OpenRouter /api/v1/key (balance)
 ```
 
 ### Component Responsibilities
 
-| Component | Responsibility | Implementation |
+| Component | Responsibility | NEW / MODIFIED |
 |-----------|----------------|----------------|
-| Vercel | Static host for SPA, SPA rewrite, env var injection at build | `vercel.json` + dashboard env vars |
-| Fly.io machine | FastAPI + Docling runtime, persistent process | Dockerfile + `fly.toml` |
-| Supabase prod | DB, auth, storage, realtime for production data | Separate project from dev |
-| LangSmith prod project | LLM trace isolation per env | `LANGCHAIN_PROJECT` env var |
-| Sentry | Error aggregation, source-mapped stack traces | `@sentry/react` + `sentry-sdk` |
-| Uptime monitor | External liveness ping, alerting | UptimeRobot free tier → `/api/health` |
+| `user_api_keys` table | One encrypted OpenRouter key per user, RLS-scoped | NEW |
+| `user_preferences` table | Per-user default model + theme (+ future prefs) | NEW |
+| `model_cache` table | Cached OpenRouter model catalog (shared, read-only to users) | NEW |
+| `threads.model` column | Per-thread selected model slug (nullable → falls back to default) | MODIFIED |
+| `crypto_service.py` | Fernet encrypt/decrypt of user keys, key from env secret | NEW |
+| `openrouter_service.py` | OAuth code→key exchange, balance fetch, models fetch | NEW |
+| `model_cache_service.py` | Refresh + read cached model list | NEW |
+| `keys.py` router | OAuth callback exchange, key status, key delete, balance | NEW |
+| `models.py` router | Serve cached model list to frontend | NEW |
+| `preferences.py` router | Read/write default model + theme | NEW |
+| `chat.py` router | Resolve per-request key + model; demo-fallback gate | MODIFIED |
+| `llm_service.py` | Accept per-request key + model instead of global settings | MODIFIED |
+| `config.py` | New settings: encryption key, demo-fallback flag, OAuth redirect base | MODIFIED |
+| Frontend `SettingsPage`, `ModelPicker`, `OAuthCallback`, `ThemeToggle` | UI for BYOK + options | NEW |
 
 ---
 
-## Integration Points (How Deploy Layer Connects to Existing App)
+## Database Schema Changes
 
-### 1. Env Config — dev vs prod separation
+Three new tables + one column on `threads`. All follow the existing migration
+convention (`supabase/migrations/2024030100002X_*.sql`, applied via `supabase db push`
+to both the dev `.env` and prod `.env.prod` Supabase projects). RLS is modeled on the
+existing `threads` policies (per-user `auth.uid() = user_id`) — see
+`20240301000001_create_threads.sql`.
 
-**Current state:** Single `.env` at repo root, loaded by both `backend/config.py` (via `python-dotenv`) and Vite (via `envDir: '..'`). Single Supabase project for everything.
+### 1. `user_api_keys` (NEW — encrypted, RLS, one row per user)
 
-**Target state:** Two-axis split.
+```sql
+create table user_api_keys (
+  user_id        uuid primary key references auth.users(id) on delete cascade,
+  provider       text not null default 'openrouter',
+  encrypted_key  text not null,          -- Fernet ciphertext (base64), never the plaintext
+  key_label      text,                   -- OpenRouter-assigned label (display only)
+  connected_at   timestamptz not null default now(),
+  last_used_at   timestamptz
+);
 
-| Axis | Dev | Prod |
-|------|-----|------|
-| **Source of secrets** | `.env` file at repo root (gitignored) | Host secret stores: `flyctl secrets` for backend, Vercel dashboard for frontend |
-| **Supabase project** | `rag-dev` (current) | `rag-prod` (new — fresh migrations + seed) |
-| **LangSmith project** | `rag-masterclass` (current default) | `rag-prod` (env-switched via `LANGCHAIN_PROJECT`) |
-| **CORS origin** | `*` (current) | `https://<portfolio>.vercel.app` only |
-| **API base URL (frontend)** | relative `/api/...` via Vite proxy | absolute `https://<app>.fly.dev/api/...` via `VITE_API_BASE_URL` |
+alter table user_api_keys enable row level security;
 
-**Change to `backend/config.py`:** None required — `pydantic-settings` already reads from the process env, which is how Fly.io injects secrets. The `load_dotenv()` call at top of file is harmless on Fly (no `.env` in image → no-op). **Keep it** for dev parity.
-
-**Change to frontend:** `apiFetch` in `frontend/src/lib/api.ts` must prefix paths with `import.meta.env.VITE_API_BASE_URL ?? ''`. Empty string in dev preserves the Vite proxy path; absolute URL in prod hits Fly directly.
-
-### 2. CORS for SSE
-
-**Current (`backend/main.py`):**
-```python
-allow_origins=["*"],
-allow_credentials=True,   # ← INVALID with "*" per CORS spec
+-- Defense-in-depth ONLY. The backend uses the service-role client (bypasses RLS),
+-- so these policies guard against any future anon-key path / direct PostgREST access.
+create policy "Users can view own key row"   on user_api_keys
+  for select using (auth.uid() = user_id);
+create policy "Users can insert own key row" on user_api_keys
+  for insert with check (auth.uid() = user_id);
+create policy "Users can update own key row" on user_api_keys
+  for update using (auth.uid() = user_id);
+create policy "Users can delete own key row" on user_api_keys
+  for delete using (auth.uid() = user_id);
 ```
 
-Browsers reject this combo silently for credentialed requests; SSE `EventSource` with `withCredentials: true` will break. Even without credentials, `*` is unsafe for a public backend with service-role secrets.
+**Design notes (HIGH confidence):**
+- **`user_id` as PK** enforces "exactly one key per user" without a separate unique index.
+- **`encrypted_key` holds ciphertext only.** Plaintext never touches Postgres. Even a
+  full DB dump leaks nothing usable without the env-held encryption secret.
+- **RLS is belt-and-suspenders.** The backend always reads/writes this table through the
+  service-role client in `database.py` (which bypasses RLS). The frontend must **never**
+  read this table directly — plaintext is never returned to the client, and even the
+  ciphertext should only be exposed through a backend "key status" endpoint that returns
+  booleans/labels, not the encrypted blob. RLS still matters because (a) the project rule
+  is that *all* tables have RLS, and (b) it closes the door if the anon client is ever
+  pointed at this table.
+- **`on delete cascade`** ties key lifecycle to the auth user (matches the anon-user
+  7-day purge sweep in `demo_service.py`).
 
-**Target:**
+### 2. `user_preferences` (NEW — default model + theme, RLS)
+
+```sql
+create table user_preferences (
+  user_id        uuid primary key references auth.users(id) on delete cascade,
+  default_model  text,                   -- OpenRouter model slug, nullable
+  theme          text not null default 'system' check (theme in ('light','dark','system')),
+  updated_at     timestamptz not null default now()
+);
+
+alter table user_preferences enable row level security;
+create policy "Users manage own prefs (select)" on user_preferences
+  for select using (auth.uid() = user_id);
+create policy "Users manage own prefs (insert)" on user_preferences
+  for insert with check (auth.uid() = user_id);
+create policy "Users manage own prefs (update)" on user_preferences
+  for update using (auth.uid() = user_id);
+```
+
+**Note:** `theme` *can* be read directly by the frontend anon client (RLS allows it) for
+instant first-paint without a backend round-trip, OR served via `preferences.py`.
+Recommendation: serve via backend for consistency with `default_model`, and additionally
+mirror theme to `localStorage` so first paint is flash-free before the session resolves.
+Theme is non-sensitive — either path is acceptable.
+
+### 3. `model_cache` (NEW — shared catalog, read-only to users)
+
+```sql
+create table model_cache (
+  id               text primary key,      -- OpenRouter model slug, e.g. "anthropic/claude-3.5-sonnet"
+  name             text not null,
+  is_free          boolean not null default false,
+  prompt_price     numeric,               -- $/token from pricing.prompt
+  completion_price numeric,               -- $/token from pricing.completion
+  context_length   integer,
+  popularity_rank  integer,               -- derived from sort=most-popular ordering
+  raw              jsonb,                 -- full model object for forward-compat
+  refreshed_at     timestamptz not null default now()
+);
+
+alter table model_cache enable row level security;
+-- Catalog is non-sensitive and shared. Readable by all authenticated users; only the
+-- service-role writer (refresh job) mutates it.
+create policy "Anyone authenticated can read model cache" on model_cache
+  for select using (auth.role() = 'authenticated');
+-- No insert/update/delete policy for anon → writes happen only via service role.
+```
+
+**Mirrors the existing mixed-visibility precedent** (`20240301000020_update_rls_policies.sql`)
+where the default KB is public-readable. The model catalog is the same shape: one shared
+dataset everyone reads, only the server writes.
+
+### 4. `threads.model` column (MODIFIED)
+
+```sql
+alter table threads add column model text;   -- nullable; null ⇒ use user default ⇒ use owner default
+```
+
+- Nullable so existing rows keep working untouched.
+- Resolution order at chat time: `thread.model` → `user_preferences.default_model` →
+  `settings.llm_model` (owner default). This three-tier fallback is the heart of
+  per-thread model selection.
+- `ThreadCreate` / `ThreadResponse` in `models/schemas.py` gain an optional
+  `model: str | None`; `create_thread` accepts it and a new `PATCH /api/threads/{id}`
+  updates it.
+
+---
+
+## Key Encryption & Decryption (where it happens)
+
+**All crypto lives in the backend service-role path. Plaintext keys never reach the
+frontend or the database.** (HIGH confidence — grounded in the existing `database.py`
+service-role pattern and the `cryptography` dependency already in `requirements.txt`.)
+
+### `crypto_service.py` (NEW)
+
+The `cryptography` library is **already a dependency** (`cryptography 46.0.5`, currently
+used for ES256 JWT verification in `auth.py`). Use **Fernet** (symmetric AES-128-CBC +
+HMAC) — the simplest correct option; envelope encryption is overkill at this scale.
+
 ```python
-allowed = [o.strip() for o in settings.cors_allowed_origins.split(",") if o.strip()]
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=allowed,            # e.g. ["https://bgkb.vercel.app", "http://localhost:5173"]
-    allow_credentials=True,
-    allow_methods=["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
-    allow_headers=["Authorization", "Content-Type"],
-    expose_headers=["Content-Type"],
+# backend/services/crypto_service.py
+from cryptography.fernet import Fernet
+from config import get_settings
+
+def _fernet() -> Fernet:
+    # KEY_ENCRYPTION_SECRET is a urlsafe-base64 32-byte Fernet key, stored as a
+    # Fly.io / .env secret. NEVER in the image, frontend bundle, or git.
+    return Fernet(get_settings().key_encryption_secret.encode())
+
+def encrypt_key(plaintext: str) -> str:
+    return _fernet().encrypt(plaintext.encode()).decode()
+
+def decrypt_key(ciphertext: str) -> str:
+    return _fernet().decrypt(ciphertext.encode()).decode()
+```
+
+### Per-request client construction (MODIFIED `llm_service.py`)
+
+Today `get_llm_client()` reads `settings.resolved_llm_api_key` (the owner key) globally
+and `stream_chat_completion()` reads `settings.llm_model`. The change is to **make the key
++ model per-request inputs**, resolved in `chat.py` and threaded down:
+
+```python
+# llm_service.py — MODIFIED
+def get_llm_client(api_key: str | None = None) -> OpenAI:
+    settings = get_settings()
+    client = OpenAI(
+        api_key=api_key or settings.resolved_llm_api_key,   # per-user key OR owner fallback
+        base_url=settings.llm_base_url,
+    )
+    if wrap_openai and settings.langsmith_api_key:
+        client = wrap_openai(client)
+    return client
+
+def stream_chat_completion(messages, *, api_key=None, model=None, tools=None, ...):
+    settings = get_settings()
+    client = get_llm_client(api_key)
+    ...
+    kwargs = {"model": model or settings.llm_model, "messages": full_messages, "stream": True}
+```
+
+**Critical security rule:** decryption happens **inside the request handler, in memory,
+for the duration of one chat turn.** The decrypted plaintext is passed to the OpenAI client
+constructor and never logged, never persisted, never returned in any response or SSE event.
+(LangSmith tracing via `wrap_openai` captures prompts/responses but should not serialize the
+client's `api_key` — verify against the prod LangSmith project's PII scrub; flagged in
+PITFALLS.)
+
+---
+
+## OAuth Callback Flow (PKCE)
+
+**Verified against OpenRouter official docs (HIGH confidence).** OpenRouter uses a PKCE
+flow with **no client secret** — ideal for a SPA-initiated, backend-completed flow.
+
+### Endpoints (OpenRouter, confirmed)
+
+- **Authorize (redirect the browser here):**
+  `https://openrouter.ai/auth?callback_url=<URL>&code_challenge=<CHALLENGE>&code_challenge_method=S256`
+- **Exchange (POST, backend):** `https://openrouter.ai/api/v1/auth/keys`
+  with JSON body `{ "code": "...", "code_verifier": "...", "code_challenge_method": "S256" }`
+  → returns `{ "key": "sk-or-v1-..." }` (the user-controlled API key).
+- S256 is the recommended `code_challenge_method` (challenge = base64 of SHA-256 of the
+  verifier). There is **no pre-registration** of callback URLs (localhost any-port works);
+  the callback URL is passed at authorize time.
+
+> Note: docs show no explicit `state` param in OpenRouter's examples. **Add and verify
+> `state` yourself** for CSRF protection — carry it through `callback_url` as a query param
+> and validate it on return. Do not rely on OpenRouter to echo a dedicated `state`.
+
+### Recommended split: frontend route + backend exchange
+
+```
+1. User clicks "Connect OpenRouter" (Settings or model-picker gate)
+2. FRONTEND generates code_verifier (random) + code_challenge (S256) + state (random)
+   - store verifier + state in sessionStorage (survives the redirect round-trip)
+3. FRONTEND redirects browser → https://openrouter.ai/auth?callback_url=<FE_CALLBACK>
+                                  &code_challenge=...&code_challenge_method=S256&state=...
+4. OpenRouter authenticates user, redirects → <FE_CALLBACK>?code=...&state=...
+5. FRONTEND OAuthCallback route (/settings/openrouter/callback):
+   - validate returned state === stored state (CSRF check)
+   - POST {code, code_verifier} to BACKEND /api/keys/openrouter/exchange
+     (with the Supabase bearer token so the backend knows which user)
+6. BACKEND keys.py:
+   - openrouter_service.exchange_code(code, code_verifier)
+     → POSTs to https://openrouter.ai/api/v1/auth/keys, gets {key}
+   - encrypt_key(key) → upsert into user_api_keys for user_id
+   - returns {connected: true, label: ...} (NEVER the key)
+7. FRONTEND shows "Connected", re-fetches key status, clears the gate
+```
+
+**Why this split:**
+- The `code_verifier` is generated and held **client-side** (correct PKCE — the verifier
+  must never leave the party that created the challenge until exchange). Storing it in
+  `sessionStorage` and posting it to *our own* backend for the exchange keeps the OpenRouter
+  key off the wire to the client entirely. The backend does the exchange so the returned
+  `sk-or-v1-...` key lands server-side and is encrypted before storage.
+- **`callback_url` must be a frontend route**, because OpenRouter redirects a *browser*. A
+  backend callback would work, but then the backend needs the verifier — pushing the verifier
+  server-side means generating it server-side and round-tripping it, which is messier than
+  letting the SPA own the PKCE pair. Frontend-callback + backend-exchange is the clean
+  division.
+
+### Redirect URL config across dev/prod (ties into existing CORS + auth-redirect)
+
+This is the **highest-friction integration point** and parallels the v1.1 CORS hardening
+(`config.py:cors_origins_list`, env-driven; PROJECT.md v1.1 Phases 1 & 6).
+
+| Env | `callback_url` value | Source |
+|-----|----------------------|--------|
+| Dev | `http://localhost:5173/settings/openrouter/callback` | derived from FE origin |
+| Prod | `https://boardgame-rag-prod.pages.dev/settings/openrouter/callback` | derived from FE origin |
+
+Recommendations:
+- **Frontend derives `callback_url` from `window.location.origin`** + fixed path. No new FE
+  env var needed — it self-locates, robust across the Cloudflare Pages prod domain and
+  localhost.
+- The **backend exchange endpoint is same-origin to the API** (`/api/keys/...`), so it is
+  already covered by the existing env-driven CORS allowlist (`cors_allowed_origins`). No CORS
+  change is required for the exchange POST as long as the FE origin is already in the allowlist
+  (it is, post-v1.1).
+- **No Supabase auth-redirect change** is needed — this OAuth flow is OpenRouter's, fully
+  independent of Supabase Auth's redirect URLs. The Supabase session is only used to
+  authenticate the exchange POST to our backend. (Do not confuse this with Supabase's own
+  redirect allowlist — separate systems.)
+- Optional backend env `OAUTH_CALLBACK_BASE_URL` only if you ever want the backend to construct
+  the URL; not required with the FE-derives approach.
+
+---
+
+## How the Agentic Chat Loop Selects Key + Model (MODIFIED `chat.py`)
+
+The resolution logic slots into `send_message` **before** the `event_generator` builds the
+budget and calls `stream_chat_completion`. The existing loop structure (chat.py lines
+~545–848) is otherwise unchanged.
+
+```python
+# chat.py send_message — NEW resolution block (pseudocode)
+settings = get_settings()
+db = get_supabase()
+
+# 1. Resolve MODEL: thread → user default → owner default
+selected_model = (
+    body.model                                   # optional per-message override (future)
+    or thread.data.get("model")                  # per-thread persisted model
+    or _get_user_default_model(db, user_id)      # user_preferences.default_model
+    or settings.llm_model                         # owner default
 )
+
+# 2. Resolve KEY: user's encrypted key → (gated) owner-key demo fallback
+key_row = db.table("user_api_keys").select("encrypted_key").eq("user_id", user_id) \
+            .maybe_single().execute()
+if key_row.data:
+    api_key = decrypt_key(key_row.data["encrypted_key"])     # in-memory, this turn only
+elif settings.demo_fallback_enabled:                         # GLOBAL FLAG, default OFF
+    api_key = settings.resolved_llm_api_key                  # owner key — demo only
+    selected_model = settings.demo_fallback_model or selected_model  # optionally pin a cheap model
+else:
+    # No key + fallback off → structured SSE error → frontend "connect key" prompt
+    yield {"event": "error", "data": json.dumps({
+        "error": "no_api_key",
+        "detail": "Connect your OpenRouter account to chat.",
+    })}
+    return
 ```
 
-Add `cors_allowed_origins: str = "http://localhost:5173"` to `Settings`. On Fly: `flyctl secrets set CORS_ALLOWED_ORIGINS="https://bgkb.vercel.app"`. Preview deploys (Vercel PR URLs) require either wildcard pattern support (not in stdlib CORSMiddleware — would need `allow_origin_regex`) or omitting preview from backend reach.
+Then thread the resolved values through the existing call sites:
 
-**SSE-specific:** No special CORS knobs needed beyond the above. SSE is just a long-lived GET; `sse-starlette` streams as `text/event-stream` and CORSMiddleware handles the preflight correctly when `Authorization` is in `allow_headers`.
-
-### 3. Frontend API Base URL
-
-**Pattern — "empty-string default" preserves both modes:**
-
-```ts
-// frontend/src/lib/api.ts
-const API_BASE = import.meta.env.VITE_API_BASE_URL ?? ''
-
-export async function apiFetch(path: string, options: RequestInit = {}) {
-  // path is always "/api/..."; API_BASE is "" in dev, absolute in prod
-  const url = `${API_BASE}${path}`
-  // ... rest unchanged
-}
+```python
+# dynamic context-length lookup currently uses settings.resolved_llm_api_key →
+# change to the resolved api_key + selected_model
+dynamic_length = fetch_model_context_length(selected_model, api_key)
+...
+for event in stream_chat_completion(
+    current_messages, tools=tools, tool_guide=..., source_hint=..., scope_hint=...,
+    api_key=api_key, model=selected_model,            # NEW args
+):
 ```
 
-Same pattern must be applied to the SSE `EventSource` construction in `useChat` (wherever `/api/chat/stream` or similar is opened). `EventSource` does not send `Authorization` headers — if the current flow relies on cookies or query-param tokens, that behavior is unchanged; just prefix the URL.
+**Demo-fallback flag check (key behavior):**
+- `settings.demo_fallback_enabled: bool = False` — new in `config.py`, env-driven, **off by
+  default** (matches PROJECT.md "global flag, off by default"). When off, keyless users get a
+  clean "connect your account" prompt instead of silently burning the owner's credits.
+- When on (e.g. for the public portfolio demo), keyless users transparently use the owner key.
+  Pair this with the existing per-user rate limit (`chat_rate_limit`, slowapi) and the existing
+  OpenRouter Guardrail cost cap to bound owner spend (PROJECT.md SEC-06).
+- The `no_api_key` SSE error reuses the **existing** in-band error path that `useChat.ts`
+  already handles (`parsed.error !== undefined` → throws → error bubble + toast). The frontend
+  just special-cases `error === "no_api_key"` to render a "Connect OpenRouter" CTA instead of
+  the generic retry bubble.
 
-**Dev:** `VITE_API_BASE_URL` unset → empty string → `/api/...` → Vite proxy → localhost:8000.
-**Prod:** Vercel env `VITE_API_BASE_URL=https://bgkb-api.fly.dev` → absolute URL → Fly.io → CORS check passes.
-
-### 4. Supabase Auth Redirect URLs
-
-Supabase Auth rejects OAuth / magic-link / email-confirmation redirects not in the project allowlist. For v1.1 (email+password), this matters for **email confirmation** and **password reset** flows.
-
-- Dev Supabase project: `http://localhost:5173/**` allowlisted (already working).
-- Prod Supabase project (new): allowlist `https://<portfolio>.vercel.app/**` AND `http://localhost:5173/**` if the same prod project is ever hit from dev (not recommended — keep projects isolated).
-- Set `Site URL` on prod project to the Vercel production URL.
-- Vercel preview deploys get unique URLs; either add `https://*.vercel.app` (wildcard allowed) or accept that confirmations only work from the stable prod URL.
-
-### 5. Docker Image for Docling
-
-**Strategy:** Multi-stage build; `python:3.12-slim` runtime; pre-download Docling models in builder to avoid cold-start downloads.
-
-**System packages (runtime stage):**
-- `poppler-utils` — PDF rendering for page images
-- `tesseract-ocr` + `tesseract-ocr-eng` — OCR engine (EasyOCR also works but downloads ~100MB models)
-- `libglib2.0-0`, `libsm6`, `libxext6`, `libxrender1` — image libs
-- `libgl1` — **only if** using `opencv-python`; prefer `opencv-python-headless` and skip `libgl1` (reduces image ~200MB)
-- `fonts-dejavu-core` — font fallback for rendered PDFs
-
-**Dockerfile skeleton:**
-```dockerfile
-# syntax=docker/dockerfile:1.7
-FROM python:3.12-slim AS builder
-WORKDIR /app
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    build-essential && rm -rf /var/lib/apt/lists/*
-COPY backend/requirements.txt .
-RUN pip install --user --no-cache-dir -r requirements.txt
-# Pre-download Docling models (optional — trades image size for cold-start speed)
-RUN python -c "from docling.document_converter import DocumentConverter; DocumentConverter()"
-
-FROM python:3.12-slim AS runtime
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    poppler-utils tesseract-ocr tesseract-ocr-eng \
-    libglib2.0-0 libsm6 libxext6 libxrender1 fonts-dejavu-core \
-    && rm -rf /var/lib/apt/lists/*
-COPY --from=builder /root/.local /root/.local
-COPY --from=builder /root/.cache/docling /root/.cache/docling
-ENV PATH=/root/.local/bin:$PATH PYTHONUNBUFFERED=1
-WORKDIR /app
-COPY backend/ ./
-EXPOSE 8080
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8080"]
-```
-
-**Size target:** ~1.2–1.8 GB with pre-downloaded Docling models. Without model pre-download: ~700–900 MB but first ingestion is slow. **Recommendation:** pre-download; Fly.io scratch pull is fast, user-facing latency matters more.
-
-### 6. File Upload Size Limits
-
-Fly.io proxy itself does not impose a strict request-body cap in current docs (community reports historic ~3MB issues were usually uvicorn/stdlib defaults, not the proxy). Real constraints:
-
-- **uvicorn**: no default body cap; accepts what ASGI receives.
-- **FastAPI `UploadFile`**: streams to disk via `SpooledTemporaryFile` (default 1MB spool → then disk). No hard cap.
-- **Supabase Storage**: 50MB per file on free tier (enforced server-side).
-- **Recommendation:** enforce `MAX_UPLOAD_MB = 25` in the documents router (read `content-length` header, 413 early). Matches a reasonable board-game rulebook ceiling and leaves headroom under Supabase's 50MB.
-
-**SSE timeouts:** Fly.io's default request timeout is generous (hours for long-running connections), but chat streams should complete in < 2 min. The existing `llm_timeout: int = 120` in `Settings` is the binding constraint. No Fly-specific tweak needed.
-
-### 7. Health Check
-
-`backend/main.py` **already has** `GET /api/health` returning `{"status": "ok"}` — sufficient for:
-- Fly.io `[[http_service.checks]]` in `fly.toml` (liveness for zero-downtime deploys)
-- UptimeRobot external monitor (5-min interval, free tier)
-
-**Enhancement (optional):** a `/api/health/deep` that checks Supabase reachability and LLM API key presence, returning 503 on failure. Keep the simple `/api/health` for Fly (fast, no external deps) to avoid flapping during Supabase blips.
-
-### 8. Deploy Flow
-
-**Recommended: manual first, automated second.**
-
-Phase A (first deploy — manual, catch surprises):
-1. `flyctl launch` → edits `fly.toml`, `flyctl deploy`
-2. `vercel deploy --prod`
-3. Verify end-to-end, then snapshot working state.
-
-Phase B (automation — only after Phase A is green):
-- GitHub Actions on push to `main`:
-  - Backend job: `flyctl deploy --remote-only` (uses `FLY_API_TOKEN` secret)
-  - Frontend job: Vercel's native GitHub integration (no workflow needed — Vercel auto-builds on push)
-- Preview deploys: Vercel preview for every PR; backend stays pinned to prod Fly machine (no ephemeral backends).
-
-**Why manual first:** Docling native deps, CORS origin, Supabase redirect URLs, and Fly secrets all have silent-failure modes that are faster to debug interactively than through CI logs.
+**The agent's tool loop itself is untouched** — tool selection, budget, SSE events all work
+identically. BYOK only changes *which credentials + model* the per-request client uses. This
+is a deliberately narrow, low-blast-radius integration.
 
 ---
 
-## New Components (Files/Artifacts Introduced by v1.1)
+## Model-List Cache: Table + Refresh Job Placement
 
-| File / Artifact | Purpose | Location |
-|---|---|---|
-| `backend/Dockerfile` | Multi-stage image with Docling system deps | repo root of backend context |
-| `backend/.dockerignore` | Exclude `venv/`, `tests/`, `__pycache__`, `.env` | backend dir |
-| `fly.toml` | App name, region, http_service, health_check, concurrency | repo root (or `backend/`) |
-| `frontend/vercel.json` | SPA rewrite (`/(.*)` → `/index.html`), optional headers | `frontend/` |
-| `backend/services/sentry_init.py` (or inline in `main.py`) | `sentry_sdk.init(dsn=..., traces_sample_rate=0.1)` | backend services |
-| `frontend/src/lib/sentry.ts` | `Sentry.init({ dsn: VITE_SENTRY_DSN, integrations: [browserTracingIntegration()] })` | frontend lib |
-| `.github/workflows/deploy-backend.yml` (Phase B) | CI deploy to Fly.io | repo |
-| Supabase prod project | Separate project; run all migrations in `supabase/migrations/` + seed | hosted |
-| `scripts/seed-prod-kb.py` (if not already idempotent) | Seed 10 default board games into prod project | repo |
-| `DEPLOY.md` or README section | Demo creds, deployed URL, env var checklist | repo |
+**Recommendation: `model_cache` table + lazy refresh-if-stale + deploy-time seed for v1.2,
+with pg_cron as a documented-but-optional upgrade.** (MEDIUM-HIGH confidence — table design
+is certain; scheduler choice is a deployment-fit tradeoff.)
 
-## Modified Components
+### Refresh options compared
 
-| File | Change |
-|---|---|
-| `backend/main.py` | Replace `allow_origins=["*"]` with env-driven allowlist; optional Sentry init |
-| `backend/config.py` | Add `cors_allowed_origins`, `sentry_dsn`, `environment` ("dev"/"prod") fields |
-| `frontend/src/lib/api.ts` | Prefix paths with `VITE_API_BASE_URL` (empty-string default) |
-| `frontend/src/lib/supabase.ts` | No change (already env-driven via `VITE_*`) |
-| `frontend/vite.config.ts` | No change — dev proxy stays; prod build uses env var |
-| `useChat` hook (SSE `EventSource` construction) | Same API-base prefix pattern |
-| `.env.example` | Add `CORS_ALLOWED_ORIGINS`, `VITE_API_BASE_URL`, `VITE_SENTRY_DSN`, `SENTRY_DSN` |
+| Option | Pros | Cons | Verdict for v1.2 |
+|--------|------|------|------------------|
+| **pg_cron** (Supabase) | True scheduled refresh, no app uptime needed | Needs HTTP-out of Postgres (`pg_net`) to OpenRouter or a backend ping; more moving parts | Document as optional upgrade |
+| **In-process scheduler** (APScheduler / asyncio) | Lives in FastAPI, easy to write | **Fly.io free tier suspends the backend** (PROJECT.md "Fly suspend, no keep-warm") → scheduler dies; unreliable | **Reject** — incompatible with suspend |
+| **Lazy refresh-if-stale** | Zero infra; refreshes on first request after TTL; survives suspend | First user after staleness eats a ~1s OpenRouter fetch | **Recommended primary** |
+| **Manual / deploy-time seed** | Dead simple; deterministic | Requires redeploy or admin trigger to pick up new models | **Recommended baseline** |
+
+**Why not the in-process scheduler:** the deployment explicitly accepts Fly.io suspend with no
+keep-warm (v1.1 Phase 4 decision). A background scheduler thread is killed on suspend and never
+reliably fires. This is the single most important infra-fit constraint for this feature.
+
+**Recommended approach:**
+1. `model_cache_service.refresh_models()` — fetches `GET https://openrouter.ai/api/v1/models`
+   (with `sort=most-popular` to populate `popularity_rank`; auth with the owner key, since the
+   catalog is global), maps fields, upserts into `model_cache`, stamps `refreshed_at`.
+   - Free detection: `is_free = (pricing.prompt == "0" and pricing.completion == "0")` and/or
+     `id` ends with `:free` (belt-and-suspenders — both signals confirmed in docs).
+2. `model_cache_service.get_models()` — reads `model_cache`; if `max(refreshed_at)` is older
+   than TTL (e.g. 24h), kicks `refresh_models()` first (lazy refresh), then returns rows.
+3. Seed the cache at deploy time (a one-off `refresh_models()` call, same pattern as the
+   default-KB seed in v1.1 Phase 3) so the table is never empty on first request.
+4. **Optional upgrade path:** a Supabase `pg_cron` job calling a backend `POST /api/models/refresh`
+   (shared-secret protected) on a daily schedule. Document it; don't build it for v1.2 unless
+   staleness becomes a real complaint.
+
+### How the frontend reads it
+
+- Frontend calls **`GET /api/models`** (NEW `models.py` router) → backend returns cached rows
+  via `model_cache_service.get_models()`. The frontend does **not** call OpenRouter directly
+  (keeps the owner key server-side and centralizes the lazy-refresh trigger).
+- `useModels()` (NEW hook) fetches once, caches in component state; `ModelPicker` renders
+  free/paid tags + popularity ordering from the returned fields.
+- Alternative (rejected): exposing `model_cache` to the anon client via RLS for a direct
+  Supabase read. Workable since it's non-sensitive, but routing through the backend keeps the
+  lazy-refresh logic in one place and matches the project's "frontend talks to backend, Supabase
+  anon is auth+realtime only" convention.
 
 ---
 
-## Data Flow Changes (Dev vs Prod)
+## New API Endpoints & Frontend Routes/Components
 
-### Dev (unchanged)
+### Backend endpoints
+
+| Method + Path | Router | Purpose | NEW/MOD |
+|---------------|--------|---------|---------|
+| `GET /api/keys/status` | `keys.py` | `{connected, label, connected_at}` — never the key | NEW |
+| `POST /api/keys/openrouter/exchange` | `keys.py` | Body `{code, code_verifier}` → exchange + encrypt + upsert | NEW |
+| `DELETE /api/keys` | `keys.py` | Disconnect (delete the user's key row) | NEW |
+| `GET /api/keys/balance` | `keys.py` | Proxy `GET openrouter.ai/api/v1/key` (+ `/credits`) with decrypted key | NEW |
+| `GET /api/models` | `models.py` | Cached model catalog for the picker | NEW |
+| `POST /api/models/refresh` | `models.py` | Force refresh (shared-secret; optional pg_cron target) | NEW |
+| `GET /api/preferences` | `preferences.py` | `{default_model, theme}` | NEW |
+| `PUT /api/preferences` | `preferences.py` | Update default model / theme | NEW |
+| `PATCH /api/threads/{id}` | `threads.py` | Accept `model` to persist per-thread selection | MODIFIED |
+| `POST /api/threads/{id}/messages` | `chat.py` | Resolve key+model per the block above | MODIFIED |
+
+All NEW endpoints use the existing `Depends(get_user_id)` auth dependency and the service-role
+`get_supabase()` client. Register the three new routers in `main.py` via `app.include_router(...)`
+exactly like `demo.router`.
+
+### Frontend routes/components
+
+| Item | Type | Notes |
+|------|------|-------|
+| `/settings` route + `SettingsPage.tsx` | NEW page | Key status/connect/disconnect, default model, theme, balance |
+| `/settings/openrouter/callback` route + `OAuthCallback.tsx` | NEW page | Validates state, posts code+verifier to exchange endpoint |
+| `ModelPicker.tsx` | NEW component | Free/paid tags, popularity order; gates on key; in chat header + thread create |
+| `ThemeToggle.tsx` + theme provider | NEW | Tailwind `dark:` class on `<html>`; persisted to prefs + localStorage |
+| `useUserKey.ts` | NEW hook | Key status, connect (PKCE init), disconnect |
+| `useModels.ts` | NEW hook | Fetch `/api/models`, expose list + free/paid filter |
+| `usePreferences.ts` | NEW hook | default model + theme read/write |
+| `lib/pkce.ts` | NEW util | `generateVerifier()`, `challengeFromVerifier()` via Web Crypto SubtleCrypto |
+| `App.tsx` | MODIFIED | Add `/settings` + callback routes (callback can be public or protected) |
+| `ChatPage.tsx` / `ThreadSidebar.tsx` | MODIFIED | Surface model picker; key-gate the send action |
+| `IconSidebar.tsx` | MODIFIED | Add Settings nav entry |
+| `useChat.ts` | MODIFIED (light) | Special-case `error === "no_api_key"` → "Connect" CTA |
+
+---
+
+## Data Flow
+
+### OAuth connect flow
+
 ```
-Browser → http://localhost:5173/api/chat  (Vite proxy)
-       → http://localhost:8000/api/chat   (FastAPI)
-       → Supabase rag-dev
-       → LangSmith "rag-masterclass"
+[Click "Connect OpenRouter"]
+   ↓ (pkce.ts: verifier+challenge+state → sessionStorage)
+[Browser redirect → openrouter.ai/auth?callback_url=<FE>&code_challenge=...&state=...]
+   ↓ (user authenticates at OpenRouter)
+[Redirect → FE /settings/openrouter/callback?code=...&state=...]
+   ↓ (validate state)
+[POST /api/keys/openrouter/exchange {code, verifier}]  ──→ openrouter.ai/api/v1/auth/keys
+   ↓                                                          ↓ {key}
+[encrypt_key → upsert user_api_keys]  ←───────────────────────┘
+   ↓
+[{connected:true} → FE refetches status → gate clears]
 ```
 
-### Prod
+### Chat turn with BYOK (MODIFIED path)
+
 ```
-Browser (any) → https://bgkb.vercel.app           (static assets)
-             → https://bgkb-api.fly.dev/api/chat  (absolute, CORS-checked)
-                 → Supabase rag-prod (service role)
-                 → LangSmith "rag-prod"
-                 → Sentry on error
+[useChat → POST /api/threads/{id}/messages {content, model?}]
+   ↓
+[chat.py: resolve model (thread→pref→owner), resolve key (user→demo-fallback gate)]
+   ↓ decrypt_key (in memory)
+[stream_chat_completion(messages, api_key=<user key>, model=<resolved>)]
+   ↓ (existing tool loop unchanged)
+[SSE content_delta / tool_event / done]   — OR — [SSE error: no_api_key → "Connect" CTA]
 ```
 
-**Key change:** API base URL is now **read at build time** on the frontend (baked into the JS bundle by Vite) and **read at process-start time** on the backend (from Fly secrets). Neither is runtime-configurable in the browser — a change to `VITE_API_BASE_URL` requires a Vercel rebuild.
+---
+
+## Anti-Patterns (BYOK-specific)
+
+### Anti-Pattern 1: Returning the decrypted (or even encrypted) key to the frontend
+**What people do:** add the key to a `/api/keys/status` response "so the UI can show it."
+**Why it's wrong:** any client-exposed key is a leak; even the ciphertext is needless exposure
+and tempts a frontend decrypt path.
+**Do this instead:** return only `{connected, label, connected_at}`. The plaintext exists only
+transiently in backend memory during a chat turn.
+
+### Anti-Pattern 2: In-process scheduler for model refresh on a suspendable host
+**What people do:** APScheduler/asyncio task in FastAPI to refresh models hourly.
+**Why it's wrong:** Fly.io free tier suspends the app (existing decision) — the scheduler dies
+and never fires reliably.
+**Do this instead:** lazy refresh-if-stale + deploy-time seed; pg_cron only if needed.
+
+### Anti-Pattern 3: Silent owner-key fallback by default
+**What people do:** when a user has no key, transparently use the owner key.
+**Why it's wrong:** the owner pays for everyone; defeats the entire BYOK purpose; unbounded cost.
+**Do this instead:** demo-fallback behind a global flag **default off**; keyless users get a
+"connect your account" prompt. Flag-on (demo) must be bounded by rate limit + Guardrail cap.
+
+### Anti-Pattern 4: Skipping PKCE `state` because OpenRouter docs omit it
+**What people do:** rely on OpenRouter to handle CSRF.
+**Why it's wrong:** without `state` you can't bind the callback to the initiating session; CSRF
+risk.
+**Do this instead:** generate `state`, carry it via `callback_url`, validate on return.
+
+### Anti-Pattern 5: Logging the decrypted key (incl. via tracing)
+**What people do:** debug-log the resolved `api_key`, or trust tracing not to capture it.
+**Why it's wrong:** LangSmith/Sentry could persist it.
+**Do this instead:** never log it; confirm `wrap_openai` does not serialize the client's
+`api_key`; keep the v1.1 Sentry PII scrub covering this path.
+
+---
+
+## Integration Points
+
+### External services
+
+| Service | Integration Pattern | Notes |
+|---------|---------------------|-------|
+| OpenRouter `/auth` | Browser redirect (PKCE, no client secret) | `callback_url` = FE route; S256 challenge |
+| OpenRouter `/api/v1/auth/keys` | Backend POST `{code, code_verifier}` → `{key}` | Exchange server-side; result encrypted |
+| OpenRouter `/api/v1/models` | Backend GET (owner key), cached to `model_cache` | `sort=most-popular`; free via zero-pricing / `:free` |
+| OpenRouter `/api/v1/key` (+ `/credits`) | Backend GET with decrypted user key | Balance / usage for the Settings page |
+| OpenRouter chat completions | Per-request OpenAI client with user (or fallback) key | Only credentials+model change vs today |
+
+### Internal boundaries
+
+| Boundary | Communication | Notes |
+|----------|---------------|-------|
+| `chat.py` ↔ `crypto_service` | Direct call, in-request | Decrypt once per turn, never persist |
+| `chat.py` ↔ `llm_service` | New `api_key`/`model` kwargs | Smallest possible surface change to the loop |
+| `keys.py` ↔ `openrouter_service` | Direct call | Exchange + balance HTTP via `httpx` (already used) |
+| `models.py` ↔ `model_cache_service` | Direct call | Lazy refresh-if-stale; reads `model_cache` table |
+| Frontend ↔ `model_cache` | **Via backend only** | Not a direct Supabase read (centralizes refresh) |
+| Frontend ↔ `user_api_keys` | **Backend only, never direct** | Anon client must never touch this table |
 
 ---
 
 ## Suggested Build Order (dependency-respecting)
 
-1. **Supabase prod project** — create, run migrations, seed default KB, verify auth works via SQL editor. *(Blocks everything downstream — no point deploying backend until it can point at a real DB.)*
-2. **Env split in code** — add `cors_allowed_origins`, `environment`, Sentry fields to `backend/config.py`; update `backend/main.py` CORS; update `frontend/src/lib/api.ts` and SSE call sites to use `VITE_API_BASE_URL`. *Validate locally by setting `VITE_API_BASE_URL=http://localhost:8000` and running frontend without Vite proxy.*
-3. **Dockerize backend** — write Dockerfile + `.dockerignore`, build locally (`docker build`), run locally (`docker run -p 8080:8080 --env-file .env`), confirm `/api/health` and one ingestion + one chat request work against **dev Supabase**.
-4. **Deploy backend to Fly.io** — `flyctl launch`, set secrets (incl. `SUPABASE_URL` pointing at **prod** project now), deploy, verify `/api/health` externally, verify one chat from curl with CORS origin header.
-5. **Deploy frontend to Vercel** — `vercel.json` rewrite, env vars (`VITE_API_BASE_URL=https://<fly-url>`, `VITE_SUPABASE_*` for prod), deploy, end-to-end smoke test.
-6. **Harden CORS & Supabase redirects** — narrow `CORS_ALLOWED_ORIGINS` to the exact Vercel prod URL; add Vercel URL to Supabase Auth allowlist + Site URL.
-7. **Observability** — LangSmith prod project env switch, Sentry frontend + backend init, UptimeRobot monitor on `/api/health`.
-8. **CI (optional)** — GitHub Action for backend deploy; Vercel auto-deploys frontend on push.
-9. **Docs** — README deployed URL, demo credentials, env var checklist, architecture diagram.
+This ordering lets the roadmapper slice phases that are each independently testable.
 
-**Rationale:**
-- Env split (step 2) must land **before** Dockerize (step 3) because the image will bake in the new config shape.
-- Dockerize (step 3) must land **before** Fly deploy (step 4) — Fly needs an image.
-- Backend deploy (step 4) must land **before** frontend deploy (step 5) — frontend needs an API URL to bake into its bundle.
-- CORS hardening (step 6) comes **after** both are live so you can set the exact Vercel URL, not a guess.
+1. **Crypto + key storage foundation** (no UI)
+   - `crypto_service.py` (Fernet), `KEY_ENCRYPTION_SECRET` in config + Fly/`.env`/`.env.prod`.
+   - `user_api_keys` migration (table + RLS).
+   - Test: encrypt/decrypt round-trip; migration applies to dev + prod.
+   - *Why first:* everything BYOK depends on safely storing a key.
 
----
+2. **OAuth exchange backend** (`openrouter_service.exchange_code` + `keys.py`)
+   - Exchange endpoint, `GET /api/keys/status`, `DELETE /api/keys`.
+   - Test: exchange against a real OpenRouter round-trip; confirm key never echoed.
+   - *Depends on:* step 1.
 
-## Anti-Patterns to Avoid
+3. **Frontend OAuth connect flow** (`lib/pkce.ts`, `OAuthCallback.tsx`, `useUserKey`, route)
+   - PKCE init + redirect, callback handling, state validation, calls step-2 exchange.
+   - Test: full connect round-trip dev + prod (callback_url derivation; CORS already covers it).
+   - *Depends on:* step 2.
 
-### AP1: Shared Supabase project across dev and prod
-**What people do:** Save the $0 of a second project, use one DB for both.
-**Why it's wrong:** Test data pollutes prod; RLS bugs in dev leak real user data; migrations become irreversible; auth redirect allowlists conflict.
-**Instead:** Two projects. Supabase free tier allows two. The only shared asset is the migration SQL files.
+4. **Model cache** (`model_cache` migration + `model_cache_service` + `models.py` + deploy seed)
+   - Refresh-if-stale, `GET /api/models`, seed at deploy.
+   - Test: catalog populated; free/paid + popularity fields correct.
+   - *Independent of 1–3* — can run in parallel; only the picker UI (step 7) joins them.
 
-### AP2: `CORS allow_origins=["*"]` with `allow_credentials=True`
-**What people do:** Keep the dev-convenient wildcard.
-**Why it's wrong:** Browsers silently drop credentialed responses; spec-violating; any site can hit your backend API.
-**Instead:** Explicit origin list from env var. `*` is only tolerable for non-credentialed public APIs.
+5. **Preferences + threads.model** (`user_preferences` migration, `preferences.py`,
+   `threads.model` column, schema updates, `PATCH /api/threads/{id}`)
+   - Default model + theme storage; per-thread model column.
+   - *Soft dependency:* consumed by the model picker (7) and chat resolution (6).
 
-### AP3: `.env` file baked into the Docker image
-**What people do:** `COPY .env .` in Dockerfile for convenience.
-**Why it's wrong:** Secrets in the image registry; every layer push leaks them; rotation requires rebuild.
-**Instead:** `.dockerignore` excludes `.env`; secrets injected by `flyctl secrets set` at deploy time; `pydantic-settings` reads from process env — zero code change needed.
+6. **Chat loop integration** (MODIFY `chat.py` + `llm_service.py`)
+   - Key + model resolution block, demo-fallback flag, `no_api_key` SSE error,
+     thread→pref→owner model resolution, per-request client.
+   - `demo_fallback_enabled` flag in config (default off).
+   - Test: keyed user chats with selected model; keyless user gets connect prompt; flag-on uses
+     owner key.
+   - *Depends on:* steps 1, 4, 5.
 
-### AP4: Hardcoded prod API URL in frontend source
-**What people do:** `const API = 'https://bgkb-api.fly.dev'` in a constants file.
-**Why it's wrong:** Breaks dev proxy; forces source edits to change deploy target; hostile to preview environments.
-**Instead:** `import.meta.env.VITE_API_BASE_URL` with empty-string fallback. Preserves dev proxy path, parameterizes prod.
+7. **Frontend options UI** (`SettingsPage`, `ModelPicker`, `ThemeToggle`, `useModels`,
+   `usePreferences`, `useChat` no_api_key handling, balance display)
+   - Wire it all: connect/disconnect, pick model (gates on key), theme, balance.
+   - *Depends on:* steps 3, 4, 5, 6.
 
-### AP5: Running Docling model downloads on first request
-**What people do:** Skip pre-download to save image size.
-**Why it's wrong:** First user to upload a PDF waits 30–120s for model downloads; Fly.io machine may hit memory/disk limits during concurrent downloads; cold starts look broken.
-**Instead:** Pre-download in Dockerfile builder stage and `COPY` the cache into runtime stage. Accept the ~500MB image size cost.
-
-### AP6: Deploying before migrations are applied
-**What people do:** Push backend code, then remember to run migrations.
-**Why it's wrong:** First requests hit missing tables, 500s flood LangSmith/Sentry, false alerts.
-**Instead:** Apply migrations to prod Supabase **first** (Step 1 above), verify schema with a SQL probe, then deploy backend. Add a startup check in `main.py` that queries one known table and logs a fatal error on failure.
-
----
-
-## Scaling Considerations (portfolio scope)
-
-| Scale | Adjustment |
-|-------|-----------|
-| 0–10 users (portfolio demo) | Single Fly.io shared-cpu-1x 256MB machine; Supabase free tier; no Redis/queue needed |
-| 10–100 users (unexpected traffic) | Scale Fly machine to 1x 512MB; set `auto_stop_machines=false`; enable Fly metrics; watch Supabase connection pool |
-| 100+ users | Not in v1.1 scope — would need: Fly machines plural + sticky sessions for SSE, Supabase Pro for connection pooler, rate limiting, background worker for Docling ingestion |
-
-**First bottleneck in portfolio scope:** Docling CPU on concurrent uploads (single-threaded per machine). Mitigation: document limit per user, `MAX_UPLOAD_MB`, surface ingestion queue status via existing Realtime channel.
-
----
-
-## Open Questions / Flags
-
-- **Docling exact `apt` list** (MEDIUM confidence): verify at first `docker build` — the list above is standard across reference Dockerfiles but Docling's dep tree can shift across releases. Pin `docling==<ver>` in `requirements.txt` before prod deploy.
-- **Fly.io body-size cap** (MEDIUM): community reports historic issues, docs are quiet. Test a 25MB upload against a staging Fly machine before committing to the limit. If 413 appears from Fly (not uvicorn), lower the app-side cap.
-- **Vercel preview CORS** (LOW urgency): if preview deploys are needed, either switch CORS to `allow_origin_regex=r"https://.*\.vercel\.app$"` or document that previews hit prod backend anyway (RLS keeps it safe but auth redirects won't work from preview URLs unless Supabase allowlist uses `https://*.vercel.app`).
-- **SSE reconnection semantics**: `EventSource` auto-reconnects; verify backend tolerates mid-stream CORS preflight on reconnect (stdlib CORSMiddleware handles this fine; just flagging for validation).
+Phases 1→2→3 are the BYOK critical path; 4 can parallelize; 5 enables per-thread model; 6 is the
+chat integration; 7 is the UI capstone. **Theme toggle** (a subset of 5/7) is the lowest-risk,
+most independent slice — it can ship anytime after `user_preferences` exists, decoupled from BYOK.
 
 ---
 
 ## Sources
 
-- [Fly.io FastAPI docs](https://fly.io/docs/python/frameworks/fastapi/) — deploy pattern, fly.toml shape
-- [Fly.io app configuration reference](https://fly.io/docs/reference/configuration/) — http_service, checks, concurrency
-- [Fly.io request body size community thread](https://community.fly.io/t/http-request-size-limits/12698) — known historic upload issues
-- [Vercel Vite framework guide](https://vercel.com/docs/frameworks/frontend/vite) — SPA rewrite, env vars
-- [Vercel vercel.json reference](https://vercel.com/docs/project-configuration/vercel-json) — rewrites config
-- [Docling installation docs](https://docling-project.github.io/docling/getting_started/installation/) — system deps
-- [Docling FAQ — libGL issue](https://docling-project.github.io/docling/faq/) — opencv-headless vs opencv-python
-- [docling-serve container images](https://deepwiki.com/docling-project/docling-serve/6.1-container-images) — multi-stage reference, model pre-download pattern
-- [FastAPI CORSMiddleware docs](https://fastapi.tiangolo.com/tutorial/cors/) — `allow_credentials` + origin list requirement
-- [Supabase Auth redirect URL docs](https://supabase.com/docs/guides/auth/concepts/redirect-urls) — Site URL + allowlist pattern
-- Existing repo files: `backend/main.py`, `backend/config.py`, `frontend/vite.config.ts`, `frontend/src/lib/api.ts`, `frontend/src/lib/supabase.ts`, `.planning/PROJECT.md`
+- OpenRouter OAuth PKCE — official docs (authorize URL, exchange endpoint, S256, response shape): https://openrouter.ai/docs/guides/overview/auth/oauth — HIGH
+- OpenRouter exchange-code reference: https://openrouter.ai/docs/api/api-reference/o-auth/exchange-auth-code-for-api-key — HIGH
+- OpenRouter list-models schema (fields, pricing, `sort=most-popular`, free detection, auth required): https://openrouter.ai/docs/api/api-reference/models/get-models — HIGH
+- OpenRouter credits / key-balance endpoints: https://openrouter.ai/docs/api/api-reference/credits/get-credits — MEDIUM (exact response field names not fully confirmed)
+- Python `cryptography` Fernet — already in `requirements.txt` (cryptography 46.0.5) — HIGH (existing dependency)
+- Existing codebase (read directly): `backend/routers/chat.py`, `backend/services/llm_service.py`, `backend/config.py`, `backend/database.py`, `backend/auth.py`, `backend/main.py`, `backend/routers/threads.py`, `backend/routers/demo.py`, `backend/models/schemas.py`, `supabase/migrations/*`, `frontend/src/App.tsx`, `frontend/src/lib/api.ts`, `frontend/src/lib/supabase.ts`, `frontend/src/contexts/AuthContext.tsx`, `frontend/src/hooks/useChat.ts`, `.planning/PROJECT.md`, `.planning/codebase/ARCHITECTURE.md` — HIGH
 
 ---
-*Architecture research for: v1.1 Portfolio Deployment integration*
-*Researched: 2026-04-22*
+*Architecture research for: v1.2 User Options & BYOK (BYOK integration into shipped agentic RAG)*
+*Researched: 2026-06-18*

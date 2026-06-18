@@ -1,560 +1,410 @@
-# Pitfalls Research — v1.1 Portfolio Deployment
+# Pitfalls Research
 
-**Domain:** Deploying FastAPI+Docling+Supabase+Vite SPA to Fly.io + Vercel + Supabase prod
-**Researched:** 2026-04-22
-**Confidence:** HIGH (most pitfalls verified against current code in this repo; a few deployment-platform specifics are MEDIUM)
+**Domain:** Adding OpenRouter BYOK (OAuth PKCE + encrypted per-user key storage + model selection + usage display) to an already-deployed multi-user RAG app (FastAPI + Supabase + React, Fly.io + Cloudflare Pages)
+**Researched:** 2026-06-18
+**Confidence:** HIGH (OpenRouter OAuth/limits/usage verified against official docs; secret-handling and Supabase RLS pitfalls grounded in this repo's actual code — `llm_service.py`, `chat.py`, `sql_service.py`, `execute_readonly_query.sql`, `sentry.ts`, `tracing.py`)
 
-Scope: mistakes made when adding deployment to *this specific* codebase. Each pitfall is tied to observed code/config in the repo where relevant, and mapped to a v1.1 deployment phase.
+> **Phase numbers below are suggestions** keyed to the natural v1.2 build order. They map to: **P1 Key Storage + Encryption**, **P2 OAuth PKCE**, **P3 Per-request Key/Model Resolution**, **P4 Model Picker + Cache**, **P5 Usage/Cost Display**, **P6 Settings/UX/Theme**, **P7 Demo-fallback Gating**. The roadmap may renumber — the pairing (pitfall → capability) is what matters.
 
-Assumed v1.1 phase skeleton (used below for mapping — roadmap agent may rename):
+> **Highest-risk area is SECTION 1 (handling user secrets).** Treat every pitfall there as a release blocker, not a polish item. This app already ships a single owner key in env; the entire risk profile changes the moment you persist *other people's* keys.
 
-- **P1 Secrets & Repo Hygiene** — secret audit, `.dockerignore`, `.gitignore`, env var plan
-- **P2 Dockerize Backend** — Dockerfile with Docling native deps, local smoke test
-- **P3 Supabase Prod Project** — migrations, extensions, storage policies, seed
-- **P4 Fly.io Backend Deploy** — secrets, machines, scale, health checks
-- **P5 Vercel Frontend Deploy** — env vars, API base URL, SPA rewrites
-- **P6 CORS, Auth, Streaming Hardening** — origins, redirect URLs, SSE proxy behavior
-- **P7 Observability & Rate Limiting** — LangSmith prod project, Sentry, rate limit, uptime
-- **P8 Demo Hardening** — demo creds, README, final smoke test
+---
 
 ## Critical Pitfalls
 
-### Pitfall 1: VITE_* env vars leak secret keys into the frontend bundle
+### Pitfall 1: LangSmith `wrap_openai` traces the per-user OpenRouter key (and prompts) to a 3rd party
 
 **What goes wrong:**
-A developer adds `VITE_SUPABASE_SERVICE_ROLE_KEY=...` or `VITE_OPENAI_API_KEY=...` to Vercel env vars thinking it's "just for the frontend." Vite inlines any `VITE_*` variable into the production bundle, so the key ships in plaintext JS served to every visitor.
+`backend/services/llm_service.py:get_llm_client()` wraps the OpenAI client with `wrap_openai(client)` whenever `langsmith_api_key` is set. Today that traces the *owner's* single key context. The moment `get_llm_client()` is changed to accept a per-user key, LangSmith captures the client config / request metadata for every BYOK call — and `wrap_openai` traces inputs and outputs by default. A user's OpenRouter key (and their full chat) leaves your trust boundary and lands in the prod LangSmith project. You are now custodian of other people's secrets in a vendor you don't control.
 
 **Why it happens:**
-- `backend/config.py` already mixes concerns: `vite_supabase_url` and `vite_supabase_anon_key` are declared on the backend `Settings` class. Someone copying that pattern adds `vite_supabase_service_role_key` "for parity" and wires it into the frontend build.
-- `.env` at the repo root is loaded by both frontend (`envDir: '..'`) and backend, so there's no physical separation of which keys are safe to expose.
-- Vercel's UI doesn't warn when a `VITE_*` variable name looks like a secret.
+The tracing wrapper is invisible at the call site — devs forget it serializes request data. The existing code wraps unconditionally; nobody re-evaluates it when the key source changes from "mine" to "theirs."
 
 **How to avoid:**
-- Only two `VITE_*` vars are ever allowed: `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, plus `VITE_API_BASE_URL` for the Fly backend. Document this explicitly in README and Vercel project.
-- Add a pre-build guard: a tiny script in `frontend/scripts/check-env.cjs` that fails `npm run build` if any `VITE_*` var name matches `/SERVICE_ROLE|SECRET|PRIVATE|OPENAI|OPENROUTER|LANGSMITH|TAVILY|RERANK|JWT/i`.
-- After deploy, grep the built assets for prefixes of known secret keys (`sk-`, `sb_secret_`, `eyJ...` longer than anon) before promoting.
+- Pass the per-user key as a constructor arg to a fresh `OpenAI(...)` and **do not** rely on the wrapper to scrub it. Confirm the `Authorization` header is never placed in trace metadata.
+- Set `LANGSMITH_HIDE_INPUTS=true` / `LANGSMITH_HIDE_OUTPUTS=true` for BYOK calls, OR register a client-side anonymizer hook that redacts `sk-or-` patterns before the payload serializes. LangSmith redaction must happen **client-side before the trace leaves the process**.
+- Decide explicitly: do BYOK chats get traced at all? Safest default: trace owner-key/demo calls, **disable LangSmith tracing on per-user-key calls** (build the client without `wrap_openai`).
 
 **Warning signs:**
-- `curl https://<vercel>/assets/index-*.js | grep -Ei 'service_role|sk-proj|sk-or-'` returns matches.
-- Supabase dashboard shows writes/reads bypassing RLS from frontend IPs.
-- Usage dashboards spike from anonymous traffic.
+A LangSmith run whose metadata or extra fields contain `api_key`, `default_headers`, or any `sk-or-v1-…` substring. A user's prompt visible in LangSmith when they used their own key.
 
-**Phase to address:** P1 (define allowed VITE_* vars), P5 (Vercel env setup + post-build grep), P8 (final audit)
+**Phase to address:** P3 (per-request key resolution) — gate the wrapper on key source.
 
 ---
 
-### Pitfall 2: Service role key used from the frontend (RLS bypass)
+### Pitfall 2: User OpenRouter key leaks into Sentry — current scrubber only catches `Authorization` + Supabase token
 
 **What goes wrong:**
-To "fix" a 401/RLS error quickly, a dev swaps the frontend's Supabase client from anon key to service role, or proxies a service-role-authenticated call through a public API endpoint with no auth. All RLS — including the public/private KB split built in Phase 1 — is bypassed. Any visitor can read or modify every user's documents.
+`frontend/src/lib/sentry.ts` redacts only (a) `Authorization` request headers and (b) console breadcrumbs matching `sb-<ref>-auth-token`. An OpenRouter key (`sk-or-v1-…`) appears in **none** of those shapes. It can leak via: the OAuth callback URL in `event.request.url` / navigation breadcrumbs; a `console.log(key)` left in dev (the `consoleLoggingIntegration` captures `log`/`warn`/`error` as breadcrumbs AND `enableLogs: true` ships logs); an error message like `"OpenRouter rejected key sk-or-v1-…"`; or the key embedded in a fetch breadcrumb body. Backend has its own path: `chat.py` catches exceptions and yields `json.dumps({"error": str(e)})` over SSE — if an OpenRouter SDK error string echoes the key, it streams to the browser and into Sentry.
 
 **Why it happens:**
-- The backend uses the service role key by design (`supabase_service_role_key` in `Settings`), so the pattern is already in the codebase.
-- `frontend/src/lib/supabase.ts` uses the anon key today, but nothing structurally prevents someone from creating a second client with a different key.
-- The app's RLS model is "mixed-visibility" (see migration 020) — a single misuse reveals both private docs and lets anonymous users mutate the default KB.
+The v1.1 scrubber was written for JWTs/PII, not for a new class of secret. BYOK introduces a brand-new token shape nobody added a rule for.
 
 **How to avoid:**
-- Hard rule: service role key exists only in Fly secrets and in local `.env` (never in Vercel, never in frontend code).
-- Add an ESLint rule or a grep guard in CI: fail if `frontend/` contains `service_role`, `SERVICE_ROLE`, or `createClient(.*SERVICE`.
-- Every backend endpoint that uses the service-role client MUST also call `get_user_id()` dependency and filter by `user_id` in SQL — do not rely on RLS when using service role. Verify this is true for all existing routers before deploy (spot-check `threads.py`, `chat.py`, `documents.py`, `folders.py`).
-- Write one RLS smoke test against prod: sign in as `ragtest1`, try to read another user's doc by ID, expect 404/403.
+- Add a global regex scrubber (`/sk-or-v1-[A-Za-z0-9_-]+/g` → `[redacted-key]`) applied to `event` (message, exception values, request.url, breadcrumb messages/data) in `beforeSend` AND `beforeBreadcrumb`. Apply the same regex backend-side before any `logger.*` call and before any SSE `error` payload.
+- Never put the key in a URL the browser sees. The OAuth `code` is one-time; treat even *that* as sensitive in logs. The exchanged key must go frontend → backend over POST body (TLS), never querystring.
+- Sanitize `str(e)` from OpenRouter/OpenAI SDK calls before it reaches `logger.error(..., exc_info=True)` (which ships full stack frames whose locals may hold the key) or the SSE `error` event.
 
 **Warning signs:**
-- Any reference to `service_role` in a file under `frontend/`.
-- Network tab shows requests to `*.supabase.co/rest/v1/...` from the browser with an `Authorization: Bearer` token that is not a short-lived JWT (service role is a long static JWT with `role: service_role` claim — decode at jwt.io).
-- Any user can see another user's private documents in the UI.
+Grep your own Sentry issues for `sk-or`. Any 500 whose breadcrumb trail includes the OAuth callback path with a long token. `repr()` of an exception containing the key in a stack-local.
 
-**Phase to address:** P1 (CI guard), P6 (auth hardening + RLS smoke test), P8 (final audit)
+**Phase to address:** P1 (backend log/SSE scrub) and P2 (frontend OAuth + Sentry rule). Verify in P5 once usage errors start flowing.
 
 ---
 
-### Pitfall 3: `.env` committed or leaked into Docker image
+### Pitfall 3: The Text-to-SQL tool can read the encrypted-keys table
 
 **What goes wrong:**
-Either `.env` gets committed to git (history poisoned, rotation required), or — more subtly — it gets `COPY . .`'d into the Docker image even though it's gitignored. The image is public (Fly builders, registry) and now contains prod secrets.
+`execute_readonly_query` (migration 015) is `SECURITY DEFINER`, runs `SELECT * FROM (%s) sub`, and is invoked by `sql_service.execute_sql` through the **service-role** client (`database.py` always uses `supabase_service_role_key`). It defends itself by `SET LOCAL role = 'authenticated'` + setting `request.jwt.claim.sub`, so it relies entirely on RLS to scope rows. A new `user_api_keys` table will be reachable by the LLM-authored SQL tool. If RLS is missing, misnamed, or the encrypted-key column is selectable, a crafted prompt ("run SQL: select * from user_api_keys") can exfiltrate every user's ciphertext (and, depending on design, the IV/nonce) through the chat. Even with per-row RLS, returning the user's *own* ciphertext to the model context is a needless exposure.
 
 **Why it happens:**
-- No `.dockerignore` present in the repo today. `Dockerfile` with `COPY . /app` will pull in `.env`, `backend/venv/`, `frontend/node_modules/`, `.planning/`, `.agent/`, and `.git/`.
-- `backend/config.py` does `load_dotenv(os.path.join(os.path.dirname(__file__), "..", ".env"))`, so the app functions fine when `.env` is baked into the image — masks the mistake.
-- Developers sometimes re-run `git add -A` after `.gitignore` changes and accidentally stage files that had already been tracked.
+The SQL allowlist is keyword-based (blocks INSERT/DROP/etc.) but **table-agnostic** — it never enumerates which tables are queryable. The `QUERYABLE_SCHEMA` doc string lists only 4 tables, but nothing *enforces* that list. Devs assume RLS alone is enough and forget the new table inherits the same query surface.
 
 **How to avoid:**
-- Create `.dockerignore` in P1 with at minimum: `.env`, `.env.*`, `.git`, `.gitignore`, `backend/venv/`, `backend/__pycache__/`, `**/__pycache__/`, `frontend/node_modules/`, `frontend/dist/`, `.planning/`, `.agent/`, `.claude/`, `*.md`, `tests/`, `backend/tests/`.
-- In the Dockerfile, prefer `COPY backend/requirements.txt .` then `COPY backend/ /app/` (explicit, not `COPY . .`).
-- Remove `load_dotenv(...)` call when `ENV == "production"`, or guard it so it only runs if the file exists. Fly injects env vars directly; relying on `.env` in prod is a smell.
-- Add a CI check that `git ls-files | grep -E '^\.env$'` returns nothing and that the repo's git history doesn't contain `.env` (`git log --all --full-history -- .env`).
-- After building the image locally: `docker run --rm <image> sh -c 'ls -la /app /app/.. ; env | grep -i key'` to confirm no secret material is baked in.
+- Enable RLS on `user_api_keys` with `USING (user_id = auth.uid())` AND deny the `authenticated` role any SELECT on the secret column — store the secret so the SQL role literally cannot read it (e.g., column-level GRANT revoke, or keep ciphertext in a separate schema the `authenticated` role has no USAGE on).
+- Harden `execute_readonly_query`: add an explicit table allowlist (regex/parse the FROM targets, or `SET search_path` to a schema that excludes secrets). Add `REVOKE SELECT ON user_api_keys FROM authenticated`.
+- Keep `user_api_keys` out of `QUERYABLE_SCHEMA` (already implied) AND out of the `authenticated` role's reach so prompt-injection can't reach it regardless of the doc string.
 
 **Warning signs:**
-- `docker image inspect` shows layer sizes much larger than expected.
-- `.env` appears in `git status` as tracked.
-- Fly deploy works even when you "forget" to set secrets — that means the image has them.
+A `query_database` tool call whose SQL references `key`, `auth`, `secret`, or `user_api_keys`. Any chat where the assistant surfaces base64/hex blobs.
 
-**Phase to address:** P1 (dockerignore + git history audit), P2 (Dockerfile review + image inspection)
+**Phase to address:** P1 (table + RLS + role-grant design ships with the storage migration). Re-verify in P3.
 
 ---
 
-### Pitfall 4: Docker image bloat from Docling pushes past free-tier disk limits
+### Pitfall 4: Encryption-key management — keys stored "encrypted" but the master key sits next to the ciphertext or isn't rotatable
 
 **What goes wrong:**
-Docling (unpinned in `requirements.txt`) pulls in `easyocr`, `torch`, `transformers`, model weights, and native libs. A naive `python:3.11` base image with `pip install -r requirements.txt` produces a 6–10+ GB image. Fly.io free-tier machines have limited rootfs (default ~8 GB), push times balloon to 20+ minutes, and cold-start pulls time out. Vercel is unaffected (frontend only).
+Three sub-failures: (a) the app encrypts with a master key that's also in the same Fly secret store with no separation, so a single env dump reveals both ciphertext-source and key; (b) the master key is hardcoded/derived weakly (e.g., reusing `supabase_jwt_secret` or a short string) instead of a 32-byte random key; (c) no key-version/rotation path — when (not if) you need to rotate, every stored key is undecryptable or you can't tell which master key encrypted which row.
 
 **Why it happens:**
-- `docling` in `requirements.txt` has no pin — `pip install docling` grabs the full easyocr+torch dependency set even if you only use PDF text extraction.
-- `python:3.11` (not `-slim`) base ships with compilers and dev headers.
-- `pip` caches wheels in `/root/.cache/pip` — not cleaned between layers.
-- Docling also downloads ML models on first use; if they're cached into the image, that adds gigabytes.
+"Encrypted at rest" feels done once `cryptography.Fernet`/AES-GCM is wired. Rotation and key-id tagging are invisible until a rotation event forces a painful migration. The repo already pins `cryptography 46.0.5`, so reaching for it is easy — but ergonomics ≠ key hygiene.
 
 **How to avoid:**
-- Use multi-stage Docker build: stage 1 `python:3.11-slim` with `build-essential` to compile wheels, stage 2 `python:3.11-slim` copying only the site-packages.
-- Clean aggressively: `pip install --no-cache-dir`, `apt-get clean && rm -rf /var/lib/apt/lists/*`.
-- Pin `docling` to a known version and audit its extras. If only PDF/DOCX are needed, check whether `docling-core` + specific backends can replace full `docling` — current code uses `DocumentConverter` so likely needs full package, but verify.
-- Pre-download Docling models during build into a known path, then set `HF_HOME`/`TORCH_HOME` to that path so prod cold starts don't hit the network. Keep models out of the image only if you can tolerate first-request latency.
-- Target <2 GB image. Check with `docker images` after build.
+- Generate a dedicated 32-byte master key (`OPENROUTER_KEY_ENC_KEY`), separate from JWT/Supabase secrets, stored only in Fly secrets — never in `.env` committed shape, never in the frontend bundle.
+- Use AES-256-GCM (authenticated) or Fernet; store per-row: ciphertext, nonce/IV, and a **`key_version` integer**. Decrypt picks the master key by version.
+- Design rotation up front: support two active master keys (current + previous) so you can re-encrypt rows lazily on next use and bump `key_version`. Document the rotation runbook now.
+- Decrypt **only** in the backend, only at the moment of an LLM call; never return plaintext to any API response, log line, or trace.
 
 **Warning signs:**
-- `fly deploy` upload > 5 minutes.
-- `Docker image size: X GB` in Fly logs with X > 4.
-- Cold starts fail because image pull exceeds machine timeout.
-- `pip install` logs show `torch-2.x-cu...whl (800 MB)` being downloaded.
+No `key_version` / `nonce` column. The enc key equals or derives from an existing secret. No written rotation procedure. Decryption code reachable from any endpoint that returns JSON to the client.
 
-**Phase to address:** P2 (Dockerfile multi-stage, size budget)
+**Phase to address:** P1 — encryption scheme, key separation, and `key_version` column are part of the first storage migration.
 
 ---
 
-### Pitfall 5: Docling missing system libs in slim image (runtime failures, not build failures)
+### Pitfall 5: OAuth PKCE — `code_verifier` stored where the callback can't reach it, or no CSRF `state`
 
 **What goes wrong:**
-Build succeeds, container starts, `/api/health` returns 200 — but the first PDF upload fails with `OSError: cannot load libGL.so.1` or `libmagic not found` or `tesseract: command not found`. Error only surfaces when `DocumentConverter` is actually invoked, so CI and health checks pass.
+OpenRouter PKCE: redirect to `https://openrouter.ai/auth?callback_url=…&code_challenge=…&code_challenge_method=S256`, then exchange `POST https://openrouter.ai/api/v1/auth/keys` with `{code, code_verifier, code_challenge_method}`; the new key returns in the `key` field. Two classic breaks: (a) the `code_verifier` is generated in one tab/route but the callback lands in a fresh SPA load (or a different device) and the verifier is gone → exchange fails with "invalid credentials" (403); (b) **OpenRouter's flow has no built-in `state` parameter** — its docs do not document CSRF/state — so if you don't add your own, an attacker can feed a victim a crafted callback URL with the attacker's `code`, silently binding the *attacker's* OpenRouter key to the *victim's* account (or vice-versa). Also `code_challenge_method` must match between request and exchange (mismatch → 400).
 
 **Why it happens:**
-- `python:3.11-slim` omits system libraries. Docling (via easyocr/OpenCV/pdfium) needs `libgl1`, `libglib2.0-0`, `libsm6`, `libxext6`, `libxrender1`. If OCR on images (Phase 2 validated feature) is used, `tesseract-ocr` and `libtesseract-dev` are needed. `libmagic1` is needed if any code path does MIME sniffing.
-- Existing `backend/services/parsing_service.py` uses a lazy `_get_converter()` singleton — the failure doesn't happen at import time, it happens on first conversion.
+Teams copy the happy-path snippet, store `code_verifier` in volatile memory, and assume PKCE alone covers CSRF (it covers code interception, not session fixation on the callback).
 
 **How to avoid:**
-- In the Dockerfile runtime stage, install: `apt-get install -y --no-install-recommends libgl1 libglib2.0-0 libsm6 libxext6 libxrender1 libmagic1 poppler-utils tesseract-ocr tesseract-ocr-eng && rm -rf /var/lib/apt/lists/*`.
-- Add a post-deploy smoke test that uploads a real PDF, a real image (OCR path), and a real XLSX to the live backend before calling the deploy done.
-- Consider `python:3.11-bookworm` (full Debian) instead of slim — costs ~100 MB but eliminates the "which system lib is missing" game. Tradeoff: bigger image.
+- Generate `code_verifier` + a random `state` together; persist BOTH in `sessionStorage` (survives the redirect within the same browser) keyed by `state`. On callback, look up the verifier *by the returned state*; reject if absent/mismatched.
+- Bind the flow to the logged-in Supabase user: the exchange must happen backend-side under the user's JWT, so the returned key is associated with `auth.uid()` server-side, not trusted from the client.
+- Send `code` + `code_verifier` to YOUR backend; the backend calls `/api/v1/auth/keys` and stores the encrypted key. Never exchange purely client-side (the key would transit/render in the browser → Pitfall 2).
+- Keep `code_challenge_method=S256` consistent in both steps.
 
 **Warning signs:**
-- `/api/health` is green but `POST /api/documents` returns 500 with `libGL.so.1` or `ImportError` in Fly logs.
-- Docling works locally (on macOS/Windows with full system) but fails in container.
-- Ingestion status in UI gets stuck at `processing` or flips to `failed` with a cryptic error.
+Exchange works on the same tab but fails after a hard refresh. No `state` round-trip. The key returned to the browser before hitting your backend. 403 "invalid credentials" / 400 "invalid challenge method" in logs.
 
-**Phase to address:** P2 (Dockerfile system deps), P8 (real-file smoke test before demo)
+**Phase to address:** P2 (OAuth flow). The state/CSRF binding is the non-obvious must-have.
 
 ---
 
-### Pitfall 6: Fly free-tier cold starts kill SSE streams and Realtime reconnects
+### Pitfall 6: Redirect/`callback_url` mismatch across dev/prod (and the SPA deep-link rewrite)
 
 **What goes wrong:**
-Fly free-tier apps can auto-stop machines when idle. First request after idle cold-starts the machine — taking 5–30+ seconds with this image size (Docling, torch). Symptoms: user clicks "Send" in chat, SSE connection times out before first token. Supabase Realtime channel for ingestion reconnects mid-upload and status never updates. Frontend shows a spinner forever.
+The exact `callback_url` sent in step 1 must match where OpenRouter redirects. This app runs three origins: `http://localhost:5173` (Vite), the Cloudflare Pages prod origin (`boardgame-rag-prod.pages.dev`), and the Fly backend. Hardcoding the callback (or building it from the wrong base) means OAuth started in prod returns the user to localhost, or the SPA's deep-link routing (Cloudflare Pages SPA rewrite, already configured in v1.1) 404s the `/auth/callback` path if it isn't whitelisted as an SPA route. OpenRouter allows localhost on any port, so dev works — masking the prod break until launch.
 
 **Why it happens:**
-- `auto_stop_machines = true` is the Fly default for cost savings.
-- Cold start has to load Docling's DocumentConverter and torch on first import if `parsing_service.py` is hit (current code is lazy, so chat-only cold start is faster — good).
-- Frontend `apiFetch` likely doesn't have retry or user-visible "server waking up" UX.
-- EventSource and `fetch`-based SSE both have ~30s idle timeouts on many proxies.
+CORS allowlist is already env-driven (`cors_allowed_origins`), so devs assume "origins are handled" — but the OAuth callback URL is a *separate* config that must derive from the same per-environment value. The dual-env setup (`.env` dev / `.env.prod`) makes it easy to ship the dev callback to prod.
 
 **How to avoid:**
-- Set `min_machines_running = 1` in `fly.toml` for the portfolio demo — trades a few dollars/month for reliability. If truly free-tier is mandatory: keep `auto_stop_machines = true` but add `auto_start_machines = true` and pre-warm on page load.
-- Add a lightweight `/api/health` ping from the frontend on app mount to trigger cold start before the user sends their first chat.
-- In the chat UI, show a "Waking up server..." state if the first SSE token takes > 3s.
-- For the Docling code path, pre-import in `main.py` at startup so the model load cost is paid once, during the health-check-passing window.
-- Tune Fly `[[services.http_checks]]` grace period to > image pull + startup time.
+- Derive `callback_url` from a single env var per environment (reuse/extend the CORS origin source). Never hardcode.
+- Ensure `/auth/callback` (or whatever path) is served by the SPA fallback on Cloudflare Pages (same fix class as the v1.1 deep-link routing).
+- Test the full round-trip on the **prod origin** before close, not just localhost. Add the callback path to any auth redirect allowlist.
 
 **Warning signs:**
-- First chat after idle returns a 502 or hangs.
-- `fly logs` shows "Starting instance..." right when user reports the timeout.
-- Ingestion UI stays on "Processing" after the page is refreshed.
+OAuth returns to the wrong host. A 404 on the callback path in prod only. "works on localhost" with no prod round-trip test.
 
-**Phase to address:** P4 (Fly config + min_machines), P6 (frontend warmup ping)
+**Phase to address:** P2 (flow) + verify on prod origin during P6/P7 deploy gate.
 
 ---
 
-### Pitfall 7: CORS misconfigured — `allow_origins=["*"]` + `allow_credentials=True` is invalid and will be silently rejected by browsers
+### Pitfall 7: Demo/owner-key fallback misconfigured → owner pays for everyone (cost blowout)
 
 **What goes wrong:**
-Current `backend/main.py` has:
-```python
-allow_origins=["*"],
-allow_credentials=True,
-```
-Browsers reject `Access-Control-Allow-Origin: *` combined with `Access-Control-Allow-Credentials: true` — the spec disallows it. Locally this might work because no auth cookies are sent, but in prod with Supabase auth or when the frontend tries to include credentials, the browser blocks the response and the user sees network errors with no useful console message.
+The owner-key demo fallback is "global flag, default off." The danger: the resolution logic in the chat path (where `get_llm_client()` is called) silently falls back to the owner key whenever a user's key is missing/invalid/expired — instead of *only* when the global demo flag is ON. Combine with v1.1's **anonymous Try-demo auth** (any visitor gets an `authenticated` JWT with no key) and you have an open door: every anon user's chats bill the owner's OpenRouter account. The existing per-user rate limit (20/min) caps *velocity*, not *spend*, and SEC-06's cost guardrail trip-test was **deferred to backlog 999.2** — so the safety net is unproven.
 
 **Why it happens:**
-- "Set it to `*` for now" is a common dev shortcut that gets left in.
-- Current auth model uses `Authorization: Bearer <jwt>` header (not cookies), so `allow_credentials` isn't actually required — but it's enabled anyway.
-- The bug is latent: chat may work while the actual CORS failure hides behind `net::ERR_FAILED`.
+"Fallback" is written as `key = user_key or owner_key` — a one-liner that ignores the flag and ignores *who* the user is. Fail-open feels friendlier than fail-closed.
 
 **How to avoid:**
-- Set `allow_origins` to an explicit list from an env var: `["https://<project>.vercel.app", "https://<custom-domain>"]` (and localhost for dev).
-- Set `allow_credentials=False` unless cookies are actually in use (they aren't in this codebase).
-- `allow_methods` and `allow_headers` can stay broad but prefer explicit: `["GET","POST","DELETE","OPTIONS"]`, `["Authorization","Content-Type","Accept"]`.
-- Test CORS from the deployed Vercel origin before demo: open browser devtools, hit chat endpoint, confirm preflight OPTIONS returns `Access-Control-Allow-Origin: https://<vercel>` (not `*`).
+- Resolution must be explicit and fail-**closed**: `if user_has_key: use user key; elif demo_flag_on and user_is_eligible: use owner key; else: refuse with a "connect your key" UX`. Never `user_key or owner_key`.
+- Define `user_is_eligible` narrowly — consider excluding anonymous demo users from owner-key fallback, or apply a much tighter per-anon spend/iteration budget when on the owner key.
+- Land the SEC-06 cost guardrail **before** enabling the fallback flag in prod (close backlog 999.2 as a dependency). Add a hard per-day owner-key spend cap and a kill switch.
+- Tag every owner-key call so usage is attributable; alert on owner-key request volume.
 
 **Warning signs:**
-- Browser console: `Access-Control-Allow-Origin` header contains `*` and credentials mode is `include` — spec violation.
-- Chat requests fail with `TypeError: Failed to fetch` from Vercel but work from `localhost`.
-- Preflight OPTIONS returns 200 but the follow-up POST is blocked.
+Owner OpenRouter spend rises without the flag being intentionally on. Anon users getting full chat responses with no key connected. Code containing `or settings.llm_api_key` / `or owner_key` in the resolution path.
 
-**Phase to address:** P6 (CORS tightening — explicit allowlist, drop credentials)
+**Phase to address:** P7 (demo-fallback gating) — but the fail-closed *shape* is set in P3 (resolution logic). Hard dependency on SEC-06 guardrail (backlog 999.2).
 
 ---
 
-### Pitfall 8: SSE broken by proxy buffering (Fly edge, Cloudflare, Vercel rewrites)
+### Pitfall 8: Wrong key used for a request (cross-user / cached-singleton leakage)
 
 **What goes wrong:**
-Backend streams tokens via `sse-starlette`. Everything works locally. On Fly, the edge proxy buffers the response until a size or time threshold, so the user sees nothing for 5–20 seconds, then the entire response dumps at once. Or worse, if the frontend proxies `/api/*` through Vercel rewrites to the Fly backend, Vercel's edge buffers the SSE and streaming is effectively dead.
+`get_llm_client()` reads from a process-global `get_settings()` (`@lru_cache`d) and builds a client from global config. If BYOK is bolted on by mutating settings or caching the client per-process (not per-request), a concurrent request can use another user's key, or a stale key. Under FastAPI async + Fly's single small instance, requests interleave; a module-level `_client` singleton or `lru_cache`d client keyed on nothing is a cross-tenant bug. Also: the budget code already calls `fetch_model_context_length(settings.llm_model, settings.resolved_llm_api_key)` (chat.py ~592) — that path must switch to the per-user key/model too, or it'll probe OpenRouter with the wrong credentials.
 
 **Why it happens:**
-- Default HTTP proxies buffer for performance.
-- `sse-starlette` sends correct headers, but some proxies only disable buffering when they also see `X-Accel-Buffering: no` (nginx convention) or when the response has `Content-Type: text/event-stream` AND no `Content-Length`.
-- Vercel's `vercel.json` rewrites to external origins don't reliably stream — the recommended pattern is to call Fly directly from the browser, not proxy through Vercel.
+The whole backend is "stateless, all state in Supabase," so devs reach for module-level singletons for the LLM client without realizing the key is now request-scoped state.
 
 **How to avoid:**
-- Set `VITE_API_BASE_URL=https://<fly-app>.fly.dev` in Vercel and call the backend directly from the browser (crosses origins — CORS from Pitfall 7 must be correct). Do NOT rewrite `/api/*` through Vercel for SSE endpoints.
-- In the chat route, explicitly add headers: `X-Accel-Buffering: no`, `Cache-Control: no-cache, no-transform`, `Connection: keep-alive`. `sse-starlette.EventSourceResponse` already sets most but not `X-Accel-Buffering`.
-- On Fly, confirm no additional reverse proxy with buffering sits in front. Fly-proxy should stream by default for `text/event-stream`.
-- Smoke test with `curl -N https://<fly>.fly.dev/api/chat/... ` and watch for tokens arriving one-by-one, not in a burst at the end.
+- Make key+model **explicit per-request parameters** threaded from `send_message` → `stream_chat_completion` → `get_llm_client(api_key=…, base_url=…, model=…)`. No global mutation, no cached client keyed on nothing.
+- Audit every call site that reads `settings.resolved_llm_api_key` / `settings.llm_model` (currently `llm_service.py`, and the budget lookup in `chat.py`) and convert them to the resolved per-request values.
+- Add a test: two concurrent requests with different keys never cross.
 
 **Warning signs:**
-- Local dev streams character-by-character; prod streams one big chunk after a long pause.
-- `curl -N` shows identical behavior.
-- `fetch` on frontend hits `ReadableStream` reader but `read()` resolves only once, with the full message.
+A `_client = None` module global in `llm_service`. `@lru_cache` on a function that returns a key-bearing client. Budget lookups still using `settings.resolved_llm_api_key` after BYOK lands.
 
-**Phase to address:** P5 (direct frontend→Fly calls, no Vercel SSE rewrite), P6 (response headers + curl smoke test)
+**Phase to address:** P3 (per-request resolution) — this is the architectural seam of the whole milestone.
 
 ---
 
-### Pitfall 9: Supabase Auth redirect URLs not updated — email verification dead in prod
+### Pitfall 9: Model picker breaks when models disappear, rename, or change pricing shape
 
 **What goes wrong:**
-User signs up on the Vercel URL, clicks the verification email, lands on `http://localhost:5173/#access_token=...` (the dev redirect), confirmation fails, account stays unverified, user blocked. Same issue breaks password reset flows.
+Four linked failures: (a) a model ID cached in the picker (and persisted **per-thread**, an active v1.2 feature) is later deprecated — OpenRouter returns **404 "no endpoints for this model found"** *at request time*, not in the model list — so a saved thread silently fails on next message; (b) pricing parsing assumes a shape — OpenRouter's `/api/v1/models` returns pricing as **strings** (`pricing.prompt`, `pricing.completion`, `pricing.image`, `pricing.request`) precisely to avoid float issues; parsing with `float()` blindly or assuming a field exists breaks when a model omits a field or the schema adds one; (c) a model renames and the persisted ID no longer resolves; (d) "free vs paid" tagging derived from naively checking `:free` suffix vs reading pricing → mislabels.
 
 **Why it happens:**
-- Supabase sends auth emails using the redirect URL configured on the project. A fresh prod project defaults to `http://localhost:3000` or whatever was set during dev.
-- The redirect is set per-Supabase-project, so the new prod project needs its own configuration — copying the dev one doesn't happen automatically.
-- This is NOT a code change — it's a dashboard config that's easy to forget.
+The picker is built against a snapshot of the list; deprecation/rename happen out-of-band; pricing-as-string surprises devs who expect numbers.
 
 **How to avoid:**
-- During P3 (Supabase prod setup), explicitly configure:
-  - **Site URL:** `https://<project>.vercel.app`
-  - **Additional Redirect URLs:** include both `https://<project>.vercel.app` and `https://<project>.vercel.app/login` and `http://localhost:5173` for local dev against prod.
-- If using `emailRedirectTo` on the frontend signup call, make sure it points to a valid configured URL.
-- Add to demo-hardening checklist: "Create brand new account from a clean browser, verify email, log in, upload a doc" — end-to-end dry run.
+- Treat persisted per-thread model IDs as *unvalidated*: on use, if the model 404s, catch it, surface a clear "this model is no longer available — pick another" and fall back to a known-good default (don't crash the thread).
+- Parse pricing defensively: `float(pricing.get("prompt", "0") or "0")`, tolerate missing/extra fields, never assume structure. Free = pricing all-zero OR `:free` suffix, computed not assumed.
+- Cache the model list but **revalidate the chosen model at send time** (cheap: the request itself returns 404 if gone). Store a `(model_id, captured_at)` so the UI can warn on stale selections.
 
 **Warning signs:**
-- Verification email link redirects to localhost.
-- User reports "clicked the link but still can't log in."
-- Supabase dashboard → Auth → Users shows users with `email_confirmed_at = null` despite having clicked the link.
+A thread that worked yesterday now errors with "no endpoints for this model." `KeyError`/`ValueError` in pricing parse after a model-list refresh. Free/paid badge wrong for a model.
 
-**Phase to address:** P3 (prod project config), P8 (E2E signup dry run)
+**Phase to address:** P4 (picker + cache) for parsing/tagging; P3 for the at-send 404 fallback.
 
 ---
 
-### Pitfall 10: pgvector / ltree / pg_trgm extensions not enabled on the prod Supabase project
+### Pitfall 10: Stale model cache + scheduled-refresh fragility (and popularity data source)
 
 **What goes wrong:**
-Migrations are applied in order, but one of them (`004_enable_pgvector.sql`, `016_enable_ltree.sql`) fails because the extension wasn't enabled at the project level, OR the migration silently succeeds but RPC functions that use operators fail at runtime with `operator does not exist: vector <=> vector`. The app deploys, chat works for non-RAG messages, but every `search_documents` call 500s.
+"Scheduled refresh" of the model list is easy to get wrong on Fly free-tier: the instance **suspends** when idle (v1.1 chose suspend, no keep-warm), so an in-process scheduler (APScheduler/asyncio task) won't fire while suspended — the cache goes stale for days, new models never appear, deprecated ones linger. Separately, "popularity" has no official, stable OpenRouter field in the models list — if popularity is scraped from the rankings page or an unofficial source, it breaks silently when that source changes, leaving the picker with empty/garbage ordering.
 
 **Why it happens:**
-- Supabase projects have a default set of enabled extensions, but `vector`, `ltree`, and sometimes `pg_trgm` (used for fuzzy search in keyword_search) require explicit enabling via Dashboard → Database → Extensions or `create extension if not exists`.
-- `004_enable_pgvector.sql` does `create extension`, but it needs the right ROLE — running via Supabase Studio works, running via external migration tool may not.
-- Some extensions create types in specific schemas (`extensions.vector`); if RLS policies or RPCs reference an unqualified type, they fail.
+Devs assume a background scheduler "just runs"; on a suspend-on-idle free tier it doesn't. Popularity is assumed to be in the API when it isn't.
 
 **How to avoid:**
-- In P3, run migrations in order 001 → 024 via `supabase db push` connected to the prod project. Do not copy SQL into Studio ad-hoc — use the migration runner.
-- After migrations, run a verification query: `SELECT extname, extversion FROM pg_extension WHERE extname IN ('vector','ltree','pg_trgm')`. All three must be present.
-- Run end-to-end search smoke test: seed one default KB document, call `POST /api/chat/...` with a query that forces `search_documents`, confirm results return (not a 500).
-- Check each RPC exists: `match_document_chunks`, `keyword_search_chunks`, `execute_readonly_query`, `kb_grep_regex`, `kb_glob`. A `SELECT proname FROM pg_proc WHERE proname LIKE 'kb_%' OR proname LIKE '%search%'` confirms them.
+- Refresh **lazily on demand** with a TTL (e.g., refresh if cache older than N hours when the picker is opened) rather than relying on a wall-clock scheduler in a suspending process. If a true schedule is needed, drive it from an external pinger (UptimeRobot already pings `/api/health`) hitting a refresh endpoint, or accept on-demand TTL.
+- Store the cache in Supabase (survives instance restarts), not in-process memory (lost on every cold start).
+- For popularity: confirm an official source exists before depending on it. If unofficial, isolate it behind a feature flag, degrade gracefully (alphabetical / free-first) when it's missing, and don't let its failure break the picker.
 
 **Warning signs:**
-- Chat works but "search your documents" queries return no results or 500.
-- `fly logs` shows `operator does not exist: public.vector <=> public.vector`.
-- Ingestion succeeds but vector column in `document_chunks` is all nulls or errors.
+New OpenRouter models never show up. Picker order empty or frozen after a deploy. Scheduler logs absent for long stretches (instance was suspended). Popularity null for all models.
 
-**Phase to address:** P3 (migrations + extension verification), P8 (search smoke test)
+**Phase to address:** P4 (cache strategy + refresh trigger + popularity source decision).
 
 ---
 
-### Pitfall 11: Migrations run in wrong order on prod (or run partially)
+### Pitfall 11: Free-model rate limits cause silent mid-chat failures
 
 **What goes wrong:**
-Someone runs migrations out of order — e.g., 020 (RLS update) before 019 (add visibility + folder), because they grabbed only "the RLS one" to re-apply. Now the `documents` table lacks the `visibility` column but has RLS policies that reference it. Every query throws `column "visibility" does not exist`.
+`:free` models carry per-minute and per-day request caps (OpenRouter; daily cap is lower without purchased credits, higher with ≥ a credits threshold). With a negative balance you get **402 Payment Required even on free models**. In the agentic loop (`chat.py` runs up to `chat_max_iterations=15` tool round-trips, each an LLM call), a single user turn can fire many requests and trip the per-minute free cap mid-turn → a 429 surfaces as a generic streamed `error` event, looking like an app bug. The user picked a "free" model and gets opaque failures.
 
 **Why it happens:**
-- 25 migration files, many interdependent. `migration 019_add_visibility_and_folder.sql` is a precondition for `020_update_rls_policies.sql` and `021_update_search_rpcs.sql`.
-- Dev used Supabase Studio directly for some earlier migrations; prod needs them all applied programmatically and in order.
-- A `run_all_module2.sql` exists — ambiguous whether it's idempotent or re-runnable.
+The picker advertises free models as frictionless; nobody maps OpenRouter's 429/402 to a human explanation; the multi-iteration tool loop amplifies request count per user message far beyond "1 message = 1 request."
 
 **How to avoid:**
-- Use `supabase db push` or `supabase migration up` against the prod project, with the migrations directory as source of truth.
-- Before deploy, run `supabase db diff` against prod to confirm no drift.
-- Verify ordering: migrations are numbered; `ls supabase/migrations/*.sql | sort` should produce the correct execution order. Check `run_all_module2.sql` and either delete it or confirm it's not re-applied on top.
-- Write a one-off verification SQL: checks all expected columns exist in `documents`, `document_chunks`, `folders`, `threads`, `messages`, `users`. Fail loudly on mismatch.
+- Detect 429 (rate limit) and 402 (payment/credit) from OpenRouter distinctly and surface tailored UX: "This free model hit its rate limit — wait a minute or pick another model / connect credits." Don't fold them into the generic `[An error occurred]`.
+- Show free-model limits in the picker tooltip so expectations are set.
+- Consider that the 15-iteration loop multiplies free-tier consumption; warn or cap iterations harder for free models.
 
 **Warning signs:**
-- `relation "folders" does not exist` or `column "visibility" does not exist` in Fly logs.
-- Ingestion fails with schema errors.
-- RLS allows or blocks the wrong rows.
+Free-model chats failing partway through multi-tool answers. Generic error events whose underlying status is 429/402. Complaints that "the free model doesn't work."
 
-**Phase to address:** P3 (migration runner + post-migration schema check)
+**Phase to address:** P3 (error mapping in the chat loop / SSE) + P5 (surfacing limits/credits in UI).
 
 ---
 
-### Pitfall 12: Supabase Storage bucket + policies not created in prod
+### Pitfall 12: Usage/cost display inaccuracy — re-deriving cost client-side instead of trusting OpenRouter
 
 **What goes wrong:**
-Migrations create the `documents` bucket via SQL (`007_create_storage_bucket.sql`), but storage policies are managed separately (either in SQL via `storage.objects` policies or in the dashboard). If `storage.objects` policies aren't applied to prod, uploads either fail with "row violates row-level security" or worse, succeed but let any user download any other user's originals.
+Two inaccuracy traps: (a) computing per-request cost by multiplying your cached `pricing.prompt/completion` by token counts — this drifts from OpenRouter's actual billing (native-tokenizer counts, caching discounts, BYOK provider differences) and will mismatch the user's real OpenRouter balance, eroding trust; (b) reading the `usage`/cost from the response too early. For **streaming** (this app streams via SSE), OpenRouter includes the usage object in the **last SSE message** — if `stream_chat_completion` returns on `finish_reason == "tool_calls"` (it does, `llm_service.py:148`) or the loop discards the final chunk, the usage object is never captured. The `/api/v1/generation` endpoint gives authoritative post-hoc cost but has a **delay** before stats are queryable.
 
 **Why it happens:**
-- Storage policies live in the `storage.objects` table, which Supabase Studio shows under a separate "Storage" UI — easy to miss when copying "Database" migrations.
-- The bucket itself may or may not be public — a dev-friendly "public bucket" setting in dev might be different in prod.
+Devs assume cost = price × tokens and that the usage field is in every chunk. The existing streaming loop wasn't built to capture a trailing usage object.
 
 **How to avoid:**
-- In P3, after migrations, verify:
-  1. `SELECT id, name, public FROM storage.buckets WHERE name = 'documents'` — expect the right `public` flag.
-  2. `SELECT policyname, qual, with_check FROM pg_policies WHERE tablename = 'objects' AND schemaname = 'storage'` — expect user-scoped policies for `documents` bucket.
-- If policies live in migration SQL, great — confirm they're in the migrations dir. If they live only in Studio, export them as SQL and add to migrations (reproducibility).
-- Smoke test: sign in as user A, upload file, get storage URL. Sign in as user B, attempt to fetch user A's URL — must 403.
+- Treat OpenRouter as the source of truth: capture the `usage` object from the final streamed chunk (request usage accounting / read the last SSE message), and read account balance from `GET /api/v1/key` (`limit`, `limit_remaining`, `usage`, `is_free_tier`) and `GET /api/v1/credits` (total purchased/used). Display *those*, don't recompute.
+- If using `/api/v1/generation` for exact cost, tolerate the propagation delay (poll/retry, or show "calculating…").
+- Update `stream_chat_completion` to surface the trailing usage chunk instead of discarding it after the last tool call. Account for the agentic loop summing usage across **multiple** LLM calls per user turn.
 
 **Warning signs:**
-- Uploads fail with `new row violates row-level security policy for table "objects"`.
-- Signed URLs return 403 even for the owning user.
-- User B can fetch user A's original PDFs.
+Your displayed cost ≠ the user's OpenRouter dashboard. Usage shows 0 tokens for streamed responses. Cost only ever reflects the last LLM call, not all iterations of the loop.
 
-**Phase to address:** P3 (storage bucket + policy verification + cross-user test)
+**Phase to address:** P5 (usage/cost display). Streaming usage-capture change touches P3's `stream_chat_completion`.
 
 ---
 
-### Pitfall 13: No rate limiting on `/api/chat` — scraper drains the LLM budget overnight
+### Pitfall 13: Key revoked/expired mid-session and "no key" dead-ends (UX traps)
 
 **What goes wrong:**
-A bot finds the public chat endpoint, scripts 10k requests, and by morning the OpenRouter/OpenAI account is out of credits. Or a single bad actor authenticated with the demo account (`ragtest1`) loops the tool-use agent to rack up charges.
+A user connects a key, then revokes it on OpenRouter (or it expires / hits zero balance). Mid-chat, the next iteration of the tool loop 401/402s. If the app only checks key presence at connect time, the user is stranded with cryptic errors. The inverse dead-end: a new user with no key picks a paid model → key-gated selection must *trigger OAuth*, but if the trigger is missing or the demo state is ambiguous, the user can't tell whether they're on the demo, their own key, or stuck. Per-thread model selection compounds this: an old thread pinned to a model the user can no longer afford/access fails on resume.
 
 **Why it happens:**
-- No rate limiting currently in `backend/main.py` or any router.
-- Demo credentials are documented in `CLAUDE.md` and will be in README — shared wide.
-- The agentic tool loop can multiply a single request into many LLM calls (retrieval + rerank + answer + optional subagent); one bad request is expensive.
+Validation is treated as a one-time gate, not a per-request reality. "Demo vs own-key" is a state nobody renders explicitly.
 
 **How to avoid:**
-- Add per-IP rate limit on `/api/chat` (e.g., `slowapi` or simple in-memory token bucket) — target 10 req/min per IP, 100/day per user.
-- Add per-user daily cap on total LLM spend — track tokens per user_id per day in a new `usage_daily` table, reject over threshold.
-- Cap tool-loop iterations (already constrained for explorer at `explorer_max_iterations=6`, but verify main chat loop has similar). Check `routers/chat.py` while-loop has a max-iterations break.
-- Put LLM API key in Fly secrets with a dollar-limit set at the provider (OpenRouter has org-level limits; OpenAI has usage caps). Belt + suspenders.
-- Use an OpenRouter key that's distinct from personal/dev, with a low monthly cap for this demo.
+- Make key state a first-class, always-visible UI signal: "Demo mode" vs "Your key: connected (balance $X)" vs "No key — connect to chat." Settings page shows key status + balance from `GET /api/v1/key`.
+- On a mid-chat 401/402/403 from OpenRouter, catch it and surface a recoverable action ("Your key was rejected — reconnect / pick the demo / add credits"), preserving the partial answer like the existing cap-hit notice does.
+- Key-gated selection: choosing a model with no connected key launches OAuth inline, then resumes the action. Don't silently no-op.
+- For revived threads pinned to an unavailable model, fall back to default + tell the user (ties into Pitfall 9).
 
 **Warning signs:**
-- LangSmith traces spike overnight.
-- OpenRouter dashboard shows unusual model calls from a single IP.
-- Fly logs show sustained POST /api/chat traffic without corresponding user activity.
+Users reporting "it just stopped working." No visible indicator of which key/mode is active. OAuth never triggered from the picker. Cryptic 401 mid-stream.
 
-**Phase to address:** P7 (rate limit + provider-level cap + usage tracking)
-
----
-
-### Pitfall 14: LangSmith free tier flooded with noisy traces
-
-**What goes wrong:**
-Every chat request + every tool call + every sub-agent invocation creates LangSmith traces. Free tier (5k traces/month as of 2026 — confirm current limits) hits the cap within days of demo traffic, traces stop recording, observability goes dark right when you need it for debugging prod.
-
-**Why it happens:**
-- `setup_tracing()` in `main.py` is unconditional — traces every request, including health checks if they're wrapped.
-- `langchain_project: "rag-masterclass"` reuses the dev project — dev noise commingles with prod.
-- The tool-use loop produces many child runs per request, each a trace.
-
-**How to avoid:**
-- Create a distinct LangSmith project: `langchain_project = "rag-masterclass-prod"`. Set via Fly secret.
-- Sample traces: only enable `LANGCHAIN_TRACING_V2=true` for a percentage of requests, or disable for health check paths. `langsmith` SDK supports `@traceable(run_type=..., sample_rate=...)`.
-- Add a kill switch: env var `LANGSMITH_ENABLED=false` that short-circuits `setup_tracing()`. Flip it off in a pinch without redeploying.
-- Use LangSmith dashboard to set up alerts at 75% of quota.
-
-**Warning signs:**
-- LangSmith dashboard shows "quota exceeded" banner.
-- New traces stop appearing mid-session.
-- Dev and prod traces intermixed in the same project.
-
-**Phase to address:** P7 (LangSmith prod project + sampling/kill switch)
-
----
-
-### Pitfall 15: Timezone assumptions break when Fly host runs UTC
-
-**What goes wrong:**
-Dev machine is local TZ (e.g., America/Los_Angeles). Fly containers default to UTC. Code that uses `datetime.now()` without tz, or formats timestamps without timezone, silently shows times 7–8 hours off in the UI, or sorts messages wrong, or expires tokens at the wrong moment.
-
-**Why it happens:**
-- `datetime.now()` without `tz=timezone.utc` returns naive local time.
-- Supabase stores `timestamptz` correctly, but Python code comparing retrieved rows to `datetime.now()` (naive) will error or give wrong results.
-- JWT expiry comparisons assume UTC; a naive datetime comparison can skew by hours.
-
-**How to avoid:**
-- Audit backend for `datetime.now()` without `tz=` — grep for `datetime.now()` and `datetime.utcnow()` (deprecated in 3.12+). Replace with `datetime.now(timezone.utc)`.
-- Set `TZ=UTC` explicitly in Dockerfile (`ENV TZ=UTC`) so behavior is predictable even if a base image changes.
-- Frontend converts to user's local TZ for display only — backend stays in UTC.
-- Test: create a thread at 11pm Pacific, confirm the `created_at` is stored in UTC and renders correctly as "11pm PT" in the UI, not "6am next day."
-
-**Warning signs:**
-- Thread timestamps in the UI are 7–12 hours off.
-- JWT verification fails unpredictably ("token expired" when it shouldn't be).
-- Sorts by `created_at` flip order compared to local dev.
-
-**Phase to address:** P2 (Dockerfile TZ=UTC), P4 (post-deploy timestamp smoke test)
-
----
-
-### Pitfall 16: SSE + CORS preflight edge cases (Accept: text/event-stream + credentials)
-
-**What goes wrong:**
-Frontend uses `fetch` (not `EventSource`) for SSE because the auth flow needs `Authorization` header (EventSource doesn't support custom headers). `fetch` with non-simple headers triggers a preflight OPTIONS. If the preflight's `Access-Control-Allow-Headers` doesn't include `Authorization` and `Content-Type`, the actual POST never happens. Chat silently fails on the Vercel origin.
-
-**Why it happens:**
-- EventSource limitation → fetch+ReadableStream pattern is standard for authed SSE.
-- `Authorization`, `Content-Type: application/json`, and sometimes `Accept: text/event-stream` all make the request "non-simple" → preflight required.
-- Current CORS config uses `allow_headers=["*"]` which *should* work, but some combinations of `allow_credentials=True` + wildcard headers are also spec-invalid.
-
-**How to avoid:**
-- Confirm `allow_credentials=False` (from Pitfall 7) — then `allow_headers=["*"]` is valid.
-- If `allow_credentials` must be True (future cookie auth), switch to explicit `allow_headers=["Authorization","Content-Type","Accept"]`.
-- Test preflight explicitly: `curl -X OPTIONS https://<fly>/api/chat/... -H "Origin: https://<vercel>" -H "Access-Control-Request-Method: POST" -H "Access-Control-Request-Headers: authorization,content-type" -i`. Expect 200 + appropriate `Access-Control-Allow-*` headers.
-
-**Warning signs:**
-- Chat button click shows OPTIONS 200 then nothing in Network tab.
-- Browser console: `Request header field authorization is not allowed by Access-Control-Allow-Headers in preflight response`.
-
-**Phase to address:** P6 (CORS hardening + preflight curl test)
+**Phase to address:** P6 (settings + key-state UX) with hooks added in P3 (error catch) and P2 (OAuth trigger).
 
 ---
 
 ## Technical Debt Patterns
 
+Shortcuts that seem reasonable but create long-term problems.
+
 | Shortcut | Immediate Benefit | Long-term Cost | When Acceptable |
 |----------|-------------------|----------------|-----------------|
-| Using a single `.env` at repo root for both frontend + backend | Works across workspaces | Can't tell which vars are safe to expose; `VITE_*` leakage risk | Dev only — prod must split (Fly secrets vs Vercel env) |
-| `allow_origins=["*"]` in dev | No CORS friction locally | Invalid + broken with credentials in prod | Dev only — must be explicit allowlist in prod |
-| `min_machines_running = 0` (Fly free tier) | $0/month | Cold starts break first-use demos | Demo never | Acceptable for cost-sensitive side projects, with UX for "server waking" |
-| Running migrations via Supabase Studio paste-and-run | Visual, forgiving | Order drift, untracked changes between dev and prod | Never for prod — always `supabase db push` |
-| Keeping `docling` unpinned | Gets latest features | Reproducibility broken; image size changes silently | Never in prod — pin before P2 |
-| Using demo `ragtest1@gmail.com` creds as public login | Easy portfolio demo | Shared account = rate limit / abuse vector | Acceptable if combined with per-IP rate limiting |
-| No rate limiting | Ship faster | LLM budget drain by a single scraper | Never for public-exposed LLM endpoints |
+| `key = user_key or owner_key` one-liner fallback | Fewer branches, demo "just works" | Cost blowout on owner key; fail-open security hole (Pitfall 7) | **Never** — must be flag-gated, fail-closed |
+| Store key encrypted with no `key_version` column | Ships faster | Painful all-rows migration at first rotation (Pitfall 4) | Never for secrets |
+| In-process model-list cache (module global) | Trivial to write | Lost on every Fly cold start; stale; cross-request races (Pitfall 10) | Prototype only; move to Supabase before prod |
+| Exchange OAuth code fully client-side | No backend round-trip | Key transits/renders in browser → Sentry/log leak (Pitfall 2/5) | Never — exchange backend-side |
+| Recompute cost = price × tokens | No extra API call | Drifts from real OpenRouter billing; user distrust (Pitfall 12) | Rough estimate only, clearly labeled "estimated" |
+| Leave LangSmith `wrap_openai` on for BYOK calls | Zero code change | User keys + prompts shipped to 3rd party (Pitfall 1) | Never for per-user-key calls |
+| Reuse `supabase_jwt_secret` as enc key | One fewer secret to manage | Co-located blast radius; weak separation (Pitfall 4) | Never |
 
 ## Integration Gotchas
 
+Common mistakes when connecting to external services.
+
 | Integration | Common Mistake | Correct Approach |
 |-------------|----------------|------------------|
-| Fly.io ↔ FastAPI | Using `127.0.0.1` as host — Fly health checks fail | Bind to `0.0.0.0` in uvicorn command; Fly injects `PORT` env var — respect it |
-| Fly.io ↔ SSE | Relying on default idle timeouts | Configure `[[services]] grace_period`, `soft_limit`, send keep-alive SSE comments every 15s |
-| Vercel ↔ SPA routing | 404 on deep-linked routes (e.g., `/documents`) | Add `vercel.json` rewrite: `{ "source": "/(.*)", "destination": "/index.html" }` |
-| Vercel ↔ Fly (API) | Proxying SSE through Vercel rewrites | Call Fly directly via `VITE_API_BASE_URL`; don't rewrite `/api/*` |
-| Supabase prod ↔ Migrations | Hand-editing Studio and calling it done | `supabase db push` from CLI; commit migrations; verify with `supabase db diff` |
-| Supabase Auth ↔ Frontend | `Site URL` left at localhost | Update Site URL + Redirect URLs after Vercel domain is known |
-| OpenRouter ↔ Embeddings | Using the same base URL for chat and embeddings | Keep embeddings pointed at OpenAI (`embedding_base_url`) — OpenRouter doesn't guarantee embedding endpoints |
-| Supabase Storage ↔ RLS | Creating bucket in dashboard, skipping policies | Create bucket + policies in migration SQL; verify `storage.objects` policies exist |
-| Supabase Realtime ↔ Fly cold start | Ingestion status channel dies during cold start | Client-side reconnect with backoff; or use polling fallback after N failed realtime reconnects |
-| LangSmith ↔ SDK | Tracing enabled by default → quota exhaustion | Separate prod project, sample rate, kill switch env var |
-| Docling ↔ Alpine/slim images | Missing libGL, libmagic, tesseract at runtime | Use Debian slim + install native deps; smoke test with real files |
+| OpenRouter OAuth `/auth` | Hardcoding `callback_url`; assuming PKCE covers CSRF | Per-env callback from one source; add own `state` param + verify on callback (Pitfall 5/6) |
+| OpenRouter `/api/v1/auth/keys` exchange | Doing it client-side; mismatched `code_challenge_method` | Backend exchange under user JWT; keep `S256` consistent (Pitfall 5) |
+| OpenRouter `/api/v1/models` | Parsing pricing as numbers; trusting cached IDs forever | Pricing fields are **strings**; revalidate model at send (Pitfall 9) |
+| OpenRouter `/api/v1/key` & `/credits` | Recomputing balance locally | Read `limit_remaining`/`usage`/`is_free_tier` from API (Pitfall 12) |
+| OpenRouter streaming usage | Discarding the final SSE chunk | Capture trailing `usage` object across all loop iterations (Pitfall 12) |
+| OpenRouter free models | Treating as unlimited | Map 429/402 to clear UX; account for 15-iteration amplification (Pitfall 11) |
+| Supabase `execute_readonly_query` RPC | Assuming RLS alone protects the new table | REVOKE select on secret column from `authenticated`; table allowlist (Pitfall 3) |
+| LangSmith `wrap_openai` | Wrapping the per-user-key client | Disable tracing or hide inputs/outputs for BYOK calls (Pitfall 1) |
+| Sentry `sk-or-` keys | Only redacting `Authorization` + JWT | Add `sk-or-v1-…` regex scrub in beforeSend/beforeBreadcrumb + backend (Pitfall 2) |
 
 ## Performance Traps
 
+Patterns that work at small scale but fail as usage grows.
+
 | Trap | Symptoms | Prevention | When It Breaks |
 |------|----------|------------|----------------|
-| Fly auto-stop cold start on every demo visit | 5–30s first-load latency | `min_machines_running = 1` for demo, warmup ping on frontend mount | Any traffic pattern with gaps > idle timeout |
-| Docling model load on first request | First ingestion takes 30s+ | Pre-warm by importing in `main.py` startup | Any cold start touching parsing_service |
-| LLM tool loop without cap | Runaway agent iterations cost $ and time | Enforce max_iterations in main chat loop (explorer already has this) | A single malicious or broken query |
-| Embedding every chunk on re-upload | Slow re-uploads, duplicate embedding cost | `record_manager.py` diffs chunks by hash — ensure it's active in prod path | Once library has >100 docs being re-uploaded |
-| SSE without keep-alive comments | Proxies close idle connections mid-stream | Send `: keepalive\n\n` every 15s during long LLM calls | LLM takes >30s to produce first token |
-| No pagination on `/api/documents` | Page load grinds when user has 500+ docs | Already in DB but verify API has limit+offset | ~200+ docs |
-| Supabase Realtime subscribing to all rows | Traffic scales with total users, not just user's docs | Filter subscription to `user_id=eq.<current>` | 10+ concurrent users |
+| Fetching balance (`/api/v1/key`) on every message render | Slow chat UI, OpenRouter rate noise | Cache balance, refresh on settings open / after a turn | Any real usage; immediately on a chatty user |
+| Synchronous model-list fetch in the chat hot path | Added latency per request | Cache in Supabase with TTL; don't fetch in `send_message` | Every request once list is large (400+ models) |
+| Decrypting key on a path that runs per-token/per-chunk | CPU + risk of plaintext lingering | Decrypt once per LLM call, hold in local scope, drop immediately | Streaming responses (many chunks) |
+| In-process scheduler on suspend-on-idle Fly | Refresh never fires; stale cache | On-demand TTL or external pinger trigger | As soon as traffic is sparse (the portfolio's actual pattern) |
 
 ## Security Mistakes
 
+Domain-specific security issues beyond general web security.
+
 | Mistake | Risk | Prevention |
 |---------|------|------------|
-| Service role key in frontend bundle | Full DB access for any visitor | CI grep guard in `frontend/`; Pitfall 2 |
-| `.env` in Docker image | Secrets in public registry | `.dockerignore`; Pitfall 3 |
-| `allow_origins=["*"]` in prod | Any site can make authed requests | Explicit allowlist; Pitfall 7 |
-| No rate limit on LLM endpoint | Budget drain + DoS | Per-IP rate limit + per-user daily cap; Pitfall 13 |
-| Demo credentials with no per-account cap | Abuse via shared demo login | Daily token cap per user_id; provider-level cap |
-| JWT verification skipped on any endpoint | RLS assumes user context | Audit all routers require `Depends(get_user_id)` — spot check for any endpoint without it |
-| Unsigned Supabase Storage URLs for private docs | Anyone with URL can download | Use signed URLs with short expiry for private docs; never return raw public URLs |
-| Logging user queries with PII to LangSmith | Data exposure if LangSmith leaks | Review what's traced; consider redaction for prompt content |
-| `execute_readonly_query` RPC exposing schema | Attacker enumerates tables via text-to-SQL tool | Verify RPC blocks dangerous keywords (migration 015 claims this — audit) |
+| Per-user key in LangSmith trace | User secret + chat exfiltrated to 3rd party | Gate `wrap_openai` off / hide inputs for BYOK (Pitfall 1) |
+| Per-user key in Sentry (URL/console/error) | Secret leak to error vendor | `sk-or-` regex scrub everywhere (Pitfall 2) |
+| Keys table readable by Text-to-SQL tool | Mass key exfiltration via prompt injection | RLS + REVOKE select on secret col from `authenticated` (Pitfall 3) |
+| Master enc key co-located / non-rotatable | Single dump compromises all keys; no recovery | Dedicated key, AES-GCM, `key_version`, rotation runbook (Pitfall 4) |
+| No CSRF `state` on OAuth callback | Attacker binds wrong key to victim account | Own `state` param, verified server-side (Pitfall 5) |
+| Owner-key fail-open fallback | Owner billed for anonymous abuse | Fail-closed, flag-gated, anon-excluded, cost cap (Pitfall 7) |
+| Plaintext key in SSE `error`/log | Secret to browser + Sentry | Sanitize `str(e)` before SSE/log (Pitfall 2) |
+| Returning own ciphertext into LLM context | Needless exposure / injection surface | Never select key column into model-visible paths (Pitfall 3) |
 
 ## UX Pitfalls
 
+Common user experience mistakes in this domain.
+
 | Pitfall | User Impact | Better Approach |
 |---------|-------------|-----------------|
-| Cold-start hang with no feedback | User thinks app is broken, bounces | "Server waking up (~15s)..." state after 3s of no response |
-| Silent CORS failure | Chat button does nothing, no error message | Catch `TypeError: Failed to fetch`, show explicit "Connection issue" banner |
-| Email verification link broken | User can't complete signup | Dry-run signup flow before demo; keep "Resend verification" accessible |
-| Realtime disconnect during upload | Status frozen at "Processing" forever | Polling fallback: after 3 missed realtime events, poll `/api/documents/:id` every 5s |
-| Vercel SPA deep link 404 | Shared link to `/documents` returns Vercel 404 | `vercel.json` SPA rewrite |
-| Demo credentials already "in use" elsewhere | Two visitors interfere with each other's data | Seed defaults + instruct visitors to sign up with their own email (rate-limited) OR wipe demo account on a cron |
+| No visible "demo vs your key" state | User unsure who's paying / why limited | Always-visible mode badge + balance (Pitfall 13) |
+| Picking paid model with no key silently no-ops | Dead-end, confusion | Key-gated selection launches OAuth inline (Pitfall 13) |
+| Mid-chat key rejection → generic error | "It broke," lost trust | Recoverable action: reconnect / demo / add credits (Pitfall 13) |
+| Free-model 429/402 shown as app error | Blames the app, not the limit | Tailored "free model rate limited" message (Pitfall 11) |
+| Per-thread model now deprecated, thread crashes | Old conversations unusable | Fall back to default + notify (Pitfall 9) |
+| Displayed cost ≠ OpenRouter dashboard | Distrust of usage numbers | Show OpenRouter-reported usage/balance, label estimates (Pitfall 12) |
 
 ## "Looks Done But Isn't" Checklist
 
-- [ ] **Dockerfile:** Builds locally — but also verify `docker run` starts the server, `/api/health` is 200, AND a real PDF uploads + gets parsed inside the container. Docling system-lib failures don't show up in health checks.
-- [ ] **CORS:** Local dev works — but test from the deployed Vercel origin, not localhost, and run a preflight OPTIONS curl.
-- [ ] **Secrets:** Fly secrets set — but also grep the image (`docker history`, `docker run ... env`) and the frontend bundle for secret-shaped strings.
-- [ ] **Migrations:** Applied — but verify each extension (`vector`, `ltree`, `pg_trgm`) exists AND run a search query end-to-end.
-- [ ] **Storage:** Bucket created — but verify policies in `pg_policies WHERE schemaname='storage'` AND cross-user access test.
-- [ ] **Auth:** Login works — but complete a fresh signup + email verification flow on the prod URL, not just "sign in with existing account."
-- [ ] **SSE:** Streams in dev — but `curl -N` against prod URL and confirm tokens arrive incrementally, not as one burst.
-- [ ] **Rate limit:** Added — but script 100 requests in a loop against `/api/chat` and confirm you get 429s.
-- [ ] **Realtime:** Subscribes — but simulate a cold-start disconnect (kill and restart Fly machine mid-upload) and verify UI recovers.
-- [ ] **Observability:** LangSmith traces appearing — but confirm the `langchain_project` is the prod project, not dev, AND that noise traces (health checks) are excluded.
-- [ ] **Demo walk-through:** You've used it — but have a non-developer friend do the signup + chat + upload flow from a phone with no coaching.
+Things that appear complete but are missing critical pieces.
+
+- [ ] **Key storage:** Often missing `key_version`/`nonce` columns and a rotation runbook — verify a second master key can decrypt + lazy re-encrypt (Pitfall 4)
+- [ ] **Encrypted keys table:** Often still readable by `execute_readonly_query` — verify `REVOKE SELECT … FROM authenticated` and a prompt-injection SQL probe returns nothing (Pitfall 3)
+- [ ] **OAuth flow:** Often missing `state`/CSRF and per-env callback — verify a forged-callback attempt is rejected and prod-origin round-trip works (Pitfall 5/6)
+- [ ] **Sentry/LangSmith:** Often only JWTs scrubbed — verify `sk-or-v1-…` is redacted in events, breadcrumbs, console logs, and BYOK chats aren't traced (Pitfall 1/2)
+- [ ] **Key resolution:** Often fail-open `user_key or owner_key` — verify it's fail-closed and flag-gated, and anon users can't reach the owner key (Pitfall 7)
+- [ ] **Per-request key:** Often a cached singleton client — verify two concurrent users with different keys never cross (Pitfall 8)
+- [ ] **Model picker:** Often crashes on deprecated/renamed model or missing pricing field — verify graceful 404 fallback + defensive string parse (Pitfall 9)
+- [ ] **Model cache refresh:** Often an in-process scheduler that never fires on suspended Fly — verify on-demand TTL or external trigger (Pitfall 10)
+- [ ] **Usage/cost:** Often recomputed locally / missing streamed usage — verify it matches OpenRouter and sums across loop iterations (Pitfall 12)
+- [ ] **Cost guardrail (SEC-06 / backlog 999.2):** Often still un-trip-tested — verify the owner-key cap actually fires *before* enabling demo fallback (Pitfall 7)
 
 ## Recovery Strategies
 
+When pitfalls occur despite prevention, how to recover.
+
 | Pitfall | Recovery Cost | Recovery Steps |
 |---------|---------------|----------------|
-| Secret committed to git | HIGH | Rotate the secret at the provider immediately; `git filter-repo` or BFG to purge from history; force-push; notify any collaborators. Cost scales with how public the repo is. |
-| Service role key in frontend bundle | HIGH | Rotate service role key in Supabase (Project Settings → API → Reset); redeploy backend + frontend; audit logs for suspicious writes during exposure window |
-| Docker image bloat | LOW | Refactor Dockerfile to multi-stage; tighter `.dockerignore`; redeploy |
-| Docling runtime missing libs | LOW | Add `apt-get install` line; redeploy; no data loss |
-| CORS misconfig | LOW | Update `CORS_ORIGINS` env var; redeploy backend; no data impact |
-| SSE buffering | MEDIUM | Diagnose proxy layer; add `X-Accel-Buffering: no`; switch Vercel rewrite → direct origin; may require small frontend change |
-| Auth redirect URLs wrong | LOW | Update in Supabase dashboard; no redeploy needed; existing un-verified users may need manual re-verification email |
-| Migrations out of order | MEDIUM-HIGH | If data already written: may need a new migration to fix drift. If empty: drop prod DB and re-run from scratch — only possible before users exist |
-| LLM budget drained | MEDIUM | Add rate limiting retroactively; rotate API key if compromised; top up provider; communicate outage |
-| Cold start breaking demo | LOW | Bump `min_machines_running` to 1; add frontend warmup ping |
-| LangSmith quota exhausted | LOW | Flip kill-switch env var; reduce sampling; wait for monthly reset or upgrade |
-| Timezone bugs in stored data | HIGH | If `timestamptz` used in Supabase, data is correct — only display logic needs fixing. If naive datetimes stored, may need backfill migration |
+| Key leaked to Sentry/LangSmith (1,2) | HIGH | Treat as breach: rotate/instruct users to revoke OpenRouter keys, purge vendor events, add scrub rule, post-mortem |
+| Keys readable via SQL tool (3) | HIGH | Immediately REVOKE grant + RLS, force key rotation for all users, audit `query_database` history |
+| Master enc key needs rotation, no `key_version` (4) | HIGH | Add column, dual-key decrypt window, lazy re-encrypt; if no old key retained, force all users to reconnect |
+| Owner-key cost blowout (7) | MEDIUM | Flip flag off (kill switch), cap spend at OpenRouter, identify abusing anon sessions, exclude anon from fallback |
+| Deprecated model crashes threads (9) | LOW | Catch 404 at send, fall back to default, prompt re-selection |
+| Stale model cache (10) | LOW | Manual refresh endpoint; switch to on-demand TTL |
+| Cost display mismatch (12) | LOW | Switch source to OpenRouter `usage`/`/key`; relabel local numbers as estimates |
 
 ## Pitfall-to-Phase Mapping
 
+How roadmap phases should address these pitfalls.
+
 | Pitfall | Prevention Phase | Verification |
 |---------|------------------|--------------|
-| 1. VITE_* secret leakage | P1 (define allowlist), P5 (Vercel env), P8 | Grep built bundle for secret prefixes |
-| 2. Service role in frontend | P1 (CI guard), P6, P8 | CI fails on `service_role` in `frontend/`; RLS smoke test |
-| 3. `.env` leaks into image/git | P1 | `.dockerignore` exists; `git log -- .env` empty; `docker run` env inspection |
-| 4. Docker image bloat | P2 | `docker images` < 2 GB; build time < 5 min |
-| 5. Docling missing system libs | P2, P8 | Real PDF + image + XLSX upload succeeds in container |
-| 6. Fly cold start kills SSE | P4, P6 | First request after 10 min idle completes within 20s OR warmup path confirmed |
-| 7. CORS wildcard + credentials | P6 | Explicit origin in preflight response; `curl -i OPTIONS` check |
-| 8. SSE proxy buffering | P5, P6 | `curl -N` shows incremental tokens in prod |
-| 9. Auth redirect URLs stale | P3, P8 | Fresh signup + email verification E2E passes |
-| 10. pgvector/ltree extensions | P3, P8 | `pg_extension` query confirms all 3; search E2E returns results |
-| 11. Migrations out of order | P3 | `supabase db diff` clean; schema verification query passes |
-| 12. Storage policies missing | P3 | `pg_policies` query confirms; cross-user access test 403s |
-| 13. No rate limit / LLM drain | P7 | 100-req loop returns 429s; provider-level cap set |
-| 14. LangSmith noise flood | P7 | Prod project distinct; sampling configured; kill switch tested |
-| 15. Timezone bugs | P2 (TZ=UTC), P4 | UI timestamps match expected local TZ rendering |
-| 16. SSE + CORS preflight | P6 | Authenticated SSE request from Vercel origin completes end-to-end |
+| 1 LangSmith traces user key | P3 (key resolution) | No `sk-or-`/prompt in LangSmith for BYOK runs |
+| 2 Sentry/log/SSE key leak | P1 (backend) + P2 (frontend) | `sk-or-` regex hits nothing in events/logs |
+| 3 SQL tool reads keys table | P1 (storage migration) | Prompt-injected `select * from user_api_keys` returns nothing |
+| 4 Enc key mgmt / rotation | P1 (storage migration) | Second master key decrypts; `key_version`/`nonce` present |
+| 5 PKCE verifier/state/CSRF | P2 (OAuth) | Forged callback rejected; hard-refresh exchange works |
+| 6 Callback URL mismatch | P2 (OAuth) + deploy gate | Prod-origin round-trip succeeds; callback path served by SPA |
+| 7 Demo fallback cost blowout | P7 (gating) + P3 (shape) | Fail-closed; anon excluded; SEC-06 cap trips (dep: 999.2) |
+| 8 Wrong/cross-user key | P3 (per-request resolution) | Concurrent different-key requests never cross |
+| 9 Model disappears/renames/pricing | P4 (picker) + P3 (send 404) | Deprecated model → graceful fallback, no crash |
+| 10 Stale cache / refresh / popularity | P4 (cache) | New model appears via on-demand TTL; popularity degrades gracefully |
+| 11 Free-model rate limits | P3 (error map) + P5 (UI) | 429/402 → tailored message, not generic error |
+| 12 Usage/cost accuracy | P5 (display) + P3 (stream usage) | Displayed cost matches OpenRouter; sums all iterations |
+| 13 Mid-chat revoke / no-key UX | P6 (settings/UX) | Mode always visible; mid-chat 401 recoverable |
 
 ## Sources
 
-- Current repo code: `backend/main.py` (CORS config with `allow_origins=["*"]` + `allow_credentials=True` — confirmed invalid per MDN CORS spec), `backend/config.py` (single `.env` pattern), `backend/requirements.txt` (`docling` unpinned).
-- Migration file listing confirms extension + RLS ordering dependencies.
-- MDN / Fetch spec on CORS credentials + wildcard origin incompatibility (HIGH confidence — long-standing browser spec).
-- Fly.io docs on auto-stop machines and SSE / streaming proxy behavior (MEDIUM — platform-specific, verify current free-tier limits at deploy time).
-- Vercel docs on SPA rewrites and streaming through rewrites (MEDIUM — Vercel's edge streaming support has evolved; confirm current behavior for Node/SSE from external origins before finalizing P5).
-- Supabase docs on Auth redirect URL configuration and Storage RLS policies (HIGH — well-documented).
-- Docling GitHub issues on system library requirements for PDF/OCR paths (MEDIUM — verify current docling version's dep list at pin time).
-- LangSmith pricing page for current free-tier trace quota (LOW — confirm current limits at deploy time; quota numbers change).
+- OpenRouter OAuth PKCE — auth URL, `callback_url`, `code_challenge`/`S256`, exchange `POST /api/v1/auth/keys`, `key` response field, localhost-any-port, error codes 400/403/405: https://openrouter.ai/docs/guides/overview/auth/oauth and https://openrouter.ai/docs/api/api-reference/o-auth/exchange-auth-code-for-api-key (HIGH)
+- OpenRouter rate limits — `:free` model RPM/RPD caps, ≥-credits threshold, 402 on negative balance, `GET /api/v1/key` fields (`limit`, `limit_remaining`, `usage`, `is_free_tier`): https://openrouter.ai/docs/api/reference/limits (HIGH)
+- OpenRouter credits/key endpoints — `GET /api/v1/credits` (total purchased/used), `GET /api/v1/key` (rate limit + spend): https://openrouter.ai/docs/api/api-reference/credits/get-credits (HIGH)
+- OpenRouter models — pricing fields are **strings** (`prompt`/`completion`/`image`/`request`); deprecated model → 404 "no endpoints for this model found": https://openrouter.ai/docs/api/api-reference/models/get-models and https://openrouter.ai/docs/guides/overview/models (HIGH)
+- OpenRouter usage accounting — `usage` object in last SSE message for streaming; `/api/v1/generation` for post-hoc cost (with delay); native-tokenizer counts: https://openrouter.ai/docs/cookbook/administration/usage-accounting (HIGH)
+- LangSmith redaction — `wrap_openai` traces inputs/outputs; hide via `LANGSMITH_HIDE_INPUTS/OUTPUTS`, client-side anonymizer before payload leaves process: https://docs.langchain.com/langsmith/mask-inputs-outputs (HIGH)
+- This repo's code (HIGH, direct read): `backend/services/llm_service.py` (`wrap_openai`, single-key client, stream returns on `finish_reason=='tool_calls'`), `backend/routers/chat.py` (15-iteration tool loop, SSE `error` events, budget key lookup), `backend/services/sql_service.py` + `supabase/migrations/20240301000015_execute_readonly_query.sql` (SECURITY DEFINER, service-role, RLS-reliant), `backend/database.py` (service-role only), `frontend/src/lib/sentry.ts` (Authorization+JWT-only scrub), `backend/config.py` (env single-key, `@lru_cache` settings)
+- Project context: `.planning/PROJECT.md` (v1.2 features, anon Try-demo auth, free-tier Fly suspend, SEC-06 deferred to 999.2), `.planning/MILESTONES.md` (v1.1 hardening already done — don't duplicate)
 
 ---
-*Pitfalls research for: v1.1 Portfolio Deployment*
-*Researched: 2026-04-22*
+*Pitfalls research for: OpenRouter BYOK addition to a deployed multi-user RAG app*
+*Researched: 2026-06-18*
