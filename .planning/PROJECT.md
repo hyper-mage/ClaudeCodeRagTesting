@@ -68,9 +68,33 @@ The agent can intelligently search and reason across a structured board game kno
 - ✓ One-click Try-demo anon onboarding + graceful chat error/retry UX — v1.1 (Phase 8)
 - ✓ Portfolio README + architecture diagram + screenshots + hero GIF + shields.io badges — v1.1 (Phase 8)
 
+## Current Milestone: v1.2 User Options & BYOK
+
+**Goal:** Users run LLMs of their choice from their own OpenRouter keys with near-zero-friction onboarding, while a gated owner-key demo fallback preserves the public demo.
+
+**Target features:**
+- OpenRouter OAuth (PKCE) auto key retrieval — no manual key paste
+- User keys stored encrypted server-side, RLS-scoped, decrypted only in backend
+- Model picker with free/paid tags + popularity, cached with scheduled refresh
+- Key-gated model selection that triggers OAuth when no key is connected
+- Owner-key demo fallback behind a global flag, off by default
+- Usage/cost display (OpenRouter balance + per-request token/cost)
+- Per-thread model selection, persisted
+- Settings/account page (key status, default model, theme, profile)
+- Theme toggle (light/dark), persisted per user
+
 ### Active
 
-(None — v1.1 shipped 2026-05-20. Next milestone scope defined via `/gsd:new-milestone`.)
+- OpenRouter OAuth (PKCE) key retrieval — auto-provision user-scoped key — v1.2
+- Encrypted server-side storage of user OpenRouter keys, RLS-scoped — v1.2
+- Model picker: list from OpenRouter /models, free/paid + popularity tags — v1.2
+- Scheduled model-list refresh to pick up new models — v1.2
+- Key-gated model selection → trigger OAuth when no key — v1.2
+- Owner-key demo fallback, global flag, default off — v1.2
+- Usage/cost display (balance + per-request) — v1.2
+- Per-thread model selection (persisted) — v1.2
+- Settings/account page — v1.2
+- Theme toggle (light/dark, persisted) — v1.2
 
 ### Out of Scope
 
@@ -153,7 +177,7 @@ This document evolves at phase transitions and milestone boundaries.
 - SEC-06 OpenRouter cost-cap live trip-test deferred to backlog `999.2`.
 - Backlog: `999.1` chat empty-state UX, `999.2` cost-guardrail burn script.
 
-**Next milestone:** not yet scoped — start with `/gsd:new-milestone`.
+**Next milestone:** v1.2 User Options & BYOK — scoped 2026-06-18. Requirements + roadmap in progress.
 
 ---
-*Last updated: 2026-05-20 — v1.1 Portfolio Deployment milestone complete and archived.*
+*Last updated: 2026-06-18 — v1.2 User Options & BYOK milestone started.*
