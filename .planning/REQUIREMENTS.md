@@ -84,42 +84,53 @@ Explicitly excluded. Anti-features from research documented to prevent scope cre
 
 ## Traceability
 
-Populated by the roadmapper during roadmap creation. Each requirement maps to exactly one phase.
+Each requirement maps to exactly one phase. Phases continue numbering from v1.1 (which ended at Phase 8); v1.2 spans Phases 9-15.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| KEY-01 | TBD | Pending |
-| KEY-02 | TBD | Pending |
-| KEY-03 | TBD | Pending |
-| KEY-04 | TBD | Pending |
-| KEY-05 | TBD | Pending |
-| MODEL-01 | TBD | Pending |
-| MODEL-02 | TBD | Pending |
-| MODEL-03 | TBD | Pending |
-| MODEL-04 | TBD | Pending |
-| MODEL-05 | TBD | Pending |
-| MODEL-06 | TBD | Pending |
-| MODEL-07 | TBD | Pending |
-| MODEL-08 | TBD | Pending |
-| COST-01 | TBD | Pending |
-| COST-02 | TBD | Pending |
-| COST-03 | TBD | Pending |
-| COST-04 | TBD | Pending |
-| DEMO-01 | TBD | Pending |
-| DEMO-02 | TBD | Pending |
-| DEMO-03 | TBD | Pending |
-| PREF-01 | TBD | Pending |
-| PREF-02 | TBD | Pending |
-| SEC-01 | TBD | Pending |
-| SEC-02 | TBD | Pending |
-| SEC-03 | TBD | Pending |
-| SEC-04 | TBD | Pending |
+| KEY-01 | Phase 10 | Pending |
+| KEY-02 | Phase 9 | Pending |
+| KEY-03 | Phase 10 | Pending |
+| KEY-04 | Phase 10 | Pending |
+| KEY-05 | Phase 15 | Pending |
+| MODEL-01 | Phase 12 | Pending |
+| MODEL-02 | Phase 12 | Pending |
+| MODEL-03 | Phase 12 | Pending |
+| MODEL-04 | Phase 12 | Pending |
+| MODEL-05 | Phase 13 | Pending |
+| MODEL-06 | Phase 13 | Pending |
+| MODEL-07 | Phase 12 | Pending |
+| MODEL-08 | Phase 15 | Pending |
+| COST-01 | Phase 14 | Pending |
+| COST-02 | Phase 14 | Pending |
+| COST-03 | Phase 14 | Pending |
+| COST-04 | Phase 14 | Pending |
+| DEMO-01 | Phase 15 | Pending |
+| DEMO-02 | Phase 15 | Pending |
+| DEMO-03 | Phase 11 | Pending |
+| PREF-01 | Phase 14 | Pending |
+| PREF-02 | Phase 13 | Pending |
+| SEC-01 | Phase 11 | Pending |
+| SEC-02 | Phase 9 | Pending |
+| SEC-03 | Phase 15 | Pending |
+| SEC-04 | Phase 11 | Pending |
 
 **Coverage:**
 - v1.2 requirements: 26 total
-- Mapped to phases: 0 (pending roadmap)
-- Unmapped: 26 ⚠️ (roadmapper to resolve)
+- Mapped to phases: 26 ✓
+- Unmapped: 0 ✓
+
+**Per-phase distribution:**
+- Phase 9 (Crypto + Key Storage): KEY-02, SEC-02 (2)
+- Phase 10 (OAuth PKCE Connect): KEY-01, KEY-03, KEY-04 (3)
+- Phase 11 (Per-Request Resolution): SEC-04, SEC-01, DEMO-03 (3)
+- Phase 12 (Model Cache + Catalog): MODEL-01, MODEL-02, MODEL-03, MODEL-04, MODEL-07 (5)
+- Phase 13 (Preferences + Per-Thread Model): MODEL-05, MODEL-06, PREF-02 (3)
+- Phase 14 (Usage/Cost + Settings UX): COST-01, COST-02, COST-03, COST-04, PREF-01 (5)
+- Phase 15 (Options UI Capstone + Demo Gating): KEY-05, MODEL-08, DEMO-01, DEMO-02, SEC-03 (5)
+
+**Cross-cutting SEC note:** Each SEC requirement is folded into the single phase where it is *enforced* (per the SUMMARY.md / PITFALLS.md pitfall-to-phase mapping), not stranded: SEC-02 (SQL-tool lockdown) ships with the storage migration in Phase 9; SEC-01 (no key in traces/logs/SSE) is enforced at the chat-loop seam in Phase 11 where the LangSmith `wrap_openai` gate lives, with the frontend Sentry `sk-or-` scrub landing alongside the OAuth callback in Phase 10 and the backend scrub alongside the resolution block in Phase 11; SEC-04 (no cross-user key bleed) is enforced by per-request key+model parameters in Phase 11; SEC-03 (owner-key cost bounded before demo) is the hard gate on enabling the demo-fallback flag in Phase 15, depending on backlog 999.2.
 
 ---
 *Requirements defined: 2026-06-18*
-*Last updated: 2026-06-18 after initial definition*
+*Last updated: 2026-06-18 after roadmap creation — traceability mapped (26/26 to Phases 9-15)*
