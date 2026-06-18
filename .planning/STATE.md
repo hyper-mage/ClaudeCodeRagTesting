@@ -4,13 +4,13 @@ milestone: v1.2
 milestone_name: User Options & BYOK
 status: executing
 stopped_at: Phase 9 context gathered
-last_updated: "2026-06-18T23:25:08.516Z"
+last_updated: "2026-06-18T23:32:49.896Z"
 last_activity: 2026-06-18
 progress:
   total_phases: 9
   completed_phases: 0
   total_plans: 3
-  completed_plans: 1
+  completed_plans: 2
   percent: 0
 ---
 
@@ -26,9 +26,9 @@ See: .planning/PROJECT.md (updated 2026-05-20 after v1.1 completion)
 ## Current Position
 
 Phase: 09 (crypto-encrypted-key-storage-foundation) — EXECUTING
-Plan: 2 of 3
+Plan: 3 of 3
 Status: Ready to execute
-Progress: [███░░░░░░░] 33%
+Progress: [███████░░░] 67%
 Last activity: 2026-06-18
 
 ## Performance Metrics
@@ -57,6 +57,8 @@ v1.2 roadmap-shaping decisions (to be promoted to PROJECT.md at phase transition
 - BYOK is additive-by-reuse: Fernet (already-pinned `cryptography`), `httpx` for all OpenRouter calls, Web Crypto PKCE (no lib); only new frontend dep surface is shadcn/ui Combobox.
 - [Phase ?]: Phase 9 BYOK encryption uses MultiFernet from day one (D-02): KEY_ENCRYPTION_SECRET is a comma-separated NEW-KEY-FIRST list; encrypt uses keys[0], decrypt tries all, rotate re-encrypts under keys[0].
 - [Phase ?]: crypto_service reads KEY_ENCRYPTION_SECRET at call-time via get_settings() so @lru_cache is test-clearable; secret/plaintext/ciphertext never logged, traced, or returned (D-04, T-09-01).
+- [Phase ?]: [Phase 9]: SQL-tool keys-table allowlist reconciled to {threads, messages, documents, document_chunks} (RESEARCH Open Question 1 closed) — matches QUERYABLE_SCHEMA; RESEARCH-era folders dropped.
+- [Phase ?]: [Phase 9]: execute_readonly_query allowlist is positive default-deny; CTE self-referencing aliases are NOT tolerated (would otherwise let an attacker alias user_api_keys past the gate). Allowlist helper in sql_service.py is additive-only — the DB RPC remains the enforcing gate.
 
 ### Pending Todos
 
@@ -73,7 +75,7 @@ v1.2 roadmap-shaping decisions (to be promoted to PROJECT.md at phase transition
 
 ## Session Continuity
 
-Last session: 2026-06-18T23:24:57.250Z
+Last session: 2026-06-18T23:32:30.128Z
 Stopped at: Phase 9 context gathered
 Resume file: None
 Next: Plan the first phase with `/gsd:plan-phase 9`.
