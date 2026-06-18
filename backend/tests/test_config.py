@@ -30,3 +30,18 @@ def test_chat_rate_limit_env_override(monkeypatch):
     from config import Settings
     s = Settings()
     assert s.chat_rate_limit == "5/minute"
+
+
+def test_key_encryption_secret_default():
+    """Settings.key_encryption_secret defaults to empty string (D-04)."""
+    from config import Settings
+    s = Settings()
+    assert s.key_encryption_secret == ""
+
+
+def test_key_encryption_secret_env_override(monkeypatch):
+    """KEY_ENCRYPTION_SECRET env var overrides default."""
+    monkeypatch.setenv("KEY_ENCRYPTION_SECRET", "abc")
+    from config import Settings
+    s = Settings()
+    assert s.key_encryption_secret == "abc"

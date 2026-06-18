@@ -18,6 +18,10 @@ class Settings(BaseSettings):
     langchain_tracing_v2: str = "true"
     langsmith_project: str = "rag-masterclass"
 
+    # BYOK master key (Phase 9 D-04) — comma-separated url-safe base64 Fernet keys,
+    # NEW KEY FIRST for MultiFernet rotation. Distinct value per env (.env vs .env.prod).
+    key_encryption_secret: str = ""
+
     # CORS allowlist (comma-separated origins, e.g. "https://app.pages.dev,http://localhost:5173")
     cors_allowed_origins: str = ""
 
