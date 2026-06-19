@@ -23,6 +23,17 @@ This procedure satisfies ROADMAP success criterion #4 (documented rotation path)
 - **`key_version`** is an integer counter on `user_api_keys` recording which master key encrypted
   a given row. Encrypt/insert paths (Phase 10) write the current primary version; the lazy
   re-encrypt path (Phase 11) bumps it.
+  - **WR-05 — Phase 9 placeholder, NOT maintained here.** Phase 9 ships only the stateless
+    `crypto_service` (encrypt/decrypt/rotate operate on token strings) and the `user_api_keys`
+    table DDL with `key_version INTEGER NOT NULL DEFAULT 1`. **No code in Phase 9 reads, sets, or
+    increments `key_version`** — `crypto_service` cannot, because it never touches storage; the
+    row-writer must. Until the Phase 10 persistence layer lands, **do not trust the stored
+    `key_version` as ground truth for which key encrypted a row** (every row will read the `1`
+    default regardless of the actual encrypting key). The contract for downstream phases is:
+    Phase 10 insert/update sets `key_version` to the current primary version on write; Phase 11's
+    lazy re-encrypt bumps it alongside `encrypted_key` (see Step 4's UPDATE shape below). This
+    note exists so a future migration/rotation tool does not read `key_version` before any phase
+    actually maintains it.
 - The master key, plaintext key, and ciphertext are **never logged, traced, or returned** —
   `crypto_service` enforces this (D-04).
 
