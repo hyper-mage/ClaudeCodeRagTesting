@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: User Options & BYOK
 status: executing
-stopped_at: Completed 10-02-PLAN.md (backend OAuth exchange path — /api/keys exchange/status/delete live, 12 tests green)
-last_updated: "2026-06-19T21:03:23.282Z"
+stopped_at: Completed 10-03-PLAN.md (FE Connect core — lib/pkce.ts + lib/sentry.ts sk-or scrub + useKeyStatus + SettingsPage + OAuthCallbackPage; build green, new files lint-clean)
+last_updated: "2026-06-19T21:12:09.177Z"
 last_activity: 2026-06-19
 progress:
   total_phases: 9
-  completed_phases: 1
+  completed_phases: 2
   total_plans: 7
-  completed_plans: 6
-  percent: 11
+  completed_plans: 7
+  percent: 22
 ---
 
 # Project State
@@ -67,6 +67,7 @@ v1.2 roadmap-shaping decisions (to be promoted to PROJECT.md at phase transition
 - [Phase ?]: [Phase 10]: keys.py exchange sets connected_at EXPLICITLY in the .upsert payload (PK=user_id, one key per user) so reconnect re-stamps; user_id bound to JWT sub; sql_service.py left untouched so the Phase 9 SEC-02 lockdown stays green (Plan 10-02).
 - [Phase ?]: [Phase 10]: FE PKCE round-trip stores code_verifier + CSRF state in sessionStorage (NOT localStorage) so a same-tab hard-refresh on the callback is the SUCCESS path (D-07); the callback reads them from sessionStorage (not React state), validates returnedState !== storedState before the bearer'd exchange POST, and renders a LOCKED generic failure sentence that never interpolates the caught error / HTTP status / sk-or- fragment (D-06). Shared startOpenRouterConnect() helper in lib/pkce.ts powers both the Connect CTA and the callback Retry (Plan 10-03).
 - [Phase ?]: [Phase 10]: SEC-01 frontend half landed — lib/sentry.ts scrubs /sk-or-v1-[A-Za-z0-9_-]+/g -> [redacted-key] in BOTH beforeSend (message/exception/request.url incl. callback URL) and beforeBreadcrumb (message/data), additive beside the existing Authorization/sb-…-auth-token rules (Plan 10-03).
+- [Phase ?]: Plan 10-04 Tasks 1-2 shipped: /settings + callback routes, IconSidebar Settings gear (rail + drawer), display-only connection dot on chat route (MobileTopBar + IconSidebar desktop) via useKeyStatus, no polling. Task 3 prod round-trip is a blocking human-verify checkpoint, pending the real user.
 
 ### Pending Todos
 
@@ -83,7 +84,7 @@ v1.2 roadmap-shaping decisions (to be promoted to PROJECT.md at phase transition
 
 ## Session Continuity
 
-Last session: 2026-06-19T21:03:23.276Z
+Last session: 2026-06-19T21:11:31.418Z
 Stopped at: Completed 10-03-PLAN.md (FE Connect core — lib/pkce.ts + lib/sentry.ts sk-or scrub + useKeyStatus + SettingsPage + OAuthCallbackPage; build green, new files lint-clean)
 Resume file: None
 Next: Execute Plan 10-04 (wire routing in App.tsx + IconSidebar gear + chat-header connection dot).
