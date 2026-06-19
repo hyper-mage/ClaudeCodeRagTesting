@@ -26,3 +26,20 @@ export async function challengeFromVerifier(verifier: string): Promise<string> {
   const hash = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(verifier))
   return base64url(hash)
 }
+
+// Generate a fresh verifier + CSRF state, persist BOTH to sessionStorage (not
+// localStorage — D-07 hard-refresh + CSRF binding), then redirect to OpenRouter
+// /auth with the S256 challenge. Shared by the SettingsPage Connect CTA and the
+// OAuthCallbackPage Retry button so both run the identical PKCE init.
+export async function startOpenRouterConnect(): Promise<void> {
+  const verifier = randomString(64)
+  const state = randomString(32)
+  const challenge = await challengeFromVerifier(verifier)
+  sessionStorage.setItem('or_pkce_verifier', verifier)
+  sessionStorage.setItem('or_pkce_state', state)
+  const callback = `${window.location.origin}/settings/openrouter/callback`
+  window.location.assign(
+    `https://openrouter.ai/auth?callback_url=${encodeURIComponent(callback)}` +
+      `&code_challenge=${challenge}&code_challenge_method=S256&state=${state}`,
+  )
+}
