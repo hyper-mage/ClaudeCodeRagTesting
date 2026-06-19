@@ -24,6 +24,14 @@ import * as Sentry from '@sentry/react'
 
 const dsn = import.meta.env.VITE_SENTRY_DSN as string | undefined
 
+// SEC-01 (frontend half): redact OpenRouter keys (`sk-or-v1-…`) anywhere they
+// could leak into a Sentry event, breadcrumb, or URL (incl. the OAuth callback
+// URL). Additive safety net beside the existing Authorization / sb-…-auth-token
+// rules — the primary defenses are generic UI copy + generic backend errors.
+const OR_KEY = /sk-or-v1-[A-Za-z0-9_-]+/g
+const scrub = (s: unknown): unknown =>
+  typeof s === 'string' ? s.replace(OR_KEY, '[redacted-key]') : s
+
 if (dsn) {
   Sentry.init({
     dsn,
@@ -45,6 +53,19 @@ if (dsn) {
       if (event.user) {
         event.user = { ip_address: '{{auto}}' }
       }
+      // Redact any leaked sk-or-v1-… from message, exception values, and the URL
+      // (the OAuth callback URL can carry a code/key fragment).
+      if (typeof event.message === 'string') {
+        event.message = scrub(event.message) as string
+      }
+      for (const exc of event.exception?.values ?? []) {
+        if (typeof exc.value === 'string') {
+          exc.value = scrub(exc.value) as string
+        }
+      }
+      if (event.request && typeof event.request.url === 'string') {
+        event.request.url = scrub(event.request.url) as string
+      }
       return event
     },
     beforeBreadcrumb(breadcrumb: Sentry.Breadcrumb) {
@@ -65,6 +86,18 @@ if (dsn) {
         /sb-[^-]+-auth-token/.test(breadcrumb.message)
       ) {
         return null
+      }
+      // Redact any leaked sk-or-v1-… from the breadcrumb message + stringy data.
+      if (typeof breadcrumb.message === 'string') {
+        breadcrumb.message = scrub(breadcrumb.message) as string
+      }
+      if (breadcrumb.data) {
+        const data = breadcrumb.data as Record<string, unknown>
+        for (const key of Object.keys(data)) {
+          if (typeof data[key] === 'string') {
+            data[key] = scrub(data[key])
+          }
+        }
       }
       return breadcrumb
     },
