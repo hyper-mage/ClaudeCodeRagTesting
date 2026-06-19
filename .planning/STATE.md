@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: User Options & BYOK
-status: executing
-stopped_at: Phase 9 context gathered
-last_updated: "2026-06-18T23:32:49.896Z"
-last_activity: 2026-06-18
+status: verifying
+stopped_at: Completed 09-03-PLAN.md (Phase 9 all plans done; ready_for_verification)
+last_updated: "2026-06-19T01:47:21.058Z"
+last_activity: 2026-06-19
 progress:
   total_phases: 9
-  completed_phases: 0
+  completed_phases: 1
   total_plans: 3
-  completed_plans: 2
-  percent: 0
+  completed_plans: 3
+  percent: 11
 ---
 
 # Project State
@@ -27,9 +27,9 @@ See: .planning/PROJECT.md (updated 2026-05-20 after v1.1 completion)
 
 Phase: 09 (crypto-encrypted-key-storage-foundation) — EXECUTING
 Plan: 3 of 3
-Status: Ready to execute
-Progress: [███████░░░] 67%
-Last activity: 2026-06-18
+Status: Phase complete — ready for verification
+Progress: [██████████] 100%
+Last activity: 2026-06-19
 
 ## Performance Metrics
 
@@ -59,6 +59,8 @@ v1.2 roadmap-shaping decisions (to be promoted to PROJECT.md at phase transition
 - [Phase ?]: crypto_service reads KEY_ENCRYPTION_SECRET at call-time via get_settings() so @lru_cache is test-clearable; secret/plaintext/ciphertext never logged, traced, or returned (D-04, T-09-01).
 - [Phase ?]: [Phase 9]: SQL-tool keys-table allowlist reconciled to {threads, messages, documents, document_chunks} (RESEARCH Open Question 1 closed) — matches QUERYABLE_SCHEMA; RESEARCH-era folders dropped.
 - [Phase ?]: [Phase 9]: execute_readonly_query allowlist is positive default-deny; CTE self-referencing aliases are NOT tolerated (would otherwise let an attacker alias user_api_keys past the gate). Allowlist helper in sql_service.py is additive-only — the DB RPC remains the enforcing gate.
+- [Phase ?]: [Phase 9]: Migrations 025/026 applied LIVE to dev (ntkkmljbariflblldmha) after a 001-024 migration-history repair; SEC-02 lockdown verified live — select * from user_api_keys rejected by the migration-026 allowlist (P0001 non-allowlisted table). Prod deferred to deploy (D-03).
+- [Phase ?]: [Phase 9]: Pre-existing execute_readonly_query 42501 (SET LOCAL role inside SECURITY DEFINER, identical in migrations 015 and 026) logged to deferred-items.md D-09-A — out of scope for the verify plan, orthogonal to SEC-02; triage in Phase 11 or a dedicated RPC-fix plan.
 
 ### Pending Todos
 
@@ -75,8 +77,8 @@ v1.2 roadmap-shaping decisions (to be promoted to PROJECT.md at phase transition
 
 ## Session Continuity
 
-Last session: 2026-06-18T23:32:30.128Z
-Stopped at: Phase 9 context gathered
+Last session: 2026-06-19T01:47:21.049Z
+Stopped at: Completed 09-03-PLAN.md (Phase 9 all plans done; ready_for_verification)
 Resume file: None
 Next: Plan the first phase with `/gsd:plan-phase 9`.
 

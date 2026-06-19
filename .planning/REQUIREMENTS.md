@@ -10,7 +10,7 @@ Requirements for this milestone. Each maps to a roadmap phase (continues numberi
 ### Key Management & BYOK (KEY)
 
 - [ ] **KEY-01**: User can connect their OpenRouter account via OAuth (PKCE) without manually pasting a key
-- [ ] **KEY-02**: User's OpenRouter key is stored encrypted at rest, RLS-scoped to the user, and never returned to the frontend
+- [x] **KEY-02**: User's OpenRouter key is stored encrypted at rest, RLS-scoped to the user, and never returned to the frontend
 - [ ] **KEY-03**: User can see their key connection status (connected vs not connected, masked label only)
 - [ ] **KEY-04**: User can disconnect and reconnect their OpenRouter key
 - [ ] **KEY-05**: Selecting a model with no connected key triggers the OAuth connect flow (key-gated)
@@ -49,7 +49,7 @@ Requirements for this milestone. Each maps to a roadmap phase (continues numberi
 Cross-cutting release blockers — secret custody is the milestone's defining risk.
 
 - [ ] **SEC-01**: User OpenRouter keys never appear in LangSmith traces, Sentry events, logs, or SSE error payloads
-- [ ] **SEC-02**: The Text-to-SQL tool cannot read the user-keys table (secret column REVOKE'd from the `authenticated` role + RPC table allowlist)
+- [x] **SEC-02**: The Text-to-SQL tool cannot read the user-keys table (secret column REVOKE'd from the `authenticated` role + RPC table allowlist)
 - [ ] **SEC-03**: Owner-key cost exposure is bounded before demo fallback is enabled in prod (SEC-06 cost guardrail / backlog 999.2 verified with a real trip-test + kill switch)
 - [ ] **SEC-04**: Concurrent requests from different users never share a key or model (per-request client, no cross-user bleed)
 
@@ -89,7 +89,7 @@ Each requirement maps to exactly one phase. Phases continue numbering from v1.1 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
 | KEY-01 | Phase 10 | Pending |
-| KEY-02 | Phase 9 | Pending |
+| KEY-02 | Phase 9 | Complete |
 | KEY-03 | Phase 10 | Pending |
 | KEY-04 | Phase 10 | Pending |
 | KEY-05 | Phase 15 | Pending |
@@ -111,7 +111,7 @@ Each requirement maps to exactly one phase. Phases continue numbering from v1.1 
 | PREF-01 | Phase 14 | Pending |
 | PREF-02 | Phase 13 | Pending |
 | SEC-01 | Phase 11 | Pending |
-| SEC-02 | Phase 9 | Pending |
+| SEC-02 | Phase 9 | Complete |
 | SEC-03 | Phase 15 | Pending |
 | SEC-04 | Phase 11 | Pending |
 

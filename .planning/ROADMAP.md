@@ -29,7 +29,7 @@ Full phase detail archived in `milestones/v1.1-ROADMAP.md`. Audit: passed, 23/23
 
 **Milestone Goal:** Users run LLMs of their choice from their own OpenRouter keys with near-zero-friction onboarding (OAuth PKCE, no manual key paste), while a gated owner-key demo fallback preserves the public demo. Secret custody is the milestone's defining risk — security findings are release blockers, front-loaded into the storage and chat-loop phases, with demo-fallback enablement deliberately last and gated on the SEC-06 cost guardrail.
 
-- [ ] **Phase 9: Crypto + Encrypted Key Storage Foundation** - Fernet encryption, `user_api_keys` table with RLS, SQL-tool lockdown
+- [x] **Phase 9: Crypto + Encrypted Key Storage Foundation** - Fernet encryption, `user_api_keys` table with RLS, SQL-tool lockdown (completed 2026-06-19)
 - [ ] **Phase 10: OAuth PKCE — Backend Exchange + Frontend Connect** - Connect/disconnect an OpenRouter account with no manual key paste
 - [ ] **Phase 11: Per-Request Key + Model Resolution (chat-loop seam)** - Every chat runs on the right user's key + model, fail-closed, no cross-user bleed
 - [ ] **Phase 12: Model Cache + Catalog** - Searchable, auto-refreshing model list with free/paid + popularity + price hints
@@ -61,7 +61,7 @@ Plans:
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 09-03-PLAN.md — [BLOCKING] apply migrations 025/026 to dev Supabase + live REVOKE/allowlist probe (dev only per D-03)
+- [x] 09-03-PLAN.md — [BLOCKING] apply migrations 025/026 to dev Supabase + live REVOKE/allowlist probe (dev only per D-03)
 
 ### Phase 10: OAuth PKCE — Backend Exchange + Frontend Connect
 
@@ -204,7 +204,7 @@ Phases execute in numeric order: 9 → 10 → 11 → 12 → 13 → 14 → 15 (Ph
 
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
-| 9. Crypto + Encrypted Key Storage | v1.2 | 2/3 | In Progress|  |
+| 9. Crypto + Encrypted Key Storage | v1.2 | 3/3 | Complete   | 2026-06-19 |
 | 10. OAuth PKCE Connect | v1.2 | 0/TBD | Not started | - |
 | 11. Per-Request Key + Model Resolution | v1.2 | 0/TBD | Not started | - |
 | 12. Model Cache + Catalog | v1.2 | 0/TBD | Not started | - |
