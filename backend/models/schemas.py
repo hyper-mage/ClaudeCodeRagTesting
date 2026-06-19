@@ -60,6 +60,30 @@ class DocumentResponse(BaseModel):
     updated_at: datetime
 
 
+# ----- OpenRouter BYOK key exchange (Phase 10) -----
+
+class ExchangeRequest(BaseModel):
+    """POST body for /api/keys/openrouter/exchange — the PKCE code + verifier.
+
+    Accepting these only via a JSON body (never query params) keeps the code /
+    code_verifier out of URLs/logs (T-10-07).
+    """
+    code: str
+    code_verifier: str
+
+
+class KeyStatusResponse(BaseModel):
+    """GET /api/keys/status — masked-only connection state (KEY-03, T-10-03).
+
+    Never carries the key: only a boolean, the non-secret masked tail, and the
+    stored connected_at timestamp (typed `str` so it passes through as-is for
+    frontend date formatting).
+    """
+    connected: bool
+    masked_label: str | None = None
+    connected_at: str | None = None
+
+
 # ----- Explorer sub-agent (Phase 5) -----
 
 class ExplorerFinding(BaseModel):
