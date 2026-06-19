@@ -177,7 +177,7 @@ This document evolves at phase transitions and milestone boundaries.
 - SEC-06 OpenRouter cost-cap live trip-test deferred to backlog `999.2`.
 - Backlog: `999.1` chat empty-state UX, `999.2` cost-guardrail burn script.
 
-**Next milestone:** v1.2 User Options & BYOK — scoped 2026-06-18. Requirements + roadmap in progress.
+**Current milestone:** v1.2 User Options & BYOK — scoped 2026-06-18. **Phase 9 complete** (Crypto + Encrypted Key Storage Foundation): KEY-02 + SEC-02 validated — encrypted BYOK key storage live on dev (Fernet/MultiFernet round-trip + rotation, ciphertext-only RLS `user_api_keys` table, REVOKE + hardened FROM-table allowlist provably blocking Text-to-SQL exfiltration incl. comma/schema bypass vectors). Prod apply deferred to the deploy step (D-03). Pre-existing RPC `42501 SET LOCAL role` issue logged for Phase 11 (D-09-A).
 
 ---
-*Last updated: 2026-06-18 — v1.2 User Options & BYOK milestone started.*
+*Last updated: 2026-06-18 — v1.2 Phase 9 (Crypto + Encrypted Key Storage Foundation) complete.*
