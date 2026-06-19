@@ -17,8 +17,18 @@ logger = logging.getLogger(__name__)
 
 
 def _multifernet() -> MultiFernet:
-    """Build a MultiFernet from the configured key list (NEW KEY FIRST), read at call time."""
+    """Build a MultiFernet from the configured key list (NEW KEY FIRST), read at call time.
+
+    Fails with a clear, actionable error when KEY_ENCRYPTION_SECRET is empty/unset
+    (its default) or all-whitespace, instead of the opaque
+    "MultiFernet requires at least one Fernet instance" ValueError from cryptography.
+    D-04: the error message NEVER includes the key value or any ciphertext.
+    """
     keys = [k.strip() for k in get_settings().key_encryption_secret.split(",") if k.strip()]
+    if not keys:
+        raise RuntimeError(
+            "KEY_ENCRYPTION_SECRET is not set — cannot encrypt/decrypt BYOK keys"
+        )
     return MultiFernet([Fernet(k.encode()) for k in keys])
 
 

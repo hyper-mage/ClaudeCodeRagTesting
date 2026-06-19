@@ -4,6 +4,7 @@ crypto_service reads KEY_ENCRYPTION_SECRET via get_settings() (which is @lru_cac
 so every monkeypatch.setenv("KEY_ENCRYPTION_SECRET", ...) MUST be followed by
 get_settings.cache_clear() before the service is exercised.
 """
+import pytest
 from cryptography.fernet import Fernet
 
 
@@ -38,3 +39,21 @@ def test_rotation_decrypts_old_and_reencrypts(monkeypatch):
     monkeypatch.setenv("KEY_ENCRYPTION_SECRET", new)
     get_settings.cache_clear()
     assert crypto_service.decrypt_key(rotated) == "sk-or-v1-example"
+
+
+def test_unset_secret_raises_clear_error(monkeypatch):
+    """WR-03: with KEY_ENCRYPTION_SECRET empty/unset (its default) or
+    all-whitespace, the crypto service raises a clear, actionable error naming
+    the missing config — NOT the opaque cryptography ValueError
+    'MultiFernet requires at least one Fernet instance'.
+    D-04: the message must not leak any key/ciphertext (there is none to leak)."""
+    from config import get_settings
+    from services import crypto_service
+
+    for unset in ("", "   ", ",, ,"):
+        monkeypatch.setenv("KEY_ENCRYPTION_SECRET", unset)
+        get_settings.cache_clear()
+        with pytest.raises(RuntimeError, match="KEY_ENCRYPTION_SECRET is not set"):
+            crypto_service.encrypt_key("sk-or-v1-example")
+        with pytest.raises(RuntimeError, match="KEY_ENCRYPTION_SECRET is not set"):
+            crypto_service.decrypt_key("gAAAAAB-not-a-real-token")
