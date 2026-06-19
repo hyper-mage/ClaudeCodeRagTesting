@@ -6,7 +6,7 @@ from fastapi.responses import JSONResponse
 from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
 
-from routers import threads, chat, documents, folders, demo
+from routers import threads, chat, documents, folders, demo, keys
 from services.tracing import setup_tracing
 from config import get_settings
 from database import get_supabase
@@ -66,6 +66,7 @@ app.include_router(chat.router)
 app.include_router(documents.router)
 app.include_router(folders.router)
 app.include_router(demo.router)
+app.include_router(keys.router)
 
 
 @app.api_route("/api/health", methods=["GET", "HEAD"])
