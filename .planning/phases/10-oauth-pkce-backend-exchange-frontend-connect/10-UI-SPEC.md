@@ -1,10 +1,11 @@
 ---
 phase: "10"
 slug: oauth-pkce-backend-exchange-frontend-connect
-status: draft
+status: approved
 shadcn_initialized: false
 preset: none
 created: 2026-06-19
+reviewed_at: 2026-06-19
 ---
 
 # Phase 10 — UI Design Contract
