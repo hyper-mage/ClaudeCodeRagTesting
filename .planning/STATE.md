@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: User Options & BYOK
 status: executing
-stopped_at: Completed 10-01-PLAN.md (migration 028 live on dev)
-last_updated: "2026-06-19T20:44:06.607Z"
+stopped_at: Completed 10-02-PLAN.md (backend OAuth exchange path live)
+last_updated: "2026-06-19T20:53:05.801Z"
 last_activity: 2026-06-19
 progress:
   total_phases: 9
   completed_phases: 1
   total_plans: 7
-  completed_plans: 4
-  percent: 11
+  completed_plans: 5
+  percent: 71
 ---
 
 # Project State
@@ -26,16 +26,16 @@ See: .planning/PROJECT.md (updated 2026-05-20 after v1.1 completion)
 ## Current Position
 
 Phase: 10 (oauth-pkce-backend-exchange-frontend-connect) — EXECUTING
-Plan: 2 of 4
+Plan: 3 of 4
 Status: Ready to execute
-Progress: [██████░░░░] 57%
+Progress: [███████░░░] 71%
 Last activity: 2026-06-19
 
 ## Performance Metrics
 
 - Phases planned: 7 (Phases 9-15)
 - Phases complete: 1/7 (Phase 9)
-- Plans complete: 4 (Phase 9: 3/3; Phase 10: 1/4 — 10-01 migration 028, ~14 min, 2 tasks, 1 file)
+- Plans complete: 5 (Phase 9: 3/3; Phase 10: 2/4 — 10-01 migration 028 ~14 min; 10-02 backend exchange path ~4 min, 3 tasks, 7 files, 12 tests green)
 - Requirements mapped: 26/26 ✓
 
 ## Accumulated Context
@@ -63,6 +63,8 @@ v1.2 roadmap-shaping decisions (to be promoted to PROJECT.md at phase transition
 - [Phase ?]: [Phase 9]: Pre-existing execute_readonly_query 42501 (SET LOCAL role inside SECURITY DEFINER, identical in migrations 015 and 026) logged to deferred-items.md D-09-A — out of scope for the verify plan, orthogonal to SEC-02; triage in Phase 11 or a dedicated RPC-fix plan.
 - [Phase ?]: [Phase 10]: connected_at added as a dedicated nullable TIMESTAMPTZ column (migration 028); set explicitly in the exchange upsert (ON CONFLICT skips defaults); backs 'Connected since' (KEY-03) + reconnect (KEY-04).
 - [Phase ?]: [Phase 10]: Migration 028 applied LIVE to dev (ntkkmljbariflblldmha), additive-only; SEC-02 lockdown verified intact (live P0001 RPC probe + unit test); prod deferred to deploy (D-03).
+- [Phase ?]: [Phase 10]: BYOK exchange returns {connected:True} only — the sk-or-v1 key (plaintext OR ciphertext) is NEVER in any response; a 403 from OpenRouter surfaces a generic HTTPException(502) scrubbed of the body/key (T-10-03/T-10-04/SEC-01, Plan 10-02).
+- [Phase ?]: [Phase 10]: keys.py exchange sets connected_at EXPLICITLY in the .upsert payload (PK=user_id, one key per user) so reconnect re-stamps; user_id bound to JWT sub; sql_service.py left untouched so the Phase 9 SEC-02 lockdown stays green (Plan 10-02).
 
 ### Pending Todos
 
@@ -79,10 +81,10 @@ v1.2 roadmap-shaping decisions (to be promoted to PROJECT.md at phase transition
 
 ## Session Continuity
 
-Last session: 2026-06-19T20:44:06.600Z
-Stopped at: Completed 10-01-PLAN.md (migration 028 live on dev)
+Last session: 2026-06-19T20:52:44.633Z
+Stopped at: Completed 10-02-PLAN.md (backend OAuth exchange path — /api/keys exchange/status/delete live, 12 tests green)
 Resume file: None
-Next: Plan the first phase with `/gsd:plan-phase 9`.
+Next: Execute Plan 10-03 (frontend Connect + SettingsPage).
 
 ## Operator Next Steps
 

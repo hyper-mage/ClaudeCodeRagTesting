@@ -205,7 +205,7 @@ Phases execute in numeric order: 9 → 10 → 11 → 12 → 13 → 14 → 15 (Ph
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
 | 9. Crypto + Encrypted Key Storage | v1.2 | 3/3 | Complete   | 2026-06-19 |
-| 10. OAuth PKCE Connect | v1.2 | 1/4 | In Progress|  |
+| 10. OAuth PKCE Connect | v1.2 | 2/4 | In Progress|  |
 | 11. Per-Request Key + Model Resolution | v1.2 | 0/TBD | Not started | - |
 | 12. Model Cache + Catalog | v1.2 | 0/TBD | Not started | - |
 | 13. Preferences + Per-Thread Model | v1.2 | 0/TBD | Not started | - |

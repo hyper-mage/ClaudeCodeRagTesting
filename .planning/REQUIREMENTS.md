@@ -9,7 +9,7 @@ Requirements for this milestone. Each maps to a roadmap phase (continues numberi
 
 ### Key Management & BYOK (KEY)
 
-- [ ] **KEY-01**: User can connect their OpenRouter account via OAuth (PKCE) without manually pasting a key
+- [x] **KEY-01**: User can connect their OpenRouter account via OAuth (PKCE) without manually pasting a key
 - [x] **KEY-02**: User's OpenRouter key is stored encrypted at rest, RLS-scoped to the user, and never returned to the frontend
 - [x] **KEY-03**: User can see their key connection status (connected vs not connected, masked label only)
 - [x] **KEY-04**: User can disconnect and reconnect their OpenRouter key
@@ -88,7 +88,7 @@ Each requirement maps to exactly one phase. Phases continue numbering from v1.1 
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| KEY-01 | Phase 10 | Pending |
+| KEY-01 | Phase 10 | Complete |
 | KEY-02 | Phase 9 | Complete |
 | KEY-03 | Phase 10 | Complete |
 | KEY-04 | Phase 10 | Complete |
