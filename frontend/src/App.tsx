@@ -5,6 +5,8 @@ import ProtectedRoute from './components/ProtectedRoute'
 import LoginPage from './pages/LoginPage'
 import ChatPage from './pages/ChatPage'
 import DocumentsPage from './pages/DocumentsPage'
+import SettingsPage from './pages/SettingsPage'
+import OAuthCallbackPage from './pages/OAuthCallbackPage'
 import IconSidebar from './components/IconSidebar'
 
 function AuthenticatedLayout({ children }: { children: React.ReactNode }) {
@@ -40,6 +42,24 @@ function App() {
                 <AuthenticatedLayout>
                   <DocumentsPage />
                 </AuthenticatedLayout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/settings"
+            element={
+              <ProtectedRoute>
+                <AuthenticatedLayout>
+                  <SettingsPage />
+                </AuthenticatedLayout>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/settings/openrouter/callback"
+            element={
+              <ProtectedRoute>
+                <OAuthCallbackPage />
               </ProtectedRoute>
             }
           />
