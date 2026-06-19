@@ -3,8 +3,8 @@ gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: User Options & BYOK
 status: planning
-stopped_at: Phase 10 context gathered
-last_updated: "2026-06-19T18:07:43.009Z"
+stopped_at: Phase 10 UI-SPEC approved
+last_updated: "2026-06-19T18:21:24.043Z"
 last_activity: 2026-06-19
 progress:
   total_phases: 9
@@ -77,9 +77,9 @@ v1.2 roadmap-shaping decisions (to be promoted to PROJECT.md at phase transition
 
 ## Session Continuity
 
-Last session: 2026-06-19T18:07:42.996Z
-Stopped at: Phase 10 context gathered
-Resume file: .planning/phases/10-oauth-pkce-backend-exchange-frontend-connect/10-CONTEXT.md
+Last session: 2026-06-19T18:21:24.032Z
+Stopped at: Phase 10 UI-SPEC approved
+Resume file: .planning/phases/10-oauth-pkce-backend-exchange-frontend-connect/10-UI-SPEC.md
 Next: Plan the first phase with `/gsd:plan-phase 9`.
 
 ## Operator Next Steps
