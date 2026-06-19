@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: User Options & BYOK
 status: executing
-stopped_at: Phase 10 UI-SPEC approved
-last_updated: "2026-06-19T20:35:00.211Z"
-last_activity: 2026-06-19 -- Phase 10 planning complete
+stopped_at: Completed 10-01-PLAN.md (migration 028 live on dev)
+last_updated: "2026-06-19T20:44:06.607Z"
+last_activity: 2026-06-19
 progress:
   total_phases: 9
   completed_phases: 1
   total_plans: 7
-  completed_plans: 3
+  completed_plans: 4
   percent: 11
 ---
 
@@ -21,21 +21,21 @@ progress:
 See: .planning/PROJECT.md (updated 2026-05-20 after v1.1 completion)
 
 **Core value:** The agent can intelligently search and reason across a structured board game knowledge base -- finding rules, comparing mechanics, and recommending games -- using the right tool for the job, transparently.
-**Current focus:** Phase 999.1 — chat empty state ux
+**Current focus:** Phase 10 — oauth-pkce-backend-exchange-frontend-connect
 
 ## Current Position
 
-Phase: 999.1
-Plan: Not started
+Phase: 10 (oauth-pkce-backend-exchange-frontend-connect) — EXECUTING
+Plan: 2 of 4
 Status: Ready to execute
-Progress: [██████████] 100%
-Last activity: 2026-06-19 -- Phase 10 planning complete
+Progress: [██████░░░░] 57%
+Last activity: 2026-06-19
 
 ## Performance Metrics
 
 - Phases planned: 7 (Phases 9-15)
-- Phases complete: 0/7
-- Plans complete: 0/0 (plan counts TBD per phase)
+- Phases complete: 1/7 (Phase 9)
+- Plans complete: 4 (Phase 9: 3/3; Phase 10: 1/4 — 10-01 migration 028, ~14 min, 2 tasks, 1 file)
 - Requirements mapped: 26/26 ✓
 
 ## Accumulated Context
@@ -61,6 +61,8 @@ v1.2 roadmap-shaping decisions (to be promoted to PROJECT.md at phase transition
 - [Phase ?]: [Phase 9]: execute_readonly_query allowlist is positive default-deny; CTE self-referencing aliases are NOT tolerated (would otherwise let an attacker alias user_api_keys past the gate). Allowlist helper in sql_service.py is additive-only — the DB RPC remains the enforcing gate.
 - [Phase ?]: [Phase 9]: Migrations 025/026 applied LIVE to dev (ntkkmljbariflblldmha) after a 001-024 migration-history repair; SEC-02 lockdown verified live — select * from user_api_keys rejected by the migration-026 allowlist (P0001 non-allowlisted table). Prod deferred to deploy (D-03).
 - [Phase ?]: [Phase 9]: Pre-existing execute_readonly_query 42501 (SET LOCAL role inside SECURITY DEFINER, identical in migrations 015 and 026) logged to deferred-items.md D-09-A — out of scope for the verify plan, orthogonal to SEC-02; triage in Phase 11 or a dedicated RPC-fix plan.
+- [Phase ?]: [Phase 10]: connected_at added as a dedicated nullable TIMESTAMPTZ column (migration 028); set explicitly in the exchange upsert (ON CONFLICT skips defaults); backs 'Connected since' (KEY-03) + reconnect (KEY-04).
+- [Phase ?]: [Phase 10]: Migration 028 applied LIVE to dev (ntkkmljbariflblldmha), additive-only; SEC-02 lockdown verified intact (live P0001 RPC probe + unit test); prod deferred to deploy (D-03).
 
 ### Pending Todos
 
@@ -77,9 +79,9 @@ v1.2 roadmap-shaping decisions (to be promoted to PROJECT.md at phase transition
 
 ## Session Continuity
 
-Last session: 2026-06-19T18:21:24.032Z
-Stopped at: Phase 10 UI-SPEC approved
-Resume file: .planning/phases/10-oauth-pkce-backend-exchange-frontend-connect/10-UI-SPEC.md
+Last session: 2026-06-19T20:44:06.600Z
+Stopped at: Completed 10-01-PLAN.md (migration 028 live on dev)
+Resume file: None
 Next: Plan the first phase with `/gsd:plan-phase 9`.
 
 ## Operator Next Steps

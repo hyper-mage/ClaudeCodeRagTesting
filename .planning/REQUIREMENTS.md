@@ -11,8 +11,8 @@ Requirements for this milestone. Each maps to a roadmap phase (continues numberi
 
 - [ ] **KEY-01**: User can connect their OpenRouter account via OAuth (PKCE) without manually pasting a key
 - [x] **KEY-02**: User's OpenRouter key is stored encrypted at rest, RLS-scoped to the user, and never returned to the frontend
-- [ ] **KEY-03**: User can see their key connection status (connected vs not connected, masked label only)
-- [ ] **KEY-04**: User can disconnect and reconnect their OpenRouter key
+- [x] **KEY-03**: User can see their key connection status (connected vs not connected, masked label only)
+- [x] **KEY-04**: User can disconnect and reconnect their OpenRouter key
 - [ ] **KEY-05**: Selecting a model with no connected key triggers the OAuth connect flow (key-gated)
 
 ### Model Selection (MODEL)
@@ -90,8 +90,8 @@ Each requirement maps to exactly one phase. Phases continue numbering from v1.1 
 |-------------|-------|--------|
 | KEY-01 | Phase 10 | Pending |
 | KEY-02 | Phase 9 | Complete |
-| KEY-03 | Phase 10 | Pending |
-| KEY-04 | Phase 10 | Pending |
+| KEY-03 | Phase 10 | Complete |
+| KEY-04 | Phase 10 | Complete |
 | KEY-05 | Phase 15 | Pending |
 | MODEL-01 | Phase 12 | Pending |
 | MODEL-02 | Phase 12 | Pending |
