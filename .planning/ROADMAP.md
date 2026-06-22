@@ -94,11 +94,22 @@ Plans:
   3. No `sk-or-v1-…` value or BYOK prompt appears in LangSmith, Sentry, logs, or SSE error payloads — `wrap_openai` is gated off for per-user-key calls and a `sk-or-` regex scrub runs before any log/SSE-error in the backend.
   4. Model resolves three-tier (`thread.model` → `user_preferences.default_model` → owner default) and OpenRouter 429 vs 402 errors are surfaced distinctly (rate-limit vs payment), not folded into a generic error; the trailing `usage` object is captured on the terminal non-tool-call turn.
 
-**Plans**: TBD
+**Plans**: 4 plans
 
 Plans:
 
-- [ ] TBD (refined during /gsd:plan-phase 11)
+**Wave 1**
+
+- [ ] 11-01-PLAN.md — config (demo_fallback_enabled OFF + demo_fallback_model :free) + scrub_secrets helper + Wave 0 test scaffolds
+- [ ] 11-02-PLAN.md — [BLOCKING] migration 029 (additive nullable messages.usage) + apply to dev Supabase
+
+**Wave 2** *(blocked on Wave 1)*
+
+- [ ] 11-03-PLAN.md — llm_service trace-gate + key/model params + usage drain; thread rerank/subagent/explorer + search_documents→rerank
+
+**Wave 3** *(blocked on Waves 1-2)*
+
+- [ ] 11-04-PLAN.md — chat.py _resolve_key_and_model (fail-closed three-branch + three-tier) + budget fifth-read fix + SSE scrub/402/429 + usage persist + demo-mode signal
 
 ### Phase 12: Model Cache + Catalog
 
@@ -206,7 +217,7 @@ Phases execute in numeric order: 9 → 10 → 11 → 12 → 13 → 14 → 15 (Ph
 |-------|-----------|----------------|--------|-----------|
 | 9. Crypto + Encrypted Key Storage | v1.2 | 3/3 | Complete   | 2026-06-19 |
 | 10. OAuth PKCE Connect | v1.2 | 4/4 | Complete   | 2026-06-22 |
-| 11. Per-Request Key + Model Resolution | v1.2 | 0/TBD | Not started | - |
+| 11. Per-Request Key + Model Resolution | v1.2 | 0/4 | Planned | - |
 | 12. Model Cache + Catalog | v1.2 | 0/TBD | Not started | - |
 | 13. Preferences + Per-Thread Model | v1.2 | 0/TBD | Not started | - |
 | 14. Usage/Cost + Settings/Key-State UX | v1.2 | 0/TBD | Not started | - |
