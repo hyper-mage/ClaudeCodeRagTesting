@@ -66,7 +66,7 @@ def test_user_key_threaded_to_all_call_sites():
          patch.object(rerank_service, "get_settings", return_value=fake_settings):
         rerank_service.rerank_with_llm(
             "query", [{"id": "c1", "content": "passage"}],
-            api_key=_USER_KEY, model=_RESOLVED_MODEL,
+            api_key=_USER_KEY, model=_RESOLVED_MODEL, trace=False,
         )
     rk_gc.assert_called_once_with(api_key=_USER_KEY, trace=False)
     assert rerank_client.chat.completions.create.call_args.kwargs["model"] == _RESOLVED_MODEL
@@ -92,7 +92,7 @@ def test_user_key_threaded_to_all_call_sites():
          patch.object(subagent_service, "get_full_document_text", return_value="hello\n\nworld"):
         list(subagent_service.run_document_analysis(
             "u", "test.md", "summarize",
-            api_key=_USER_KEY, model=_RESOLVED_MODEL,
+            api_key=_USER_KEY, model=_RESOLVED_MODEL, trace=False,
         ))
     sa_gc.assert_called_once_with(api_key=_USER_KEY, trace=False)
     assert subagent_client.chat.completions.create.call_args.kwargs["model"] == _RESOLVED_MODEL
@@ -133,7 +133,7 @@ def test_user_key_threaded_to_all_call_sites():
          patch.object(explorer_service, "_explorer_tool_schemas", return_value=[]):
         list(explorer_service.run_exploration(
             "u", "q", mode="deep_search",
-            api_key=_USER_KEY, model=_RESOLVED_MODEL,
+            api_key=_USER_KEY, model=_RESOLVED_MODEL, trace=False,
         ))
     ex_gc.assert_called_once_with(api_key=_USER_KEY, trace=False)
     # ALL explorer create() calls (loop + summary) must use the resolved model,

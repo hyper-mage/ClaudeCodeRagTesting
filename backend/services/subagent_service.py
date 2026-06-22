@@ -52,7 +52,12 @@ def get_full_document_text(user_id: str, document_id: str) -> str:
 
 @traceable(name="subagent_document_analysis")
 def run_document_analysis(
-    user_id: str, document_name: str, analysis_query: str
+    user_id: str,
+    document_name: str,
+    analysis_query: str,
+    api_key: str | None = None,
+    model: str | None = None,
+    trace: bool = True,
 ) -> Iterator[dict]:
     """Spawn an isolated sub-agent to analyze a full document.
 
@@ -66,6 +71,10 @@ def run_document_analysis(
     - {"type": "result", "result": {...}}   -- final payload
 
     On any error, yields a final {"type": "result", "result": {"error": "..."}}.
+
+    `api_key`/`model`/`trace`: per-request resolution (D-01/SEC-04). The aux model
+    defaults to the single resolved turn `model` (D-02); both fall through to owner
+    `settings` when None.
     """
     settings = get_settings()
 
@@ -134,10 +143,10 @@ def run_document_analysis(
     ]
 
     # Non-streaming completion with timeout
-    client = get_llm_client()
+    client = get_llm_client(api_key=api_key, trace=trace)
     try:
         response = client.chat.completions.create(
-            model=settings.llm_model,
+            model=model or settings.llm_model,
             messages=messages,
             max_tokens=settings.subagent_max_tokens,
             timeout=settings.subagent_timeout,

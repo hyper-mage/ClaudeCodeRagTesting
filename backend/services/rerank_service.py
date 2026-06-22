@@ -16,16 +16,27 @@ Score from 0.0 to 1.0 where:
 Respond with ONLY a JSON object: {"score": <float>}"""
 
 
-def rerank_with_llm(query: str, documents: list[dict]) -> list[dict]:
-    """Score each document's relevance to the query using the chat LLM."""
+def rerank_with_llm(
+    query: str,
+    documents: list[dict],
+    api_key: str | None = None,
+    model: str | None = None,
+    trace: bool = True,
+) -> list[dict]:
+    """Score each document's relevance to the query using the chat LLM.
+
+    `api_key`/`model`/`trace`: per-request resolution (D-01/SEC-04). The aux model
+    defaults to the single resolved turn `model` (D-02 — no distinct aux param);
+    both fall through to owner `settings` when None.
+    """
     settings = get_settings()
-    client = get_llm_client()
+    client = get_llm_client(api_key=api_key, trace=trace)
     scored = []
 
     for doc in documents:
         try:
             response = client.chat.completions.create(
-                model=settings.llm_model,
+                model=model or settings.llm_model,
                 messages=[
                     {"role": "system", "content": RERANK_PROMPT},
                     {"role": "user", "content": f"Query: {query}\n\nPassage: {doc['content'][:2000]}"},
@@ -74,16 +85,26 @@ def rerank_with_api(query: str, documents: list[dict]) -> list[dict]:
     return scored
 
 
-def rerank(query: str, documents: list[dict]) -> list[dict]:
+def rerank(
+    query: str,
+    documents: list[dict],
+    api_key: str | None = None,
+    model: str | None = None,
+    trace: bool = True,
+) -> list[dict]:
     """Rerank documents using configured provider. Returns top-k reranked results.
-    No-ops when reranking is disabled."""
+    No-ops when reranking is disabled.
+
+    `api_key`/`model`/`trace` forward only to the LLM provider (`rerank_with_llm`);
+    the dedicated rerank-API provider (`rerank_with_api`) uses its own key and is
+    intentionally left untouched (D-01)."""
     settings = get_settings()
 
     if not settings.rerank_enabled or not documents:
         return documents
 
     if settings.rerank_provider == "llm":
-        return rerank_with_llm(query, documents)
+        return rerank_with_llm(query, documents, api_key=api_key, model=model, trace=trace)
     elif settings.rerank_provider == "api":
         return rerank_with_api(query, documents)
     else:

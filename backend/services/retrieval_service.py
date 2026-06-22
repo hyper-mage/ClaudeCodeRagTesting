@@ -70,11 +70,21 @@ def reciprocal_rank_fusion(
 
 
 def search_documents(
-    user_id: str, query: str, top_k: int = 5, metadata_filter: dict | None = None
+    user_id: str,
+    query: str,
+    top_k: int = 5,
+    metadata_filter: dict | None = None,
+    api_key: str | None = None,
+    model: str | None = None,
+    trace: bool = True,
 ) -> list[dict]:
     """Search user's documents using configured search mode (vector, keyword, or hybrid).
 
     Pipeline: search -> RRF fusion (if hybrid) -> rerank (if enabled) -> top_k
+
+    `api_key`/`model`/`trace`: forwarded into the LLM rerank hop (D-01/SEC-04) so a
+    user-key turn reranks on the user's key/model. Embedding search uses the separate
+    embedding client and is intentionally not threaded here.
     """
     settings = get_settings()
     mode = settings.search_mode
@@ -103,7 +113,7 @@ def search_documents(
         results = vector_search(user_id, query, candidate_k, metadata_filter)
 
     # Optional reranking
-    results = rerank(query, results)
+    results = rerank(query, results, api_key=api_key, model=model, trace=trace)
 
     # Final top_k trim
     return results[:top_k]
