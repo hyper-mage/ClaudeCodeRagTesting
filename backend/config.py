@@ -28,6 +28,18 @@ class Settings(BaseSettings):
     # Rate limiting (Phase 6 D-05) — slowapi window string consumed by @limiter.limit(...)
     chat_rate_limit: str = "20/minute"
 
+    # Demo fallback (Phase 11 D-06, D-09) — env-driven.
+    # demo_fallback_enabled gates the keyless-user owner-key spend branch. It MUST default
+    # OFF in dev AND prod this phase (D-09); flipping it ON in prod is a Phase 15 decision,
+    # hard-gated on SEC-03. With it OFF, a keyless user is refused fail-closed (no silent
+    # owner-key completion). The fail-closed branch that reads this is built in plan 11-04.
+    demo_fallback_enabled: bool = False
+    # demo_fallback_model pins a free OpenRouter `:free` slug used ONLY when the demo branch
+    # is enabled. Executor SHOULD re-confirm a currently-live `:free` slug at build time via
+    # openrouter.ai/models (`:free` filter — Assumption A1); demo_fallback_enabled defaulting
+    # OFF makes a stale slug harmless until Phase 15 re-validates it.
+    demo_fallback_model: str = "meta-llama/llama-3.3-70b-instruct:free"
+
     @property
     def cors_origins_list(self) -> list[str]:
         """Parse CORS_ALLOWED_ORIGINS env var into a list.

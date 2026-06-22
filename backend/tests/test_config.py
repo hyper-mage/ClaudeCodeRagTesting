@@ -45,3 +45,54 @@ def test_key_encryption_secret_env_override(monkeypatch):
     from config import Settings
     s = Settings()
     assert s.key_encryption_secret == "abc"
+
+
+# ---------------------------------------------------------------------
+# Phase 11 SEC-01 / DEMO-03: demo-fallback config + scrub_secrets helper
+# ---------------------------------------------------------------------
+
+
+def test_demo_fallback_enabled_default():
+    """Settings.demo_fallback_enabled defaults to False — fail-closed in dev AND
+    prod this phase (D-09). The owner-key spend branch is structurally gated OFF."""
+    from config import Settings
+    s = Settings()
+    assert s.demo_fallback_enabled is False
+
+
+def test_demo_fallback_enabled_env_override(monkeypatch):
+    """DEMO_FALLBACK_ENABLED env var overrides default to True."""
+    monkeypatch.setenv("DEMO_FALLBACK_ENABLED", "true")
+    from config import Settings
+    s = Settings()
+    assert s.demo_fallback_enabled is True
+
+
+def test_demo_fallback_model_default():
+    """Settings.demo_fallback_model defaults to a non-empty `:free` slug (D-06)."""
+    from config import Settings
+    s = Settings()
+    assert s.demo_fallback_model
+    assert s.demo_fallback_model.endswith(":free")
+
+
+def test_demo_fallback_model_env_override(monkeypatch):
+    """DEMO_FALLBACK_MODEL env var overrides default."""
+    monkeypatch.setenv("DEMO_FALLBACK_MODEL", "x/y:free")
+    from config import Settings
+    s = Settings()
+    assert s.demo_fallback_model == "x/y:free"
+
+
+def test_scrub_secrets_redacts():
+    """scrub_secrets redacts any sk-or- prefixed key to [redacted-key] (SEC-01)."""
+    from services.log_scrub import scrub_secrets
+    out = scrub_secrets("err sk-or-v1-ABC123def_-")
+    assert "sk-or-" not in out
+    assert "[redacted-key]" in out
+
+
+def test_scrub_secrets_passthrough():
+    """scrub_secrets passes non-str values through unchanged."""
+    from services.log_scrub import scrub_secrets
+    assert scrub_secrets(123) == 123
