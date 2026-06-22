@@ -30,7 +30,7 @@ Full phase detail archived in `milestones/v1.1-ROADMAP.md`. Audit: passed, 23/23
 **Milestone Goal:** Users run LLMs of their choice from their own OpenRouter keys with near-zero-friction onboarding (OAuth PKCE, no manual key paste), while a gated owner-key demo fallback preserves the public demo. Secret custody is the milestone's defining risk — security findings are release blockers, front-loaded into the storage and chat-loop phases, with demo-fallback enablement deliberately last and gated on the SEC-06 cost guardrail.
 
 - [x] **Phase 9: Crypto + Encrypted Key Storage Foundation** - Fernet encryption, `user_api_keys` table with RLS, SQL-tool lockdown (completed 2026-06-19)
-- [ ] **Phase 10: OAuth PKCE — Backend Exchange + Frontend Connect** - Connect/disconnect an OpenRouter account with no manual key paste
+- [x] **Phase 10: OAuth PKCE — Backend Exchange + Frontend Connect** - Connect/disconnect an OpenRouter account with no manual key paste (completed 2026-06-22)
 - [ ] **Phase 11: Per-Request Key + Model Resolution (chat-loop seam)** - Every chat runs on the right user's key + model, fail-closed, no cross-user bleed
 - [ ] **Phase 12: Model Cache + Catalog** - Searchable, auto-refreshing model list with free/paid + popularity + price hints
 - [ ] **Phase 13: Preferences + Per-Thread Model** - Default model, per-thread model selection, persisted theme storage
@@ -205,7 +205,7 @@ Phases execute in numeric order: 9 → 10 → 11 → 12 → 13 → 14 → 15 (Ph
 | Phase | Milestone | Plans Complete | Status | Completed |
 |-------|-----------|----------------|--------|-----------|
 | 9. Crypto + Encrypted Key Storage | v1.2 | 3/3 | Complete   | 2026-06-19 |
-| 10. OAuth PKCE Connect | v1.2 | 3/4 | In Progress|  |
+| 10. OAuth PKCE Connect | v1.2 | 4/4 | Complete   | 2026-06-22 |
 | 11. Per-Request Key + Model Resolution | v1.2 | 0/TBD | Not started | - |
 | 12. Model Cache + Catalog | v1.2 | 0/TBD | Not started | - |
 | 13. Preferences + Per-Thread Model | v1.2 | 0/TBD | Not started | - |

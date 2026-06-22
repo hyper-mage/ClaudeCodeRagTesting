@@ -36,8 +36,9 @@ key-decisions:
   - "Verify gate scoped per the plan caveat: success = `npm run build` exit 0 AND `npx eslint` clean on this plan's touched files (App.tsx, IconSidebar.tsx, MobileTopBar.tsx). Repo-wide `npm run lint` still fails on 4 pre-existing ChatPage.tsx errors (D-10-A) — out of scope, this plan does not touch ChatPage"
   - "Task 3 (prod round-trip on the Cloudflare Pages origin) is a blocking human-verify checkpoint — NOT auto-approved and NOT fabricated; the automated backend regression (pytest -q) was run, the 8 prod browser steps are returned to the human"
 
-requirements-completed: []
-requirements-pending-human-verify: [KEY-01, KEY-03]
+requirements-completed: [KEY-01, KEY-03]
+requirements-pending-human-verify: []
+human-verify-result: "Task 3 verified 8/8 on prod (boardgame-rag-prod.pages.dev) 2026-06-22 — connect round-trip, key never returned, forged-state rejected, hard-refresh succeeds, masked status, disconnect/reconnect, no key leak. Step 7 surfaced a stale connection-dot defect (per-instance useKeyStatus didn't refresh the persistent sidebar/top-bar dots on in-SPA disconnect); fixed in cf7d749 (window-event broadcast) and re-verified — dots now flip green/gray live."
 
 # Metrics
 duration: 6min
@@ -97,22 +98,20 @@ None — plan executed exactly as written for Tasks 1 and 2.
 
 The desktop IconSidebar connection dot (logically part of Task 2) was committed in the Task 1 commit (`58e22bb`) rather than the Task 2 commit, because both the gear (Task 1) and the desktop dot (Task 2) edit the same file `IconSidebar.tsx`; splitting one file across two commits via partial staging would have been fragile. The two edits are non-overlapping (gear in the top nav cluster; dot in the bottom DemoPill region), exactly as the plan's Task 2 action requires. The MobileTopBar dot — the other half of Task 2 — is the standalone Task 2 commit (`2b550c9`). Net effect on the tree is identical to the plan's intent; only the commit boundary for the in-file desktop dot shifted by one commit.
 
-## Task 3 — Prod Round-Trip Verification (PENDING HUMAN — BLOCKING CHECKPOINT)
+## Task 3 — Prod Round-Trip Verification (VERIFIED 8/8 — 2026-06-22)
 
-This step REQUIRES the real user on the deployed **prod Cloudflare Pages origin** (`https://boardgame-rag-prod.pages.dev`), signed in as a real user. The agent cannot perform it (OpenRouter auth screen, deployed prod site, browser console / network tab / Sentry inspection). **Carry-forward dependency:** migration 028 must be applied to PROD before the exchange endpoint runs there (D-03) — confirm this before step 2.
+Performed by the user on the deployed **prod Cloudflare Pages origin** (`https://boardgame-rag-prod.pages.dev`), signed in as a real user. Prerequisites done before the run: migration 028 applied to PROD (`supabase db push --linked`, ref `ybehhhduhynsdujmxdzx`, applied 025→028 in order; D-03 carry-forward closed) and `KEY_ENCRYPTION_SECRET` set as a distinct prod Fly secret (D-04); backend redeployed (`fly deploy`, `/api/health` 200).
 
-Record pass/fail per step here once verified:
+1. [x] Gear → `/settings` loads → "Connect OpenRouter" (not-connected).
+2. [x] Connect → OpenRouter `/auth` screen → authorized.
+3. [x] Returned to `/settings/openrouter/callback` (no 404 — SPA fallback) → "Connecting…" spinner → auto-redirect to `/settings` (Connected) + "OpenRouter connected." toast.
+4. [x] `/settings` shows the masked tail + "Connected since {date}"; chat-route dot green.
+5. [x] Hard-refresh on the callback mid-flow → SUCCEEDS (D-07, sessionStorage).
+6. [x] Forged callback (`?code=x&state=WRONG`) → generic "Couldn't connect…" inline error + Retry/Back, rejected (CSRF, ROADMAP #2).
+7. [x] Disconnect → confirm dialog → not-connected + Connect CTA; **sidebar dot flips green→gray live**. Reconnect → re-stamps. *(Initially the persistent sidebar/top-bar dots did not refresh on in-SPA disconnect — per-instance `useKeyStatus` held stale state. Fixed in `cf7d749` via a `notifyKeyStatusChanged()` window-event broadcast every instance listens for; re-verified live.)*
+8. [x] No `sk-or-v1-…` in browser console, network response bodies (exchange/status), or Sentry for the flow.
 
-1. [ ] Open the deployed site → click the gear → `/settings` loads → shows "Connect OpenRouter" (not-connected).
-2. [ ] Click "Connect OpenRouter" → reach the OpenRouter `/auth` screen → authorize.
-3. [ ] Return to `<prod-origin>/settings/openrouter/callback` (confirm it does NOT 404 — SPA fallback) → see the "Connecting your OpenRouter account…" spinner → auto-redirect to `/settings` (Connected) + the "OpenRouter connected." toast.
-4. [ ] `/settings` shows the masked tail (`sk-or-v1-…wXyZ`) + "Connected since {today}"; the chat-route dot is green.
-5. [ ] Hard-refresh the callback URL mid-flow (reconnect, then refresh on the callback) → it SUCCEEDS, not an error (D-07, sessionStorage).
-6. [ ] Forge a callback: open `<prod-origin>/settings/openrouter/callback?code=x&state=WRONG` directly → generic "Couldn't connect…" inline error + Retry/Back, rejected (CSRF state mismatch, ROADMAP criterion #2).
-7. [ ] Disconnect → confirm dialog → confirm → state flips to not-connected + Connect CTA; dot goes gray. Reconnect → "Connected since" re-stamps.
-8. [ ] No `sk-or-v1-…` appears in the browser console, network response bodies (exchange/status), or any Sentry event for the flow.
-
-**Resume signal:** type "verified" once all 8 prod steps pass, or describe which step failed.
+**Result:** all 8 steps pass. KEY-01 + KEY-03 satisfied on prod.
 
 ## Deferred Issues
 
@@ -135,4 +134,4 @@ No new security-relevant surface beyond the plan's `<threat_model>`. This plan i
 
 ---
 *Phase: 10-oauth-pkce-backend-exchange-frontend-connect*
-*Completed: 2026-06-19 (Tasks 1-2; Task 3 pending human prod round-trip)*
+*Completed: 2026-06-19 (Tasks 1-2); Task 3 prod round-trip verified 8/8 on 2026-06-22 (+ dot-sync fix cf7d749).*
