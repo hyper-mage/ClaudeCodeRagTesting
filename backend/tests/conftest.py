@@ -78,6 +78,9 @@ def mock_stream_chat_completion(monkeypatch):
     controller.call_count = 0
     controller._events_per_call: list[list[dict]] = []
     controller._default_tool_call_mode = False
+    # Phase 11 D-04: optional trailing usage event per call index. Empty by default
+    # so existing callers (set_events / set_default_tool_call) are unaffected.
+    controller._usage_per_call: list[dict | None] = []
 
     def _default_tool_call_event() -> list[dict]:
         return [
@@ -105,6 +108,12 @@ def mock_stream_chat_completion(monkeypatch):
             events = [{"type": "text_delta", "text": "done"}]
         for ev in events:
             yield ev
+        # Phase 11 D-04: append a trailing {"type":"usage","usage":{…}} event when
+        # configured for this call index (additive — None means no usage event).
+        if idx < len(controller._usage_per_call):
+            usage = controller._usage_per_call[idx]
+            if usage is not None:
+                yield {"type": "usage", "usage": usage}
 
     def _set_events(events_per_call: list[list[dict]]) -> None:
         controller._events_per_call = events_per_call
@@ -113,8 +122,18 @@ def mock_stream_chat_completion(monkeypatch):
     def _set_default_tool_call() -> None:
         controller._default_tool_call_mode = True
 
+    def _set_usage(usage_per_call: list[dict | None]) -> None:
+        """Configure a trailing usage event per call index (Phase 11 D-04).
+
+        Each entry is the `usage` dict emitted as {"type":"usage","usage":{…}}
+        after that call's normal events; None skips the usage event for that call.
+        Additive — leaving this unset preserves existing fixture behavior.
+        """
+        controller._usage_per_call = usage_per_call
+
     controller.set_events = _set_events
     controller.set_default_tool_call = _set_default_tool_call
+    controller.set_usage = _set_usage
 
     try:
         monkeypatch.setattr(
