@@ -109,12 +109,17 @@ def _summarize_findings(
     tools_used: list[str],
     iterations: int,
     budget_exhausted: bool,
+    model: str | None = None,
 ) -> ExplorerResult:
     """Final structured-output call with three-tier fallback.
 
     1) response_format=json_schema   (preferred -- strict)
     2) response_format=json_object   (loose -- schema in prompt)
     3) regex extract {...} block from plain text
+
+    `model`: the resolved per-request turn model (D-01); falls through to the owner
+    default when None. The `client` already carries the resolved key (built in
+    run_exploration).
     """
     schema = ExplorerResult.model_json_schema()
     summary_user = {
@@ -133,7 +138,7 @@ def _summarize_findings(
 
     def _try(model_kwargs):
         return client.chat.completions.create(
-            model=settings.llm_model,
+            model=model or settings.llm_model,
             messages=summary_messages,
             timeout=settings.explorer_timeout,
             **model_kwargs,
@@ -201,7 +206,14 @@ def _summarize_findings(
 
 
 @traceable(name="subagent_explorer")
-def run_exploration(user_id: str, query: str, mode: str = "deep_search") -> Iterator[dict]:
+def run_exploration(
+    user_id: str,
+    query: str,
+    mode: str = "deep_search",
+    api_key: str | None = None,
+    model: str | None = None,
+    trace: bool = True,
+) -> Iterator[dict]:
     """Run the explorer sub-agent. Yields progress events; the LAST yield is
     {"type": "result", "result": <ExplorerResult dict>}.
 
@@ -210,12 +222,17 @@ def run_exploration(user_id: str, query: str, mode: str = "deep_search") -> Iter
       {"type": "sub_tool_start", "call_id": str, "tool": str, "args_preview": str}
       {"type": "sub_tool_result", "call_id": str, "tool": str, "output": str}  # clipped
       {"type": "result", "result": dict}                                       # final
+
+    `api_key`/`model`/`trace`: per-request resolution (D-01/SEC-04). The client is
+    built ONCE here with the resolved key; the resolved `model` threads into both the
+    loop create and `_summarize_findings` (Pitfall 4 — all three owner-key read sites).
+    Both fall through to owner `settings` when None.
     """
     if mode not in ("deep_search", "summarize", "find_similar"):
         mode = "deep_search"
 
     settings = get_settings()
-    client = get_llm_client()
+    client = get_llm_client(api_key=api_key, trace=trace)
     tool_schemas = _explorer_tool_schemas()
 
     system_prompt = settings.explorer_system_prompt + "\n\n" + MODE_HINTS.get(mode, "")
@@ -235,7 +252,7 @@ def run_exploration(user_id: str, query: str, mode: str = "deep_search") -> Iter
 
         try:
             response = client.chat.completions.create(
-                model=settings.llm_model,
+                model=model or settings.llm_model,
                 messages=messages,
                 tools=tool_schemas,
                 timeout=settings.explorer_timeout,
@@ -317,6 +334,7 @@ def run_exploration(user_id: str, query: str, mode: str = "deep_search") -> Iter
         result = _summarize_findings(
             client, settings, messages, query, mode,
             tools_used, iteration, budget_exhausted,
+            model=model,
         )
     except Exception as e:
         logger.error(f"Explorer summary phase crashed: {e}", exc_info=True)

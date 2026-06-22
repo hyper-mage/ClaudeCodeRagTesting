@@ -8,14 +8,22 @@ except ImportError:
     wrap_openai = None
 
 
-def get_llm_client() -> OpenAI:
-    """Create OpenAI-compatible client for chat completions."""
+def get_llm_client(api_key: str | None = None, trace: bool = True) -> OpenAI:
+    """Create OpenAI-compatible client for chat completions.
+
+    `api_key`: the per-request key to use; falls through to the owner key
+        (`settings.resolved_llm_api_key`) when None (SEC-04 — explicit per-request
+        param, NO module singleton, NO @lru_cache).
+    `trace`: when False (a per-user-key call), the LangSmith `wrap_openai` wrapper
+        is SKIPPED so the user's key + prompt is never shipped to the owner's
+        LangSmith project (SEC-01 / D-10). Owner/demo calls pass trace=True.
+    """
     settings = get_settings()
     client = OpenAI(
-        api_key=settings.resolved_llm_api_key,
+        api_key=api_key or settings.resolved_llm_api_key,
         base_url=settings.llm_base_url,
     )
-    if wrap_openai and settings.langsmith_api_key:
+    if trace and wrap_openai and settings.langsmith_api_key:
         client = wrap_openai(client)
     return client
 
@@ -32,12 +40,34 @@ def get_embedding_client() -> OpenAI:
     return client
 
 
+def _usage_to_dict(usage) -> dict:
+    """Normalize an OpenRouter/OpenAI `usage` object (or dict) to a plain dict.
+
+    Defensive (A4 / D-04): tolerate missing token sub-fields and treat `cost`
+    as the authoritative summed field. Already-a-dict passes through; otherwise
+    pull the standard token fields plus OpenRouter's `cost` via getattr.
+    """
+    if usage is None:
+        return {}
+    if isinstance(usage, dict):
+        return usage
+    out: dict = {}
+    for field in ("prompt_tokens", "completion_tokens", "total_tokens", "cost"):
+        val = getattr(usage, field, None)
+        if val is not None:
+            out[field] = val
+    return out
+
+
 def stream_chat_completion(
     messages: list[dict],
     tools: list[dict] | None = None,
     tool_guide: str | None = None,
     source_hint: str | None = None,
     scope_hint: dict | None = None,
+    api_key: str | None = None,
+    model: str | None = None,
+    trace: bool = True,
 ) -> Generator[dict, None, None]:
     """Stream a chat completion with optional tool definitions.
 
@@ -45,13 +75,17 @@ def stream_chat_completion(
       {"type": "system_content", "content": "..."} first event with final system prompt
       {"type": "text_delta", "text": "..."} for text chunks
       {"type": "tool_call", "tool_calls": [...]} when model invokes a tool
+      {"type": "usage", "usage": {...}} the trailing OpenRouter usage object (incl. cost)
       {"type": "done"} when streaming is complete
 
     `source_hint`: "default_kb" | "private" | "both" | None -- appended as routing guidance.
     `scope_hint`:  {"folder_hint": "..."} | {"source_hint": "..."} | None -- narrowing guidance.
+    `api_key`/`model`/`trace`: per-request resolution (SEC-04 / D-10). `api_key` and
+        `model` fall through to the owner `settings` values when None; `trace=False`
+        skips LangSmith wrapping for user-key calls.
     """
     settings = get_settings()
-    client = get_llm_client()
+    client = get_llm_client(api_key=api_key, trace=trace)
 
     system_content = settings.system_prompt
     if tool_guide:
@@ -98,7 +132,7 @@ def stream_chat_completion(
     ]
 
     kwargs = {
-        "model": settings.llm_model,
+        "model": model or settings.llm_model,
         "messages": full_messages,
         "stream": True,
     }
@@ -109,8 +143,18 @@ def stream_chat_completion(
 
     # Accumulate tool calls across chunks
     tool_calls_acc: dict[int, dict] = {}
+    # Drain-and-accumulate the trailing usage chunk (D-04 / Pattern 4). OpenRouter
+    # puts `usage` on the LAST streamed chunk (often choices==[]) — we MUST keep
+    # draining after the tool_call yield (no early return) and read chunk.usage
+    # BEFORE the `if not choice: continue` skip below.
+    usage_obj = None
+    emitted_tool_call = False
 
     for chunk in stream:
+        # Capture usage whenever present — it rides the LAST chunk (often choices==[]).
+        if getattr(chunk, "usage", None):
+            usage_obj = chunk.usage
+
         choice = chunk.choices[0] if chunk.choices else None
         if not choice:
             continue
@@ -139,12 +183,17 @@ def stream_chat_completion(
                     if tc.function.arguments:
                         tool_calls_acc[idx]["function"]["arguments"] += tc.function.arguments
 
-        # Check for finish
-        if choice.finish_reason == "tool_calls":
+        # Check for finish. Emit the tool_call event ONCE, then keep draining so the
+        # trailing usage chunk is still seen (do NOT return early — D-04 / Pitfall 12).
+        if choice.finish_reason == "tool_calls" and not emitted_tool_call:
             yield {
                 "type": "tool_call",
                 "tool_calls": list(tool_calls_acc.values()),
             }
-            return
+            emitted_tool_call = True
+
+    # Stream exhausted — yield the captured usage (cost + token sub-fields) before done.
+    if usage_obj is not None:
+        yield {"type": "usage", "usage": _usage_to_dict(usage_obj)}
 
     yield {"type": "done"}
