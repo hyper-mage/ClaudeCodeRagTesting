@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import ConfirmDialog from '../components/ConfirmDialog'
-import { useKeyStatus } from '../hooks/useKeyStatus'
+import { useKeyStatus, notifyKeyStatusChanged } from '../hooks/useKeyStatus'
 import { apiFetch } from '../lib/api'
 import { startOpenRouterConnect } from '../lib/pkce'
 
@@ -17,7 +17,7 @@ function formatConnectedSince(iso: string): string {
 }
 
 export default function SettingsPage() {
-  const { status, loading, refresh } = useKeyStatus()
+  const { status, loading } = useKeyStatus()
   const [confirmOpen, setConfirmOpen] = useState(false)
 
   const handleConnect = () => {
@@ -27,7 +27,10 @@ export default function SettingsPage() {
   const handleDisconnect = async () => {
     setConfirmOpen(false)
     await apiFetch('/api/keys', { method: 'DELETE' })
-    refresh()
+    // Broadcast so this card AND the persistent sidebar/top-bar dots flip to
+    // not-connected without a page reload (refresh() alone only updates this
+    // instance). See notifyKeyStatusChanged() in useKeyStatus.
+    notifyKeyStatusChanged()
   }
 
   return (
