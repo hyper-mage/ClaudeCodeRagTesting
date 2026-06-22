@@ -100,12 +100,12 @@ Plans:
 
 **Wave 1**
 
-- [ ] 11-01-PLAN.md — config (demo_fallback_enabled OFF + demo_fallback_model :free) + scrub_secrets helper + Wave 0 test scaffolds
+- [x] 11-01-PLAN.md — config (demo_fallback_enabled OFF + demo_fallback_model :free) + scrub_secrets helper + Wave 0 test scaffolds
 - [ ] 11-02-PLAN.md — [BLOCKING] migration 029 (additive nullable messages.usage) + apply to dev Supabase
 
 **Wave 2** *(blocked on Wave 1)*
 
-- [ ] 11-03-PLAN.md — llm_service trace-gate + key/model params + usage drain; thread rerank/subagent/explorer + search_documents→rerank
+- [x] 11-03-PLAN.md — llm_service trace-gate + key/model params + usage drain; thread rerank/subagent/explorer + search_documents→rerank
 
 **Wave 3** *(blocked on Waves 1-2)*
 
@@ -217,7 +217,7 @@ Phases execute in numeric order: 9 → 10 → 11 → 12 → 13 → 14 → 15 (Ph
 |-------|-----------|----------------|--------|-----------|
 | 9. Crypto + Encrypted Key Storage | v1.2 | 3/3 | Complete   | 2026-06-19 |
 | 10. OAuth PKCE Connect | v1.2 | 4/4 | Complete   | 2026-06-22 |
-| 11. Per-Request Key + Model Resolution | v1.2 | 0/4 | Planned | - |
+| 11. Per-Request Key + Model Resolution | v1.2 | 2/4 | In Progress|  |
 | 12. Model Cache + Catalog | v1.2 | 0/TBD | Not started | - |
 | 13. Preferences + Per-Thread Model | v1.2 | 0/TBD | Not started | - |
 | 14. Usage/Cost + Settings/Key-State UX | v1.2 | 0/TBD | Not started | - |

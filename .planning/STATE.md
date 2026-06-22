@@ -4,8 +4,8 @@ milestone: v1.2
 milestone_name: User Options & BYOK
 status: executing
 stopped_at: Phase 11 context gathered
-last_updated: "2026-06-22T20:42:07.402Z"
-last_activity: 2026-06-22 -- Phase 11 planning complete
+last_updated: "2026-06-22T20:55:49.670Z"
+last_activity: 2026-06-22 -- Phase 11 execution started
 progress:
   total_phases: 9
   completed_phases: 2
@@ -21,15 +21,15 @@ progress:
 See: .planning/PROJECT.md (updated 2026-05-20 after v1.1 completion)
 
 **Core value:** The agent can intelligently search and reason across a structured board game knowledge base -- finding rules, comparing mechanics, and recommending games -- using the right tool for the job, transparently.
-**Current focus:** Phase 10 — oauth-pkce-backend-exchange-frontend-connect
+**Current focus:** Phase 11 — per-request-key-model-resolution-chat-loop-seam
 
 ## Current Position
 
-Phase: 10 (oauth-pkce-backend-exchange-frontend-connect) — EXECUTING
-Plan: 4 of 4
-Status: Ready to execute
+Phase: 11 (per-request-key-model-resolution-chat-loop-seam) — EXECUTING
+Plan: 1 of 4
+Status: Executing Phase 11
 Progress: [█████████░] 86%
-Last activity: 2026-06-22 -- Phase 11 planning complete
+Last activity: 2026-06-22 -- Phase 11 execution started
 
 ## Performance Metrics
 
