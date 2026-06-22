@@ -154,6 +154,7 @@ yield {
     "data": json.dumps({"error": str(e)}),                     # ← json.dumps({"error": scrub_secrets(str(e))}) — str(e) can echo sk-or-…
 }
 ```
+> The `logger.error(..., exc_info=True)` at line 897 needs MORE than a message-string scrub: a decrypted key can sit in a stack-frame local of the traceback. Plan 11-04 Task 2 installs a `logging.Filter` (`_ScrubFilter`) that scrubs the formatted record (incl. the `exc_info` traceback → `record.exc_text`) — that is the belt; the inline message scrub is the suspenders (RESEARCH Open Q2 / Pitfall 2).
 
 **Done event — usage + mode signal (D-04/D-08)** (lines 889-895, current): extend the payload (the recommended low-FE-touch path — `useChat.ts:185` keys only on `message_id` and ignores extra keys):
 ```python
@@ -197,6 +198,8 @@ def resolved_llm_api_key(self) -> str:                         # ← demo branch
 ```
 
 **Dual-env** — already handled by the `ENV_FILE` switch at lines 6-9; the two new env vars (`DEMO_FALLBACK_ENABLED`, `DEMO_FALLBACK_MODEL`) ride the same `.env` / `.env.prod` mechanism. No new loading code.
+
+> **D-02 aux/utility-model override (plumbing + fallthrough only this phase):** the aux model defaults to the single resolved turn `model` — there is NO separate aux config field or distinct aux param added in P11. The seam is satisfied because the shared per-request `model` flows into rerank/subagent/explorer; the *value source* for a distinct aux/utility model (storage + picker) is explicitly Phase 13 / Phase 15. Do NOT add a `demo_fallback`-style aux field here.
 
 ---
 
@@ -247,14 +250,14 @@ except openai.APITimeoutError:                                  # existing typed
 
 **Three owner-key read sites to thread** — the executor must catch ALL of them (Pitfall 4):
 - `client = get_llm_client()` — **line 218** (loop client) → `get_llm_client(api_key=, trace=)`
-- `model=settings.llm_model` in the loop `create` — **line 239**
+- `model=settings.llm_model` in the loop `create` — **line 238**
 - `model=settings.llm_model` in `_summarize_findings._try` — **line 136**
 
 ```python
 # line 218 (entry) — client built once for the whole exploration loop
 client = get_llm_client()                                       # ← get_llm_client(api_key=api_key, trace=trace)
 ...
-# line 237-242 (loop iteration)
+# line 238 (loop iteration create)
 response = client.chat.completions.create(
     model=settings.llm_model,                                  # ← model
     messages=messages, tools=tool_schemas,
@@ -325,6 +328,8 @@ def test_key_encryption_secret_env_override(monkeypatch):
 
 **Scrub regex test** — assert `scrub_secrets("…sk-or-v1-ABC123…")` redacts. The regex source-of-truth is `sentry.ts:31` (`/sk-or-v1-[A-Za-z0-9_-]+/g`), **broadened on the backend to `sk-or-[A-Za-z0-9_-]+`** per D-11.
 
+**Logging-filter test (D-11 / Open Q2)** — `test_error_surfacing.py::test_logging_filter_scrubs_exc_info` asserts the `_ScrubFilter` (plan 11-04 Task 2) scrubs the FORMATTED record incl. the `exc_info` traceback, not just `record.getMessage()`. Build a `logging.LogRecord` with `exc_info` from an exception carrying `sk-or-v1-…`, pass it through the filter (or format it via the installed handler), and assert the output has `[redacted-key]` and no `sk-or-` substring.
+
 ---
 
 ## Shared Patterns
@@ -360,7 +365,7 @@ _OR_KEY = re.compile(r"sk-or-[A-Za-z0-9_-]+")
 def scrub_secrets(s: str) -> str:
     return _OR_KEY.sub("[redacted-key]", s) if isinstance(s, str) else s
 ```
-Prefer fixed-copy structured errors (`no_api_key` / `rate_limit` / `payment_required`) over `str(e)` entirely on the known-error paths.
+Prefer fixed-copy structured errors (`no_api_key` / `rate_limit` / `payment_required`) over `str(e)` entirely on the known-error paths. For `logger.error(..., exc_info=True)`, the message-string scrub is INSUFFICIENT — the traceback / stack-frame locals can hold the key — so plan 11-04 Task 2 installs a `logging.Filter` (`_ScrubFilter`) that scrubs the formatted record incl. the `exc_info` path.
 
 ### LangSmith trace gate (D-10)
 **Source:** `backend/services/llm_service.py:18-19` (the existing conditional wrap) + `backend/services/tracing.py` (wiring context)

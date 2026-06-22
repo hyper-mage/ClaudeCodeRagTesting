@@ -452,22 +452,27 @@ const OR_KEY = /sk-or-v1-[A-Za-z0-9_-]+/g
 
 **If this table is empty:** It is not — A1–A5 above need executor/planner attention, especially A4 (usage summing) and A5 (prod LangSmith validation).
 
-## Open Questions
+## Open Questions (RESOLVED)
+
+> All three resolved during phase 11 planning (revision). Resolutions are load-bearing for SEC-01 — see the per-question RESOLUTION lines below.
 
 1. **Where does the `mode:"demo"` + `usage` signal ride — the `done` event or a dedicated SSE event?**
    - What we know: The `done` event today carries `{message_id, content}` (chat.py:889-895). `useChat.ts` keys on `parsed.message_id` for the done path (line 185).
    - What's unclear: Whether to extend `done` with `mode` + `usage` (one-line FE change) or add a dedicated event.
    - Recommendation: Extend the `done` event payload with optional `mode` and `usage` — minimal FE change, no new event-type handling, and `useChat.ts` already ignores unknown keys on the done branch. Claude's Discretion per CONTEXT D-08.
+   - **RESOLUTION (P11 planning):** `mode` and `usage` ride the `done` event (plan 11-04 Task 3). No dedicated SSE event; `useChat.ts:185` ignores the extra keys.
 
 2. **Should the `sk-or-` scrub be a logging.Filter (covers `exc_info` stack locals) or just inline `scrub_secrets()` at the SSE/log call sites?**
    - What we know: `logger.error(..., exc_info=True)` ships stack frames whose locals could hold the decrypted key (it's a local in the resolution block + passed to `OpenAI(api_key=…)`).
    - What's unclear: Whether a global `logging.Filter` is in scope for P11 or if scrubbing the message string + using fixed structured-error copy is sufficient.
    - Recommendation: Inline `scrub_secrets()` on every `str(e)` reaching SSE/logs PLUS prefer fixed-copy structured errors (no `str(e)`) for the 402/429/no_api_key paths. A `logging.Filter` is the belt-and-suspenders upgrade; flag it for the planner as a small, high-value add. The decrypted key is a short-lived local — minimize its lifetime (decrypt → pass to `OpenAI()` → drop).
+   - **RESOLUTION (P11 planning):** BOTH. Plan 11-04 Task 2 installs a stdlib `logging.Filter` (`_ScrubFilter`) on the backend/root logger that scrubs the FORMATTED record — including the `exc_info` traceback / stack-frame locals (assigned to a scrubbed `record.exc_text`, `exc_info` cleared) — NOT just the message string. The inline `scrub_secrets()` + fixed-copy structured errors stay as defense-in-depth. This closes the SEC-01 "keys never appear in logs" guarantee for the `logger.error(..., exc_info=True)` path at chat.py:897, which the message-string scrub alone left open. New test: `test_logging_filter_scrubs_exc_info` in test_error_surfacing.py.
 
 3. **Does `decrypt_key()` raise if `KEY_ENCRYPTION_SECRET` is unset, and is that path reachable in P11 tests?**
    - What we know: `crypto_service._multifernet()` raises a clear `RuntimeError` when the secret is empty (crypto_service.py:29).
    - What's unclear: Whether the resolution block should pre-check or let it raise (caught by the chat error path → scrubbed generic error).
    - Recommendation: Let it raise; the existing `except Exception` in `event_generator` catches it and (post-D-11) yields a scrubbed generic error. Tests set `KEY_ENCRYPTION_SECRET` via monkeypatch (test_crypto_service.py already does). No new handling needed.
+   - **RESOLUTION (P11 planning):** Let it raise — rely on the existing `except Exception` in `event_generator` for `decrypt_key`; the post-D-11 scrub (inline + the new `logging.Filter`) sanitizes the resulting SSE/log output. No pre-check added.
 
 ## Environment Availability
 
@@ -615,10 +620,11 @@ const OR_KEY = /sk-or-v1-[A-Za-z0-9_-]+/g
 | Usage capture | MEDIUM-HIGH | Last-chunk-usage verified; per-iteration summing inferred (A4 mitigation specified). |
 | LangSmith gate | MEDIUM-HIGH | Mechanism verified; prod-project behavior must be validated live (A5). |
 
-### Open Questions
-- Where the `mode:"demo"`+`usage` signal rides (recommend: extend the `done` event) — Claude's Discretion.
-- `sk-or-` scrub as a `logging.Filter` (covers `exc_info` stack locals) vs inline scrub — recommend inline + fixed-copy errors now, Filter as a flagged upgrade.
-- Prod LangSmith validation of the `wrap_openai` gate (A5/D-10) — highest-blast-radius; must run during planning.
+### Open Questions (RESOLVED)
+- Q1 — the `mode:"demo"`+`usage` signal rides the `done` event (plan 11-04 Task 3). RESOLVED.
+- Q2 — a stdlib `logging.Filter` is added in plan 11-04 Task 2 (scrubs the formatted record incl. the `exc_info` traceback path), alongside the inline `scrub_secrets()` + fixed-copy structured errors. Closes SEC-01 "never in logs". RESOLVED.
+- Q3 — rely on the existing `except Exception` for `decrypt_key`; no pre-check. RESOLVED.
+- Prod LangSmith validation of the `wrap_openai` gate (A5/D-10) remains a MANUAL planning/validation step (highest-blast-radius) — tracked in 11-VALIDATION.md Manual-Only Verifications.
 
 ### Ready for Planning
 Research complete. The planner can create PLAN.md files: the seam, the four call sites, the resolution helper, the usage migration (029), the error/scrub/gate work, and the Wave 0 test files are all specified with verified line numbers and confidence levels.
