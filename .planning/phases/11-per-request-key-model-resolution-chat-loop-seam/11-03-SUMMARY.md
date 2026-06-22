@@ -117,6 +117,10 @@ None - no external service configuration required.
 - Plan 11-04 can now wire `chat.py`: build `_resolve_key_and_model`, decrypt the user key, and pass `api_key`/`model`/`trace=(not is_user_key)` into `stream_chat_completion` and the aux dispatch sites. The `{"type":"usage",...}` event is emitted for 11-04 to sum across the tool loop and persist to the `messages.usage` column (migration 029, already landed by 11-02).
 - The remaining Wave-0 stubs in `test_usage_capture.py` (`test_usage_persisted_to_messages`) and `test_key_model_resolution.py` (5 stubs) are owned by plan 11-04.
 
+## Self-Check: PASSED
+
+All 5 modified service files present; all 6 task/doc commits (`101c1d9`, `0db1afe`, `04388fa`, `d7aba4a`, `9c60c4a`, `b4c854f`) found in git history. Targeted tests green (3 passed); regression unit suite green (165 passed, 9 Wave-0 stubs skipped). The 2 pre-existing live-integration collection errors are logged as deferred and out of scope.
+
 ---
 *Phase: 11-per-request-key-model-resolution-chat-loop-seam*
 *Completed: 2026-06-22*
