@@ -17,13 +17,13 @@ Requirements for this milestone. Each maps to a roadmap phase (continues numberi
 
 ### Model Selection (MODEL)
 
-- [ ] **MODEL-01**: User can browse a searchable list of available OpenRouter models
-- [ ] **MODEL-02**: Each model is tagged as free or paid
-- [ ] **MODEL-03**: Popular models are marked (curated) in the picker
-- [ ] **MODEL-04**: The model list auto-refreshes to pick up newly added models
+- [x] **MODEL-01**: User can browse a searchable list of available OpenRouter models
+- [x] **MODEL-02**: Each model is tagged as free or paid
+- [x] **MODEL-03**: Popular models are marked (curated) in the picker
+- [x] **MODEL-04**: The model list auto-refreshes to pick up newly added models
 - [ ] **MODEL-05**: User can set a default model
 - [ ] **MODEL-06**: User can select a model per chat thread, persisted on the thread
-- [ ] **MODEL-07**: Picker shows context-length and per-Mtok price hints per model
+- [x] **MODEL-07**: Picker shows context-length and per-Mtok price hints per model
 - [ ] **MODEL-08**: User can favorite/pin models to the top of the picker
 
 ### Usage & Cost (COST)
@@ -93,13 +93,13 @@ Each requirement maps to exactly one phase. Phases continue numbering from v1.1 
 | KEY-03 | Phase 10 | Complete |
 | KEY-04 | Phase 10 | Complete |
 | KEY-05 | Phase 15 | Pending |
-| MODEL-01 | Phase 12 | Pending |
-| MODEL-02 | Phase 12 | Pending |
-| MODEL-03 | Phase 12 | Pending |
-| MODEL-04 | Phase 12 | Pending |
+| MODEL-01 | Phase 12 | Complete |
+| MODEL-02 | Phase 12 | Complete |
+| MODEL-03 | Phase 12 | Complete |
+| MODEL-04 | Phase 12 | Complete |
 | MODEL-05 | Phase 13 | Pending |
 | MODEL-06 | Phase 13 | Pending |
-| MODEL-07 | Phase 12 | Pending |
+| MODEL-07 | Phase 12 | Complete |
 | MODEL-08 | Phase 15 | Pending |
 | COST-01 | Phase 14 | Pending |
 | COST-02 | Phase 14 | Pending |
