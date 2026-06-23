@@ -3,8 +3,8 @@ gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: User Options & BYOK
 status: executing
-stopped_at: Phase 11 executed — 4/4 plans merged; verification human_needed (2 SEC-01 manual gates)
-last_updated: "2026-06-23T02:44:50.374Z"
+stopped_at: Phase 12 context gathered
+last_updated: "2026-06-23T03:47:57.681Z"
 last_activity: 2026-06-22 -- Phase 11 execution started
 progress:
   total_phases: 9
@@ -84,9 +84,9 @@ v1.2 roadmap-shaping decisions (to be promoted to PROJECT.md at phase transition
 
 ## Session Continuity
 
-Last session: 2026-06-23T02:44:50.366Z
-Stopped at: Phase 11 executed — 4/4 plans merged; verification human_needed (2 SEC-01 manual gates)
-Resume file: .planning/phases/11-per-request-key-model-resolution-chat-loop-seam/11-HUMAN-UAT.md
+Last session: 2026-06-23T03:47:57.674Z
+Stopped at: Phase 12 context gathered
+Resume file: .planning/phases/12-model-cache-catalog/12-CONTEXT.md
 Next: Execute Plan 10-04 (wire routing in App.tsx + IconSidebar gear + chat-header connection dot).
 
 ## Operator Next Steps
