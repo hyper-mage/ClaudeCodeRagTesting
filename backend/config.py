@@ -40,6 +40,32 @@ class Settings(BaseSettings):
     # OFF makes a stale slug harmless until Phase 15 re-validates it.
     demo_fallback_model: str = "meta-llama/llama-3.3-70b-instruct:free"
 
+    # Model catalog cache (Phase 12 D-03) — lazy refresh-if-stale TTL for the
+    # OpenRouter catalog mirror in the `model_cache` table. 24h default; NO in-process
+    # scheduler (Fly suspend kills timers). Env override MODEL_CACHE_TTL_SECONDS; set 0
+    # to force every read stale (used by MODEL-04 unit tests, no time-travel lib needed).
+    model_cache_ttl_seconds: int = 86400
+
+    # Curated popular-model ranking (Phase 12 D-06/D-07/D-08) — an ORDERED list of
+    # OpenRouter model-id slugs; index 0 == most popular → popularity_rank 0. This is a
+    # versioned, CODE-REVIEWED constant that ships with the deploy (no DB/env round-trip,
+    # no admin UI, NOT a runtime call). Curated using artificialanalysis.ai rankings as a
+    # one-time human guide (D-07). Slugs were finalized against the live OpenRouter catalog
+    # at build time (2026-06-23); a slug that later goes stale self-heals to
+    # popularity_rank None (popularity_for ValueError → None, D-09) — never crashes.
+    POPULAR_MODELS: list[str] = [
+        "anthropic/claude-sonnet-4.5",
+        "openai/gpt-5.1",
+        "google/gemini-2.5-pro",
+        "anthropic/claude-sonnet-4",
+        "openai/gpt-4o-mini",
+        "google/gemini-2.5-flash",
+        "openai/gpt-5-mini",
+        "deepseek/deepseek-r1",
+        "deepseek/deepseek-chat",
+        "meta-llama/llama-3.3-70b-instruct",
+    ]
+
     @property
     def cors_origins_list(self) -> list[str]:
         """Parse CORS_ALLOWED_ORIGINS env var into a list.
