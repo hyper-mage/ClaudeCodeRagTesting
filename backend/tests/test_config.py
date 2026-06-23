@@ -96,3 +96,23 @@ def test_scrub_secrets_passthrough():
     """scrub_secrets passes non-str values through unchanged."""
     from services.log_scrub import scrub_secrets
     assert scrub_secrets(123) == 123
+
+
+# ---------------------------------------------------------------------
+# Phase 12 MODEL-04 / D-03: model cache TTL config
+# ---------------------------------------------------------------------
+
+
+def test_model_cache_ttl_default():
+    """Settings.model_cache_ttl_seconds defaults to 86400 (24h TTL, D-03)."""
+    from config import Settings
+    s = Settings()
+    assert s.model_cache_ttl_seconds == 86400
+
+
+def test_model_cache_ttl_env_override(monkeypatch):
+    """MODEL_CACHE_TTL_SECONDS env var overrides default (injectable for MODEL-04 tests)."""
+    monkeypatch.setenv("MODEL_CACHE_TTL_SECONDS", "0")
+    from config import Settings
+    s = Settings()
+    assert s.model_cache_ttl_seconds == 0
