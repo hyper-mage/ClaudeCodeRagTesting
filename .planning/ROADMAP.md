@@ -33,7 +33,8 @@ Full phase detail archived in `milestones/v1.1-ROADMAP.md`. Audit: passed, 23/23
 - [x] **Phase 10: OAuth PKCE — Backend Exchange + Frontend Connect** - Connect/disconnect an OpenRouter account with no manual key paste (completed 2026-06-22)
 - [x] **Phase 11: Per-Request Key + Model Resolution (chat-loop seam)** - Every chat runs on the right user's key + model, fail-closed, no cross-user bleed
  (completed 2026-06-23)
-- [x] **Phase 12: Model Cache + Catalog** - Searchable, auto-refreshing model list with free/paid + popularity + price hints (completed 2026-06-23)
+- [x] **Phase 12: Model Cache + Catalog** - Searchable, auto-refreshing model list with free/paid + popularity + price hints
+ (completed 2026-06-23)
 - [ ] **Phase 13: Preferences + Per-Thread Model** - Default model, per-thread model selection, persisted theme storage
 - [ ] **Phase 14: Usage/Cost Display + Settings/Key-State UX** - Per-message cost, balance, low-balance warning, per-thread totals, settings page
 - [ ] **Phase 15: Options UI Capstone + Demo-Fallback Gating** - Model picker, favorites, key-gated selection, demo banner, demo-fallback flag (gated on SEC-03)
@@ -124,7 +125,7 @@ Plans:
   3. Popular models are marked from a curated config allowlist (there is no OpenRouter popularity field); the picker degrades gracefully (e.g. free-first / alphabetical) when popularity data is absent.
   4. A newly added OpenRouter model appears after the TTL lapses via lazy refresh-if-stale on read (no in-process scheduler — Fly suspend would kill it); the catalog persists across cold starts.
 
-**Plans**: 3 plans
+**Plans**: 4 plans
 
 Plans:
 
@@ -136,6 +137,10 @@ Plans:
 **Wave 2** *(blocked on Wave 1)*
 
 - [x] 12-03-PLAN.md — ModelResponse schema + models.py router (GET /api/models refresh-if-stale + ?free_only) + main.py wiring + idempotent deploy seed + Wave 0 route tests
+
+**Wave 3** *(gap closure — blocked on Waves 1-2)*
+
+- [ ] 12-04-PLAN.md — [GAP CR-01] coalesce name→model_id + corrective migration 031 (relax model_cache.name to nullable, RLS-preserved) + empty-catalog guard + honest fail-path warnings + seed try/except + bounded TTL + CR-01/WR-03/WR-05 regression tests (closes VERIFICATION truth #5 / never-empty-by-design)
 
 ### Phase 13: Preferences + Per-Thread Model
 
