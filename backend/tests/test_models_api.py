@@ -154,6 +154,19 @@ def test_first_request_populate(monkeypatch) -> None:
     assert len(body) > 0, "first-request populate returned an empty catalog (D-05 violated)"
     assert fetch_called["count"] == 1, "fetch_catalog was not invoked on an empty cache"
 
+    # WR-03: assert the populate actually went through the upsert/re-select path with the
+    # MAPPED rows — so a regression that returns the fetched catalog directly (skipping the
+    # upsert + persistence) FAILS here instead of silently passing.
+    upsert = mock_db.table.return_value.upsert
+    upsert.assert_called_once()
+    upsert_payload = upsert.call_args.args[0]
+    assert isinstance(upsert_payload, list) and upsert_payload, "upsert must receive the mapped rows"
+    upserted_ids = {r.get("model_id") for r in upsert_payload}
+    fixture_ids = {m.get("id") for m in _load_fixture() if m.get("id")}
+    assert fixture_ids <= upserted_ids, (
+        f"upsert payload missing fetched model_ids: {fixture_ids - upserted_ids}"
+    )
+
 
 def test_serve_stale_on_fetch_failure(monkeypatch) -> None:
     """Stale rows present + fetch_catalog raises → the route serves the existing stale

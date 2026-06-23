@@ -27,6 +27,7 @@ ops pass. It is intentionally NOT added in Phase 12 — the first-request popula
 the correctness guarantee, so the seed stays a manual/optional warm-up.
 """
 
+import logging
 import os
 import sys
 from datetime import datetime, timezone
@@ -37,30 +38,44 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from database import get_supabase
 from services.model_catalog_service import _to_cache_row, fetch_catalog
 
+logger = logging.getLogger(__name__)
 
-def main() -> None:
+
+def main() -> int:
     """Fetch the live OpenRouter catalog and idempotently upsert it into model_cache.
 
     Idempotent: keyed on model_id via on_conflict, so re-running re-upserts the same rows
     (no duplicates, no delete-all). Prints a seeded/updated count.
+
+    Returns a POSIX exit code: 0 on success (incl. the empty-catalog no-op), 1 on any
+    fetch/upsert failure. IN-01: the body is wrapped in try/except so a deploy seed failure
+    surfaces as a logged, non-zero exit — NEVER a bare traceback that blocks the deploy.
     """
-    db = get_supabase()
-    print("Seeding model_cache from the live OpenRouter catalog...")
+    try:
+        db = get_supabase()
+        print("Seeding model_cache from the live OpenRouter catalog...")
 
-    catalog = fetch_catalog()
-    fetched_at = datetime.now(timezone.utc).isoformat()
-    # Reuse the plan-01 row mapping (free/paid tag + trimmed serve fields + raw); skip
-    # any upstream row missing an id (can't be a PK).
-    cache_rows = [_to_cache_row(m, fetched_at) for m in catalog if m.get("id")]
+        catalog = fetch_catalog()
+        fetched_at = datetime.now(timezone.utc).isoformat()
+        # Reuse the plan-01 row mapping (free/paid tag + trimmed serve fields + raw); skip
+        # any upstream row missing an id (can't be a PK).
+        cache_rows = [_to_cache_row(m, fetched_at) for m in catalog if m.get("id")]
 
-    if not cache_rows:
-        print("No models returned from the catalog — nothing to seed.")
-        return
+        if not cache_rows:
+            print("No models returned from the catalog — nothing to seed.")
+            return 0
 
-    # model_id-keyed upsert: NEVER delete-all (Pitfall 5); idempotent on re-run.
-    db.table("model_cache").upsert(cache_rows, on_conflict="model_id").execute()
-    print(f"Seeded/updated {len(cache_rows)} models into model_cache.")
+        # model_id-keyed upsert: NEVER delete-all (Pitfall 5); idempotent on re-run.
+        db.table("model_cache").upsert(cache_rows, on_conflict="model_id").execute()
+        print(f"Seeded/updated {len(cache_rows)} models into model_cache.")
+        return 0
+    except Exception as exc:
+        # Visible, non-crashing failure (IN-01): the first-request populate (D-05) remains
+        # the correctness guarantee, so a seed failure must not block a deploy as a traceback.
+        logger.error("model_cache seed failed: %s", type(exc).__name__, exc_info=True)
+        print(f"model_cache seed FAILED ({type(exc).__name__}: {exc})", file=sys.stderr)
+        return 1
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

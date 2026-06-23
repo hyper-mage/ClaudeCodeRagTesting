@@ -189,7 +189,12 @@ def _to_cache_row(model: dict, fetched_at: str) -> dict:
     ctx = model.get("context_length")
     return {
         "model_id": str(model.get("id") or ""),
-        "name": model.get("name"),
+        # Coalesce a missing/empty upstream name to the model_id (mirrors the same
+        # `str(model.get("id") or "")` used for model_id above). This is the primary
+        # CR-01 fix: defense-in-depth so the served `name` is NEVER NULL — one nameless
+        # upstream model can no longer fail the whole batch upsert and empty the cache,
+        # even after migration 031 relaxes the column to nullable (T-12-V5-01, D-05).
+        "name": model.get("name") or str(model.get("id") or ""),
         "context_length": ctx if isinstance(ctx, int) else None,
         "pricing": model.get("pricing") or {},
         "is_free": tag_is_free(model),
@@ -223,8 +228,26 @@ def refresh_if_stale(db) -> list[dict]:
         catalog = fetch_catalog()
         fetched_at = datetime.now(timezone.utc).isoformat()
         cache_rows = [_to_cache_row(m, fetched_at) for m in catalog if m.get("id")]
+        # WR-01: NEVER issue a blind upsert([]). An empty catalog (upstream returned
+        # nothing, or every row was filtered out for lacking an id) must not wipe or
+        # no-op-churn the table — serve the existing rows and log a DISTINCT warning so
+        # this is not confused with the generic fetch-failure path below.
+        if not cache_rows:
+            logger.warning(
+                "model_cache refresh got an empty catalog, serving stale (%d rows)", len(rows)
+            )
+            return rows
         db.table("model_cache").upsert(cache_rows, on_conflict="model_id").execute()
         return db.table("model_cache").select("*").execute().data or []
     except Exception as exc:
-        logger.warning("model_cache refresh failed, serving stale: %s", type(exc).__name__)
+        # WR-02: distinguish the cold-cache failure (rows == []) from the serve-stale
+        # path. We cannot serve rows we never fetched, so we still return `rows` (== []),
+        # but the log must be HONEST about it rather than claiming "serving stale".
+        if not rows:
+            logger.warning(
+                "model_cache refresh failed on an EMPTY cache, returning empty catalog: %s",
+                type(exc).__name__,
+            )
+        else:
+            logger.warning("model_cache refresh failed, serving stale: %s", type(exc).__name__)
         return rows

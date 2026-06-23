@@ -1,3 +1,4 @@
+from pydantic import Field
 from pydantic_settings import BaseSettings
 from functools import lru_cache
 import os
@@ -44,7 +45,10 @@ class Settings(BaseSettings):
     # OpenRouter catalog mirror in the `model_cache` table. 24h default; NO in-process
     # scheduler (Fly suspend kills timers). Env override MODEL_CACHE_TTL_SECONDS; set 0
     # to force every read stale (used by MODEL-04 unit tests, no time-travel lib needed).
-    model_cache_ttl_seconds: int = 86400
+    # ge=0 (WR-04, T-12-V5-04): a negative TTL would make every read stale and hammer
+    # upstream on every request → it fails loudly at Settings init instead of silently
+    # degrading into a rate-limit DoS.
+    model_cache_ttl_seconds: int = Field(default=86400, ge=0)
 
     # Curated popular-model ranking (Phase 12 D-06/D-07/D-08) — an ORDERED list of
     # OpenRouter model-id slugs; index 0 == most popular → popularity_rank 0. This is a

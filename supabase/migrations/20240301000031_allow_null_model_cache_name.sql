@@ -1,0 +1,29 @@
+-- Corrective migration: relax model_cache.name to NULLABLE (Phase 12 — CR-01 fix).
+--
+-- Migration 030 declared `name TEXT NOT NULL`, but the write path is nullable-defensive:
+-- `_to_cache_row` (model_catalog_service.py) and the seed store the raw upstream `name`,
+-- and `ModelResponse.name` is `str | None`. One OpenRouter model that omits `name` would
+-- therefore fail the WHOLE batch upsert (single statement) → `refresh_if_stale` swallows
+-- that as "serve stale" → a cold/empty cache stays empty forever (200 []), violating the
+-- "never empty" guarantee (D-05). 030 is ALREADY applied to dev, so the column change
+-- ships as a NEW migration (031) rather than an in-place edit.
+--
+-- This brings the DB constraint into lockstep with the nullable-defensive posture
+-- (context_length is already nullable; build_model_response never raises on a partial
+-- row). It is defense-in-depth ALONGSIDE the Task-1 coalesce (`model.get("name") or
+-- model_id`): the coalesce keeps the served name non-null in practice, this migration
+-- removes the schema-level contradiction so a NULL name can never trip the batch upsert.
+--
+-- RLS IS UNCHANGED. The existing inverted posture from 030 stays exactly as-is:
+--   * ENABLE ROW LEVEL SECURITY (already on)
+--   * ONE permissive SELECT policy USING (true)   (global read, non-secret catalog)
+--   * ZERO INSERT/UPDATE/DELETE policy             (RLS denies all client writes;
+--                                                   service-role backend owns writes)
+-- This migration deliberately does NOT re-declare, add, or drop any policy (T-12-V5-02).
+-- It touches ONLY the `name` column NOT-NULL constraint — no other column, index, or RLS.
+--
+-- Each migration runs as one transaction (Supabase default). Additive — no backfill
+-- (existing rows already have non-null names). Applied to DEV this phase; prod is deferred
+-- to deploy (D-03 dual-env discipline).
+
+ALTER TABLE model_cache ALTER COLUMN name DROP NOT NULL;
