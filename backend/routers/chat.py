@@ -1,5 +1,6 @@
 import json
 import logging
+import openai
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sse_starlette.sse import EventSourceResponse
 from auth import get_user_id
@@ -13,12 +14,197 @@ from services.llm_service import stream_chat_completion
 from services.sql_service import get_queryable_schema, execute_sql
 from services.web_search_service import search_web
 from services.kb_tools_service import kb_ls, kb_tree, kb_read, kb_grep, kb_glob
+from services.crypto_service import decrypt_key
+from services.log_scrub import scrub_secrets
 from services.budget_service import (
     TokenBudget,
     infer_source_scope,
     parse_scope_hint,
     fetch_model_context_length,
 )
+
+
+# --- SEC-01 log scrub filter (closes the exc_info traceback leak path) -------
+# A message-string scrub at the call site alone is INSUFFICIENT: a decrypted
+# `sk-or-…` key sitting in a stack-frame local of an `exc_info=True` traceback
+# still reaches the log sink (RESEARCH Open Q2 / Pitfall 2). This filter scrubs
+# the FORMATTED record — both `record.getMessage()` AND the exc_info traceback
+# (rendered into `record.exc_text`, with `exc_info` cleared so the sink never
+# re-formats the raw traceback / stack-frame locals).
+class _ScrubFilter(logging.Filter):
+    def filter(self, record: logging.LogRecord) -> bool:
+        # (a) Scrub the rendered message; rewrite msg + clear args so the sink
+        #     cannot re-interpolate an un-scrubbed value.
+        try:
+            scrubbed_msg = scrub_secrets(record.getMessage())
+        except Exception:
+            scrubbed_msg = scrub_secrets(str(record.msg))
+        record.msg = scrubbed_msg
+        record.args = None
+        # (b) Scrub the exc_info traceback (where a stack-frame local key hides),
+        #     render it into exc_text, and clear exc_info so the handler renders
+        #     the scrubbed text instead of re-formatting the raw exception.
+        if record.exc_info:
+            try:
+                formatted = logging.Formatter().formatException(record.exc_info)
+            except Exception:
+                formatted = ""
+            record.exc_text = scrub_secrets(formatted)
+            record.exc_info = None
+        elif record.exc_text:
+            record.exc_text = scrub_secrets(record.exc_text)
+        return True
+
+
+def _install_scrub_filter() -> None:
+    """Install _ScrubFilter where it actually SEES routers.chat records.
+
+    chat.py logs via getLogger(__name__) == 'routers.chat' (NOT a descendant of
+    'backend'; logger filters are NOT inherited across the hierarchy). HANDLER
+    filters DO run on records propagated up to the root, so attach to the ROOT
+    logger's handler(s); ALSO attach directly to the 'routers.chat' logger as a
+    belt for the no-root-handler case. Do NOT attach only to getLogger('backend').
+    """
+    root = logging.getLogger()
+    for _h in root.handlers:
+        if not any(isinstance(f, _ScrubFilter) for f in _h.filters):
+            _h.addFilter(_ScrubFilter())
+    chat_logger = logging.getLogger("routers.chat")
+    if not any(isinstance(f, _ScrubFilter) for f in chat_logger.filters):
+        chat_logger.addFilter(_ScrubFilter())
+
+
+_install_scrub_filter()
+
+
+def _sse_error(code: str, detail: str) -> dict:
+    """Build a structured SSE error event (D-12 / Example 1).
+
+    `detail` is FIXED copy (no str(e)) on known paths; scrub anyway as
+    defense-in-depth so no `sk-or-…` value can ever ride the payload.
+    """
+    return {
+        "event": "error",
+        "data": json.dumps({"error": code, "detail": scrub_secrets(detail)}),
+    }
+
+def _mark_error_row(db, assistant_msg_id) -> None:
+    """Best-effort: stamp the orphan assistant placeholder with an error notice.
+
+    Mirrors the prior inline cleanup so every error branch (429/402/upstream/
+    generic) leaves the same recoverable row. Swallows its own failures.
+    """
+    if not assistant_msg_id:
+        return
+    try:
+        db.table("messages").update({
+            "content": "[An error occurred while generating the response]",
+        }).eq("id", assistant_msg_id).execute()
+    except Exception:
+        pass  # Best-effort cleanup
+
+def _accumulate_usage(turn_usage: dict, event_usage: dict) -> None:
+    """Sum an OpenRouter usage dict into the running turn accumulator (D-08 / A4).
+
+    Summed across EVERY tool-loop iteration of the turn. `cost` is the
+    authoritative field; token sub-fields are tolerated when absent. The
+    reported numbers are persisted as-is — never recomputed client/locally.
+    """
+    if not event_usage:
+        return
+    for field in ("prompt_tokens", "completion_tokens", "total_tokens", "cost"):
+        val = event_usage.get(field)
+        if val is None:
+            continue
+        turn_usage[field] = turn_usage.get(field, 0) + val
+
+
+def _safe_thread_model(thread_row: dict | None) -> str | None:
+    """Read thread.model off the EXISTING SELECT * row (D-03 / Pattern 2).
+
+    The `model` column does not exist until P13 — reading it off the already-
+    fetched row is an absent-KEY read (None), NOT a DB query (no 42703).
+    """
+    return thread_row.get("model") if thread_row else None
+
+
+def _safe_user_default_model(db, user_id: str) -> str | None:
+    """Read user_preferences.default_model, tolerating the absent P13 table.
+
+    The user_preferences table does not exist until P13 → the query raises
+    (PostgREST APIError, Postgres 42P01 relation-does-not-exist). Swallow it and
+    fall through to the next model tier (D-03). ZERO P13 schema created here.
+    """
+    try:
+        r = (
+            db.table("user_preferences")
+            .select("default_model")
+            .eq("user_id", user_id)
+            .maybe_single()
+            .execute()
+        )
+        return r.data.get("default_model") if r and r.data else None
+    except Exception as e:  # APIError 42P01 (relation does not exist) pre-P13
+        logger.debug(f"user_preferences not available (pre-P13): {scrub_secrets(str(e))}")
+        return None
+
+
+def _resolve_key_and_model(
+    db, user_id: str, thread_row: dict | None, body
+) -> tuple[str | None, str, str, bool]:
+    """Resolve the per-request (api_key, model, mode, is_user_key) — SEC-04/DEMO-03/D-03.
+
+    Module-level (NOT a Settings method) and NOT @lru_cache'd (Pitfall 8: a cache
+    would bleed one user's key/model into another's turn). Called once per turn.
+
+    MODEL — three-tier, each tier tolerant of the absent P13 schema (D-03):
+        body.model? → thread_row.model? → user_preferences.default_model?
+                    → settings.llm_model (owner default — always present)
+
+    KEY — fail-closed three-branch (NEVER a fail-open one-liner):
+        if a user_api_keys row exists → decrypt in-memory → ("user", is_user_key=True)
+        elif settings.demo_fallback_enabled → owner key + free demo model → ("demo", False)
+        else → (None, model, "no_key", False) ; caller refuses with a structured error.
+    """
+    settings = get_settings()
+
+    # MODEL tier — fall through on absent P13 schema (D-03).
+    model = (
+        getattr(body, "model", None)              # optional per-message override (future)
+        or _safe_thread_model(thread_row)         # thread.model — column may not exist yet
+        or _safe_user_default_model(db, user_id)  # user_preferences.default_model — table may not exist
+        or settings.llm_model                     # owner default — always present
+    )
+
+    # KEY tier — fail-closed three-branch. Read the user's stored key via the
+    # service-role client using the empty-row guard from keys.py:79-88.
+    row = (
+        db.table("user_api_keys")
+        .select("encrypted_key")
+        .eq("user_id", user_id)
+        .maybe_single()
+        .execute()
+    )
+    # Empty-row guard (keys.py:79-88). maybe_single() returns a dict-or-None .data;
+    # defensively require a dict (a list/None means "no key row" → fall through).
+    if row and isinstance(row.data, dict) and row.data.get("encrypted_key"):
+        # Decrypt in-memory, this turn only. The plaintext is a short-lived local —
+        # never stashed in a closure that outlives the turn, never returned to the FE.
+        api_key = decrypt_key(row.data["encrypted_key"])
+        return api_key, model, "user", True
+
+    if settings.demo_fallback_enabled:
+        # Owner-key fallback is PINNED to a free model (D-06): the cost bound comes
+        # from the MODEL, not from who's eligible (D-05).
+        return (
+            settings.resolved_llm_api_key,
+            settings.demo_fallback_model or model,
+            "demo",
+            False,
+        )
+
+    # Fail-closed refusal (DEMO-03): NO key, NO LLM call — caller yields no_api_key.
+    return None, model, "no_key", False
 
 try:
     from langsmith import traceable
@@ -372,8 +558,19 @@ def _build_args_preview(fn_name: str, fn_args: dict, source_scope: str | None = 
     return " ".join(parts)[:200]
 
 
-def execute_tool(fn_name: str, fn_args: dict, user_id: str) -> str:
-    """Dispatch a tool call to the appropriate service and return JSON result."""
+def execute_tool(
+    fn_name: str,
+    fn_args: dict,
+    user_id: str,
+    api_key: str | None = None,
+    model: str | None = None,
+    trace: bool = True,
+) -> str:
+    """Dispatch a tool call to the appropriate service and return JSON result.
+
+    The resolved per-request key/model (SEC-04) are threaded into search_documents
+    so its rerank step uses the SAME key/model as the turn, never the owner default.
+    """
     settings = get_settings()
 
     if fn_name == "search_documents":
@@ -388,6 +585,9 @@ def execute_tool(fn_name: str, fn_args: dict, user_id: str) -> str:
                 user_id=user_id,
                 query=fn_args["query"],
                 metadata_filter=metadata_filter or None,
+                api_key=api_key,
+                model=model,
+                trace=trace,
             )
             return json.dumps({
                 "tool": "search_documents",
@@ -546,6 +746,7 @@ async def send_message(
         full_content = ""
         tools_used_acc = []
         assistant_msg_id = None
+        turn_usage: dict = {}  # summed OpenRouter usage across all tool-loop iterations
         try:
             # Build tools list based on availability
             settings = get_settings()
@@ -578,6 +779,23 @@ async def send_message(
             if scope_hint.get("source_hint"):
                 source_scope = scope_hint["source_hint"]
 
+            # --- Per-request key + model resolution (SEC-04/DEMO-03/D-03) --------
+            # Resolve ONCE per turn, fail-closed. mode=="no_key" → refuse with a
+            # structured SSE error and make NO LLM call (DEMO-03). The decrypted
+            # key (when mode=="user") is a short-lived local — threaded straight
+            # into the call sites below, never stashed in a closure beyond the turn.
+            api_key, model, mode, is_user_key = _resolve_key_and_model(
+                db, user_id, thread.data, body
+            )
+            if mode == "no_key":
+                # Fail-closed: clean up the orphan placeholder is unnecessary (none
+                # created yet — the assistant row insert is below the budget block).
+                yield _sse_error(
+                    "no_api_key",
+                    "Connect your OpenRouter account to chat.",
+                )
+                return
+
             # --- Token budget (Phase 6) ------------------------------------------
             budget = TokenBudget(
                 context_length=settings.model_context_length,
@@ -587,13 +805,11 @@ async def send_message(
             )
             # Best-effort dynamic context length lookup (OpenRouter).
             if settings.llm_base_url and "openrouter" in settings.llm_base_url:
-                dynamic_length = fetch_model_context_length(
-                    settings.llm_model, settings.resolved_llm_api_key
-                )
+                dynamic_length = fetch_model_context_length(model, api_key)
                 if dynamic_length and dynamic_length > 0:
                     budget.context_length = dynamic_length
                     logger.info(
-                        f"Using dynamic context length {dynamic_length} for {settings.llm_model}"
+                        f"Using dynamic context length {dynamic_length} for {model}"
                     )
 
             # Create assistant message early for incremental tool persistence
@@ -623,6 +839,9 @@ async def send_message(
                     tool_guide=TOOL_SELECTION_GUIDE if tools else None,
                     source_hint=source_scope,
                     scope_hint=scope_hint if scope_hint else None,
+                    api_key=api_key,
+                    model=model,
+                    trace=(not is_user_key),
                 ):
                     if event["type"] == "system_content":
                         # Budget bookkeeping before LLM sees the messages.
@@ -641,6 +860,10 @@ async def send_message(
                             "event": "content_delta",
                             "data": json.dumps({"text": event["text"]}),
                         }
+                    elif event["type"] == "usage":
+                        # Sum the trailing OpenRouter usage across EVERY iteration
+                        # (it can fire once per tool-loop pass). Persisted as-is.
+                        _accumulate_usage(turn_usage, event.get("usage") or {})
                     elif event["type"] == "tool_call":
                         tool_call_happened = True
 
@@ -697,6 +920,9 @@ async def send_message(
                                             user_id=user_id,
                                             query=fn_args["query"],
                                             mode=fn_args.get("mode", "deep_search"),
+                                            api_key=api_key,
+                                            model=model,
+                                            trace=(not is_user_key),
                                         ):
                                             q.put(ev)
                                     except Exception as ex:
@@ -762,6 +988,9 @@ async def send_message(
                                             user_id=user_id,
                                             document_name=fn_args["document_name"],
                                             analysis_query=fn_args["query"],
+                                            api_key=api_key,
+                                            model=model,
+                                            trace=(not is_user_key),
                                         ):
                                             q2.put(ev)
                                     except Exception as ex:
@@ -794,7 +1023,14 @@ async def send_message(
                                     final_result_dict = {"error": "Document analysis produced no result."}
                                 tool_result = json.dumps({"tool": "analyze_document", **final_result_dict})
                             else:
-                                tool_result = execute_tool(fn_name, fn_args, user_id)
+                                tool_result = execute_tool(
+                                    fn_name,
+                                    fn_args,
+                                    user_id,
+                                    api_key=api_key,
+                                    model=model,
+                                    trace=(not is_user_key),
+                                )
 
                             current_messages.append({
                                 "role": "tool",
@@ -875,10 +1111,11 @@ async def send_message(
                 except Exception as e:
                     logger.debug(f"LangSmith metadata tag failed (non-fatal): {e}")
 
-            # Update assistant message with final content
+            # Update assistant message with final content + summed usage (D-08).
             db.table("messages").update({
                 "content": full_content,
                 "tools_used": tools_used_acc if tools_used_acc else None,
+                "usage": turn_usage or None,
             }).eq("id", assistant_msg_id).execute()
 
             # Auto-generate title from first message
@@ -886,25 +1123,63 @@ async def send_message(
                 title = body.content[:50] + ("..." if len(body.content) > 50 else "")
                 db.table("threads").update({"title": title}).eq("id", thread_id).execute()
 
+            # done event — carry the summed usage; signal mode:"demo" so the FE
+            # can surface the owner-key demo banner (Phase 15). useChat.ts:185
+            # keys only on message_id, so extra keys are inert (D-08).
+            done_payload = {
+                "message_id": assistant_msg_id,
+                "content": full_content,
+            }
+            if turn_usage:
+                done_payload["usage"] = turn_usage
+            if mode == "demo":
+                done_payload["mode"] = "demo"
             yield {
                 "event": "done",
-                "data": json.dumps({
-                    "message_id": assistant_msg_id,
-                    "content": full_content,
-                }),
+                "data": json.dumps(done_payload),
             }
+        except openai.RateLimitError as e:
+            # 429 — model hit its rate limit (D-12). Distinct structured code so the
+            # UI can disambiguate from a 402. RateLimitError IS an APIStatusError
+            # subclass, so this MUST be caught BEFORE the APIStatusError branch.
+            logger.warning(f"Chat rate-limited: {scrub_secrets(str(e))}", exc_info=True)
+            _mark_error_row(db, assistant_msg_id)
+            yield _sse_error(
+                "rate_limit",
+                "This model hit its rate limit. Wait a minute or pick another "
+                "model / connect credits.",
+            )
+        except openai.APIStatusError as e:
+            # 402 → payment_required (no 402 subclass exists; branch on status_code).
+            # Use the TYPED exception + .status_code, never str(e) parsing (leak risk).
+            if e.status_code == 402:  # APIStatusError always carries .status_code
+                logger.warning(
+                    f"Chat payment-required: {scrub_secrets(str(e))}", exc_info=True
+                )
+                _mark_error_row(db, assistant_msg_id)
+                yield _sse_error(
+                    "payment_required",
+                    "This model needs credits. Connect your OpenRouter account or "
+                    "add credits.",
+                )
+            else:
+                logger.error(
+                    f"Chat upstream error: {scrub_secrets(str(e))}", exc_info=True
+                )
+                _mark_error_row(db, assistant_msg_id)
+                yield _sse_error(
+                    "upstream_error",
+                    "The model provider returned an error. Try again or pick "
+                    "another model.",
+                )
         except Exception as e:
-            logger.error(f"Chat error: {e}", exc_info=True)
-            if assistant_msg_id:
-                try:
-                    db.table("messages").update({
-                        "content": "[An error occurred while generating the response]",
-                    }).eq("id", assistant_msg_id).execute()
-                except Exception:
-                    pass  # Best-effort cleanup
+            # Defense in depth: scrub str(e) on the message string too (the
+            # _ScrubFilter is the belt that also catches the exc_info traceback).
+            logger.error(f"Chat error: {scrub_secrets(str(e))}", exc_info=True)
+            _mark_error_row(db, assistant_msg_id)
             yield {
                 "event": "error",
-                "data": json.dumps({"error": str(e)}),
+                "data": json.dumps({"error": scrub_secrets(str(e))}),
             }
         finally:
             # Handle client disconnect (GeneratorExit) -- clean up ghost messages
