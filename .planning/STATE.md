@@ -4,12 +4,12 @@ milestone: v1.2
 milestone_name: User Options & BYOK
 status: executing
 stopped_at: Phase 12 context gathered
-last_updated: "2026-06-23T03:47:57.681Z"
-last_activity: 2026-06-22 -- Phase 11 execution started
+last_updated: "2026-06-23T14:58:43.912Z"
+last_activity: 2026-06-23 -- Phase 12 planning complete
 progress:
   total_phases: 9
   completed_phases: 3
-  total_plans: 11
+  total_plans: 14
   completed_plans: 11
   percent: 33
 ---
@@ -27,9 +27,9 @@ See: .planning/PROJECT.md (updated 2026-05-20 after v1.1 completion)
 
 Phase: 11 (per-request-key-model-resolution-chat-loop-seam) — EXECUTING
 Plan: 1 of 4
-Status: Executing Phase 11
+Status: Ready to execute
 Progress: [█████████░] 86%
-Last activity: 2026-06-22 -- Phase 11 execution started
+Last activity: 2026-06-23 -- Phase 12 planning complete
 
 ## Performance Metrics
 
