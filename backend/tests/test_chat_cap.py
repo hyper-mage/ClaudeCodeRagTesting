@@ -55,6 +55,14 @@ def test_cap_hit_graceful_exit(mock_stream_chat_completion, mock_user_id, monkey
     monkeypatch.setattr("routers.chat.execute_tool", lambda *a, **kw: '{"ok":true}', raising=False)
     monkeypatch.setattr("database.get_supabase", lambda: fake_db)
     monkeypatch.setattr("routers.chat.get_supabase", lambda: fake_db)
+    # Phase 11: chat now resolves a per-request key (fail-closed). These legacy
+    # cap/retry tests predate BYOK and do not stock a user_api_keys row; stub the
+    # resolver to the owner-key "user" path so the loop runs as it did pre-P11
+    # (key resolution itself is covered by test_key_model_resolution.py).
+    monkeypatch.setattr(
+        "routers.chat._resolve_key_and_model",
+        lambda db, user_id, thread_row, body: ("sk-or-v1-OWNER", "owner/model", "user", True),
+    )
 
     from main import app
     app.dependency_overrides[get_user_id] = _fake_get_user_id
@@ -114,6 +122,14 @@ def test_cap_hit_logs_warning(mock_stream_chat_completion, caplog, mock_user_id,
     monkeypatch.setattr("routers.chat.execute_tool", lambda *a, **kw: '{"ok":true}', raising=False)
     monkeypatch.setattr("database.get_supabase", lambda: fake_db)
     monkeypatch.setattr("routers.chat.get_supabase", lambda: fake_db)
+    # Phase 11: chat now resolves a per-request key (fail-closed). These legacy
+    # cap/retry tests predate BYOK and do not stock a user_api_keys row; stub the
+    # resolver to the owner-key "user" path so the loop runs as it did pre-P11
+    # (key resolution itself is covered by test_key_model_resolution.py).
+    monkeypatch.setattr(
+        "routers.chat._resolve_key_and_model",
+        lambda db, user_id, thread_row, body: ("sk-or-v1-OWNER", "owner/model", "user", True),
+    )
 
     from main import app
     app.dependency_overrides[get_user_id] = _fake_get_user_id
@@ -163,6 +179,14 @@ def test_cap_hit_langsmith_tag(mock_stream_chat_completion, mock_langsmith_run,
     monkeypatch.setattr("routers.chat.execute_tool", lambda *a, **kw: '{"ok":true}', raising=False)
     monkeypatch.setattr("database.get_supabase", lambda: fake_db)
     monkeypatch.setattr("routers.chat.get_supabase", lambda: fake_db)
+    # Phase 11: chat now resolves a per-request key (fail-closed). These legacy
+    # cap/retry tests predate BYOK and do not stock a user_api_keys row; stub the
+    # resolver to the owner-key "user" path so the loop runs as it did pre-P11
+    # (key resolution itself is covered by test_key_model_resolution.py).
+    monkeypatch.setattr(
+        "routers.chat._resolve_key_and_model",
+        lambda db, user_id, thread_row, body: ("sk-or-v1-OWNER", "owner/model", "user", True),
+    )
 
     from main import app
     app.dependency_overrides[get_user_id] = _fake_get_user_id
@@ -223,6 +247,14 @@ def test_voluntary_stop_preserved(mock_stream_chat_completion, mock_user_id, mon
 
     monkeypatch.setattr("database.get_supabase", lambda: fake_db)
     monkeypatch.setattr("routers.chat.get_supabase", lambda: fake_db)
+    # Phase 11: chat now resolves a per-request key (fail-closed). These legacy
+    # cap/retry tests predate BYOK and do not stock a user_api_keys row; stub the
+    # resolver to the owner-key "user" path so the loop runs as it did pre-P11
+    # (key resolution itself is covered by test_key_model_resolution.py).
+    monkeypatch.setattr(
+        "routers.chat._resolve_key_and_model",
+        lambda db, user_id, thread_row, body: ("sk-or-v1-OWNER", "owner/model", "user", True),
+    )
 
     from main import app
     app.dependency_overrides[get_user_id] = _fake_get_user_id
