@@ -84,6 +84,27 @@ class KeyStatusResponse(BaseModel):
     connected_at: str | None = None
 
 
+# ----- Model catalog (Phase 12, MODEL-01 / MODEL-07, D-10) -----
+
+class ModelResponse(BaseModel):
+    """One render-ready OpenRouter catalog entry served by GET /api/models (D-10).
+
+    The backend does ALL the tagging/price math (via the plan 12-01 pure functions);
+    the frontend RENDERS these fields and never recomputes free/paid status, per-Mtok
+    hints, or popularity. The raw `pricing` strings are retained verbatim (D-10) so a
+    future feature can re-derive other figures without a re-fetch.
+    """
+    id: str
+    name: str | None = None
+    context_length: int | None = None
+    is_free: bool
+    price_per_mtok_prompt: float | None = None
+    price_per_mtok_completion: float | None = None
+    popularity_rank: int | None = None
+    popularity_source: str = "curated"
+    pricing: dict
+
+
 # ----- Explorer sub-agent (Phase 5) -----
 
 class ExplorerFinding(BaseModel):
