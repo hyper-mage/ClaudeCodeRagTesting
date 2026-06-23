@@ -93,6 +93,14 @@ Prod is NOT pushed in this plan. At deploy time, apply migration 030 to the prod
 - `model_cache` is live on dev and reachable via the service-role client — plan 12-03's route + seed tests can now read/write a real table (the BLOCKING push closed the false-positive-verification gap).
 - No blockers introduced. Prod apply tracked as the ops note above for the deploy step.
 
+## Self-Check: PASSED
+
+- FOUND: `supabase/migrations/20240301000030_create_model_cache.sql`
+- FOUND: `.planning/phases/12-model-cache-catalog/12-02-SUMMARY.md`
+- FOUND: commit `3f90e6d` (Task 1 — migration)
+- FOUND: commit `535759d` (plan metadata)
+- Live verification: service-role probe of `model_cache` on dev returned count = 0 (table reachable, no relation-does-not-exist error)
+
 ---
 *Phase: 12-model-cache-catalog*
 *Completed: 2026-06-23*
