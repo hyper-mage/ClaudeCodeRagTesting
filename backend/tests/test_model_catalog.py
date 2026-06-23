@@ -228,3 +228,156 @@ def test_serve_stale_on_fetch_failure(monkeypatch):
     rows = svc.refresh_if_stale(db)  # must NOT raise
 
     assert {r["model_id"] for r in rows} == {"openai/gpt-4o-mini"}, "must serve the stale rows"
+
+
+# ---------------------------------------------------------------------
+# CR-01 / VERIFICATION truth #5 — a nameless upstream model must NOT
+# empty/stall the cache (constraint-aware regression, closes WR-03)
+# ---------------------------------------------------------------------
+def _constraint_aware_stub_db(initial_rows: list[dict]):
+    """Like `_stub_db`, but the upsert MIMICS the live `name TEXT NOT NULL` posture:
+    any row whose `name` is None/empty raises, simulating a Postgres NOT NULL violation.
+
+    This is the harness WR-03 demands — the route test's mock DB enforces NO constraint,
+    so a nameless upstream model silently passes there. Here a nameless row that reaches
+    the upsert WITHOUT the coalesce would blow up the whole batch (exactly CR-01).
+    """
+    state = {"rows": list(initial_rows)}
+
+    select_result = MagicMock()
+    type(select_result).data = property(lambda self: list(state["rows"]))
+
+    table = MagicMock()
+    table.select.return_value.execute.return_value = select_result
+
+    def _upsert(payload, *a, **kw):
+        rows = payload if isinstance(payload, list) else [payload]
+        for r in rows:
+            # The live model_cache.name was NOT NULL pre-031; an empty name is the CR-01 trip.
+            if r.get("name") in (None, ""):
+                raise RuntimeError(
+                    "null value in column \"name\" violates not-null constraint"
+                )
+        state["rows"] = rows
+        up = MagicMock()
+        up.execute.return_value = MagicMock(data=rows)
+        return up
+
+    table.upsert.side_effect = _upsert
+
+    db = MagicMock()
+    db.table.return_value = table
+    db._state = state
+    return db
+
+
+def test_nameless_model_coalesces_to_model_id(monkeypatch):
+    """A nameless upstream model (id present, no `name`) must persist with
+    name == its model_id (NOT None) and NEVER fail the batch upsert (CR-01).
+
+    Driven over the constraint-aware stub (which rejects a null name like the live DB
+    did pre-031), so without the `_to_cache_row` coalesce this test FAILS RED."""
+    import services.model_catalog_service as svc
+
+    monkeypatch.setattr(svc, "get_settings", lambda: MagicMock(model_cache_ttl_seconds=0))
+    monkeypatch.setattr(svc, "fetch_catalog", _fixture_models)
+
+    db = _constraint_aware_stub_db([])  # cold/empty cache → stale → must populate
+    rows = svc.refresh_if_stale(db)  # must NOT raise on the nameless row
+
+    assert rows, "cold cache + nameless upstream model must NOT yield an empty catalog"
+    by_id = {r["model_id"]: r for r in rows}
+    assert "vendor/nameless-edge" in by_id, "the nameless model must persist, not nuke the batch"
+    assert by_id["vendor/nameless-edge"]["name"] == "vendor/nameless-edge", (
+        "a missing upstream name must coalesce to the model_id, never NULL"
+    )
+
+
+def test_empty_catalog_guard_serves_stale(monkeypatch, caplog):
+    """A fetch returning an empty catalog (or all rows filtered out) over a NON-empty
+    stale cache must NOT issue a blind `upsert([])` — the existing stale rows are
+    returned unchanged and a DISTINCT empty-catalog warning is logged (WR-01)."""
+    import logging
+    import services.model_catalog_service as svc
+
+    monkeypatch.setattr(svc, "get_settings", lambda: MagicMock(model_cache_ttl_seconds=0))
+    monkeypatch.setattr(svc, "fetch_catalog", lambda: [])  # upstream returns nothing
+
+    stale_rows = [
+        {"model_id": "openai/gpt-4o-mini", "name": "x",
+         "fetched_at": (datetime.now(timezone.utc) - timedelta(days=10)).isoformat()},
+    ]
+    db = _stub_db(stale_rows)
+
+    with caplog.at_level(logging.WARNING):
+        rows = svc.refresh_if_stale(db)
+
+    # The blind upsert([]) must NOT have been issued.
+    db.table.return_value.upsert.assert_not_called()
+    # The existing stale rows survive unchanged.
+    assert {r["model_id"] for r in rows} == {"openai/gpt-4o-mini"}
+    # A DISTINCT empty-catalog warning — not the generic "serving stale" failure message.
+    assert any("empty catalog" in rec.message for rec in caplog.records), (
+        f"expected a distinct empty-catalog warning, got: {[r.message for r in caplog.records]}"
+    )
+
+
+def test_empty_and_failed_distinct_warning(monkeypatch, caplog):
+    """A COLD/empty cache + a fetch that RAISES must log a DISTINCT 'empty cache + fetch
+    failed → returning empty' warning rather than the misleading generic 'serving stale'
+    (you cannot serve rows you never fetched) — WR-02. Still returns [] without raising."""
+    import logging
+    import services.model_catalog_service as svc
+
+    monkeypatch.setattr(svc, "get_settings", lambda: MagicMock(model_cache_ttl_seconds=0))
+
+    def _boom():
+        raise RuntimeError("openrouter unreachable")
+
+    monkeypatch.setattr(svc, "fetch_catalog", _boom)
+
+    db = _stub_db([])  # cold/empty cache
+    with caplog.at_level(logging.WARNING):
+        rows = svc.refresh_if_stale(db)  # must NOT raise
+
+    assert rows == [], "a cold cache + failed fetch returns empty (cannot serve unfetched rows)"
+    msgs = " ".join(rec.message for rec in caplog.records).lower()
+    assert "empty" in msgs, (
+        f"empty-and-failed must log a distinct honest warning, got: {[r.message for r in caplog.records]}"
+    )
+
+
+def test_fetch_catalog_sends_no_auth_header(monkeypatch):
+    """fetch_catalog must send NO Authorization header / no auth in headers — locking the
+    'never couple the catalog to an owner key' decision (D-05, WR-05, T-12-V5-03)."""
+    import services.model_catalog_service as svc
+
+    captured = {}
+
+    def _fake_get(url, *a, **kw):
+        captured["url"] = url
+        captured["headers"] = kw.get("headers") or {}
+        resp = MagicMock()
+        resp.raise_for_status.return_value = None
+        resp.json.return_value = {"data": []}
+        return resp
+
+    monkeypatch.setattr(svc.httpx, "get", _fake_get)
+    svc.fetch_catalog()
+
+    headers = captured["headers"]
+    lower_keys = {k.lower() for k in headers}
+    assert "authorization" not in lower_keys, f"fetch_catalog must NOT send auth: {headers}"
+    # No bearer/api-key smuggled under any header value either.
+    joined = " ".join(str(v) for v in headers.values()).lower()
+    assert "bearer" not in joined and "sk-or-" not in joined, f"no key in headers: {headers}"
+
+
+def test_negative_ttl_rejected_loudly():
+    """A negative MODEL_CACHE_TTL_SECONDS must fail Settings validation loudly
+    (pydantic ValidationError) rather than silently hammering upstream (WR-04, T-12-V5-04)."""
+    from pydantic import ValidationError
+    from config import Settings
+
+    with pytest.raises(ValidationError):
+        Settings(model_cache_ttl_seconds=-1)

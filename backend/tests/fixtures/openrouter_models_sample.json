@@ -39,6 +39,15 @@
       "id": "test/missing-pricing-edge",
       "canonical_slug": "test/missing-pricing-edge",
       "name": "Edge: Missing Pricing & Context"
+    },
+    {
+      "id": "vendor/nameless-edge",
+      "canonical_slug": "vendor/nameless-edge",
+      "context_length": 8192,
+      "pricing": {
+        "prompt": "0.000001",
+        "completion": "0.000002"
+      }
     }
   ]
 }
