@@ -14,6 +14,7 @@ Config-touching tests (when un-skipped) MUST follow each `monkeypatch.setenv(...
 on a cached settings field with `get_settings.cache_clear()` (mirror
 test_crypto_service.py:11-20) — get_settings() is @lru_cache'd.
 """
+import inspect
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -26,18 +27,108 @@ _USER_KEY = "sk-or-v1-USERKEY"
 _RESOLVED_MODEL = "anthropic/claude-3.5-sonnet"
 
 
-@pytest.mark.skip(reason=_WAVE0)
+def _fake_settings(**overrides):
+    """Build a fake Settings-like object for _resolve_key_and_model.
+
+    Defaults mirror a keyless owner-default config; override per test.
+    """
+    s = MagicMock()
+    s.llm_model = "owner/default-model"
+    s.resolved_llm_api_key = "sk-or-v1-OWNERKEY"
+    s.demo_fallback_enabled = False
+    s.demo_fallback_model = "meta-llama/llama-3.3-70b-instruct:free"
+    for k, v in overrides.items():
+        setattr(s, k, v)
+    return s
+
+
+def _db_with_key_row(encrypted_key: str | None, pref_model: str | None = None,
+                     pref_raises: bool = False):
+    """Build a fake supabase client for _resolve_key_and_model.
+
+    - user_api_keys read returns a row (or none) carrying `encrypted_key`.
+    - user_preferences read returns `pref_model` (or none), or raises when
+      `pref_raises` is set (simulating the absent P13 table → Postgres 42P01).
+
+    Each read is chained .table().select().eq().maybe_single().execute() → `.data`.
+    """
+    db = MagicMock()
+
+    def _table(name: str):
+        tbl = MagicMock()
+        exec_result = MagicMock()
+        if name == "user_api_keys":
+            exec_result.data = (
+                {"encrypted_key": encrypted_key} if encrypted_key else None
+            )
+            tbl.select.return_value.eq.return_value.maybe_single.return_value.execute.return_value = (
+                exec_result
+            )
+        elif name == "user_preferences":
+            if pref_raises:
+                tbl.select.return_value.eq.return_value.maybe_single.return_value.execute.side_effect = (
+                    RuntimeError('relation "user_preferences" does not exist (42P01)')
+                )
+            else:
+                exec_result.data = (
+                    {"default_model": pref_model} if pref_model else None
+                )
+                tbl.select.return_value.eq.return_value.maybe_single.return_value.execute.return_value = (
+                    exec_result
+                )
+        else:
+            exec_result.data = None
+            tbl.select.return_value.eq.return_value.maybe_single.return_value.execute.return_value = (
+                exec_result
+            )
+        return tbl
+
+    db.table.side_effect = _table
+    return db
+
+
 def test_no_key_flag_off_refuses():
     """DEMO-03: keyless user + demo_fallback_enabled=False → mode=='no_key',
     api_key is None; caller yields structured no_api_key SSE error, makes NO LLM call."""
-    raise NotImplementedError
+    from routers import chat
+
+    db = _db_with_key_row(None)
+    settings = _fake_settings(demo_fallback_enabled=False)
+    body = MagicMock(spec=[])  # no .model attribute
+
+    with patch.object(chat, "get_settings", return_value=settings):
+        api_key, model, mode, is_user_key = chat._resolve_key_and_model(
+            db, "user-1", {"id": "t1"}, body
+        )
+
+    assert api_key is None
+    assert mode == "no_key"
+    assert is_user_key is False
+    assert model == "owner/default-model"  # still resolves a model for the error context
 
 
-@pytest.mark.skip(reason=_WAVE0)
 def test_demo_fallback_uses_free_model():
     """DEMO-03: keyless user + demo_fallback_enabled=True → owner key +
     settings.demo_fallback_model (:free slug), mode=='demo', is_user_key False."""
-    raise NotImplementedError
+    from routers import chat
+
+    db = _db_with_key_row(None)
+    settings = _fake_settings(
+        demo_fallback_enabled=True,
+        demo_fallback_model="meta-llama/llama-3.3-70b-instruct:free",
+    )
+    body = MagicMock(spec=[])
+
+    with patch.object(chat, "get_settings", return_value=settings):
+        api_key, model, mode, is_user_key = chat._resolve_key_and_model(
+            db, "user-1", {"id": "t1"}, body
+        )
+
+    assert api_key == "sk-or-v1-OWNERKEY"
+    assert model == "meta-llama/llama-3.3-70b-instruct:free"
+    assert model.endswith(":free")
+    assert mode == "demo"
+    assert is_user_key is False
 
 
 def test_user_key_threaded_to_all_call_sites():
@@ -142,22 +233,80 @@ def test_user_key_threaded_to_all_call_sites():
         assert call.kwargs["model"] == _RESOLVED_MODEL
 
 
-@pytest.mark.skip(reason=_WAVE0)
 def test_no_cross_user_bleed():
     """SEC-04: two concurrent resolutions for different users never cross
     key/model (per-request resolution is NOT cached — Pitfall 8)."""
-    raise NotImplementedError
+    from routers import chat
+
+    settings = _fake_settings()
+    body = MagicMock(spec=[])
+
+    # Each user has a DISTINCT stored (encrypted) key. decrypt_key is the identity
+    # transform here so the decrypted value == the stored ciphertext per user.
+    db_a = _db_with_key_row("sk-or-v1-CIPHER-A")
+    db_b = _db_with_key_row("sk-or-v1-CIPHER-B")
+
+    with patch.object(chat, "get_settings", return_value=settings), \
+         patch.object(chat, "decrypt_key", side_effect=lambda c: c.replace("CIPHER", "PLAIN")):
+        key_a, model_a, mode_a, is_user_a = chat._resolve_key_and_model(
+            db_a, "user-A", {"id": "tA"}, body
+        )
+        key_b, model_b, mode_b, is_user_b = chat._resolve_key_and_model(
+            db_b, "user-B", {"id": "tB"}, body
+        )
+
+    assert key_a == "sk-or-v1-PLAIN-A"
+    assert key_b == "sk-or-v1-PLAIN-B"
+    assert key_a != key_b  # no shared/cached state across calls
+    assert mode_a == mode_b == "user"
+    assert is_user_a is is_user_b is True
 
 
-@pytest.mark.skip(reason=_WAVE0)
 def test_fail_closed_no_or_fallback():
     """SEC-04: _resolve_key_and_model never returns `user_key or owner_key`
     (fail-closed shape — a missing user key does NOT silently fall back to owner)."""
-    raise NotImplementedError
+    from routers import chat
+
+    # Static-source assertion: the helper body must NOT contain a fail-open
+    # `user_key or owner_key`-style one-liner; the three branches are explicit.
+    src = inspect.getsource(chat._resolve_key_and_model)
+    src_no_comments = "\n".join(
+        line for line in src.splitlines() if not line.lstrip().startswith("#")
+    )
+    assert "user_key or owner_key" not in src_no_comments
+    assert "resolved_llm_api_key or" not in src_no_comments
+
+    # Behavioral assertion: keyless + flag OFF must refuse, never return the owner key.
+    db = _db_with_key_row(None)
+    settings = _fake_settings(demo_fallback_enabled=False)
+    body = MagicMock(spec=[])
+    with patch.object(chat, "get_settings", return_value=settings):
+        api_key, _model, mode, is_user_key = chat._resolve_key_and_model(
+            db, "user-1", {"id": "t1"}, body
+        )
+    assert api_key is None and api_key != settings.resolved_llm_api_key
+    assert mode == "no_key"
+    assert is_user_key is False
 
 
-@pytest.mark.skip(reason=_WAVE0)
 def test_model_fallthrough_absent_p13_schema():
     """D-03: model resolves to the owner default when thread.model /
     user_preferences are absent (no crash on the not-yet-present P13 schema)."""
-    raise NotImplementedError
+    from routers import chat
+
+    settings = _fake_settings()
+    body = MagicMock(spec=[])  # no body.model override
+    # thread_row has NO "model" key (column absent pre-P13) and the
+    # user_preferences query RAISES (table absent pre-P13 → 42P01).
+    db = _db_with_key_row("sk-or-v1-CIPHER", pref_raises=True)
+
+    with patch.object(chat, "get_settings", return_value=settings), \
+         patch.object(chat, "decrypt_key", side_effect=lambda c: "sk-or-v1-PLAIN"):
+        api_key, model, mode, is_user_key = chat._resolve_key_and_model(
+            db, "user-1", {"id": "t1"}, body  # thread_row dict has no "model"
+        )
+
+    assert model == "owner/default-model"  # fell through to owner default, no crash
+    assert api_key == "sk-or-v1-PLAIN"
+    assert mode == "user"
+    assert is_user_key is True

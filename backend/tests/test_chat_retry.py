@@ -96,6 +96,14 @@ def test_retry_deletes_prior_failed_assistant_row(
 
     monkeypatch.setattr("database.get_supabase", lambda: fake_db)
     monkeypatch.setattr("routers.chat.get_supabase", lambda: fake_db)
+    # Phase 11: chat now resolves a per-request key (fail-closed). These legacy
+    # cap/retry tests predate BYOK and do not stock a user_api_keys row; stub the
+    # resolver to the owner-key "user" path so the loop runs as it did pre-P11
+    # (key resolution itself is covered by test_key_model_resolution.py).
+    monkeypatch.setattr(
+        "routers.chat._resolve_key_and_model",
+        lambda db, user_id, thread_row, body: ("sk-or-v1-OWNER", "owner/model", "user", True),
+    )
 
     from main import app
     app.dependency_overrides[get_user_id] = _fake_get_user_id
@@ -160,6 +168,14 @@ def test_retry_skips_user_message_insert(
 
     monkeypatch.setattr("database.get_supabase", lambda: fake_db)
     monkeypatch.setattr("routers.chat.get_supabase", lambda: fake_db)
+    # Phase 11: chat now resolves a per-request key (fail-closed). These legacy
+    # cap/retry tests predate BYOK and do not stock a user_api_keys row; stub the
+    # resolver to the owner-key "user" path so the loop runs as it did pre-P11
+    # (key resolution itself is covered by test_key_model_resolution.py).
+    monkeypatch.setattr(
+        "routers.chat._resolve_key_and_model",
+        lambda db, user_id, thread_row, body: ("sk-or-v1-OWNER", "owner/model", "user", True),
+    )
 
     from main import app
     app.dependency_overrides[get_user_id] = _fake_get_user_id
@@ -219,6 +235,14 @@ def test_non_retry_path_unchanged(
 
     monkeypatch.setattr("database.get_supabase", lambda: fake_db)
     monkeypatch.setattr("routers.chat.get_supabase", lambda: fake_db)
+    # Phase 11: chat now resolves a per-request key (fail-closed). These legacy
+    # cap/retry tests predate BYOK and do not stock a user_api_keys row; stub the
+    # resolver to the owner-key "user" path so the loop runs as it did pre-P11
+    # (key resolution itself is covered by test_key_model_resolution.py).
+    monkeypatch.setattr(
+        "routers.chat._resolve_key_and_model",
+        lambda db, user_id, thread_row, body: ("sk-or-v1-OWNER", "owner/model", "user", True),
+    )
 
     from main import app
     app.dependency_overrides[get_user_id] = _fake_get_user_id

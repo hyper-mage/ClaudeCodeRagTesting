@@ -42,7 +42,8 @@ def _make_explore_tool_call_streams():
     """Return a side_effect list: first call yields tool_call, second yields text."""
     call_count = 0
 
-    def _stream(messages, tools=None, tool_guide=None, source_hint=None, scope_hint=None):
+    def _stream(messages, tools=None, tool_guide=None, source_hint=None,
+                scope_hint=None, api_key=None, model=None, trace=True):
         nonlocal call_count
         call_count += 1
         # Budget tracking in chat.py expects a system_content event first.
@@ -158,7 +159,12 @@ def _post_message_collect(client_obj):
     db = MagicMock()
     db.table = MagicMock(side_effect=_table)
 
+    # Phase 11: chat now resolves a per-request key (fail-closed). This integration
+    # test predates BYOK and routes user_api_keys to the generic messages chain
+    # (list .data); stub the resolver to the owner-key "user" path so the loop runs.
     with patch("routers.chat.get_supabase", return_value=db), \
+         patch("routers.chat._resolve_key_and_model",
+               return_value=("sk-or-v1-OWNER", "owner/model", "user", True)), \
          patch("routers.chat.stream_chat_completion", side_effect=_make_explore_tool_call_streams()), \
          patch("services.explorer_service.run_exploration", side_effect=lambda **kw: _fake_explorer_events()):
         with client_obj.stream("POST", "/api/threads/thread_1/messages",
