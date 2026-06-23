@@ -140,7 +140,7 @@ Plans:
 
 **Wave 3** *(gap closure — blocked on Waves 1-2)*
 
-- [ ] 12-04-PLAN.md — [GAP CR-01] coalesce name→model_id + corrective migration 031 (relax model_cache.name to nullable, RLS-preserved) + empty-catalog guard + honest fail-path warnings + seed try/except + bounded TTL + CR-01/WR-03/WR-05 regression tests (closes VERIFICATION truth #5 / never-empty-by-design)
+- [x] 12-04-PLAN.md — [GAP CR-01] coalesce name→model_id + corrective migration 031 (relax model_cache.name to nullable, RLS-preserved) + empty-catalog guard + honest fail-path warnings + seed try/except + bounded TTL + CR-01/WR-03/WR-05 regression tests (closes VERIFICATION truth #5 / never-empty-by-design)
 
 ### Phase 13: Preferences + Per-Thread Model
 
@@ -231,7 +231,7 @@ Phases execute in numeric order: 9 → 10 → 11 → 12 → 13 → 14 → 15 (Ph
 | 9. Crypto + Encrypted Key Storage | v1.2 | 3/3 | Complete   | 2026-06-19 |
 | 10. OAuth PKCE Connect | v1.2 | 4/4 | Complete   | 2026-06-22 |
 | 11. Per-Request Key + Model Resolution | v1.2 | 4/4 | Complete   | 2026-06-23 |
-| 12. Model Cache + Catalog | v1.2 | 3/3 | Complete   | 2026-06-23 |
+| 12. Model Cache + Catalog | v1.2 | 4/4 | Complete   | 2026-06-23 |
 | 13. Preferences + Per-Thread Model | v1.2 | 0/TBD | Not started | - |
 | 14. Usage/Cost + Settings/Key-State UX | v1.2 | 0/TBD | Not started | - |
 | 15. Options UI Capstone + Demo Gating | v1.2 | 0/TBD | Not started | - |
