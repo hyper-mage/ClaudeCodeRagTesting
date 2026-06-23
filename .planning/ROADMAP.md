@@ -33,7 +33,7 @@ Full phase detail archived in `milestones/v1.1-ROADMAP.md`. Audit: passed, 23/23
 - [x] **Phase 10: OAuth PKCE — Backend Exchange + Frontend Connect** - Connect/disconnect an OpenRouter account with no manual key paste (completed 2026-06-22)
 - [x] **Phase 11: Per-Request Key + Model Resolution (chat-loop seam)** - Every chat runs on the right user's key + model, fail-closed, no cross-user bleed
  (completed 2026-06-23)
-- [ ] **Phase 12: Model Cache + Catalog** - Searchable, auto-refreshing model list with free/paid + popularity + price hints
+- [x] **Phase 12: Model Cache + Catalog** - Searchable, auto-refreshing model list with free/paid + popularity + price hints (completed 2026-06-23)
 - [ ] **Phase 13: Preferences + Per-Thread Model** - Default model, per-thread model selection, persisted theme storage
 - [ ] **Phase 14: Usage/Cost Display + Settings/Key-State UX** - Per-message cost, balance, low-balance warning, per-thread totals, settings page
 - [ ] **Phase 15: Options UI Capstone + Demo-Fallback Gating** - Model picker, favorites, key-gated selection, demo banner, demo-fallback flag (gated on SEC-03)
@@ -135,7 +135,7 @@ Plans:
 
 **Wave 2** *(blocked on Wave 1)*
 
-- [ ] 12-03-PLAN.md — ModelResponse schema + models.py router (GET /api/models refresh-if-stale + ?free_only) + main.py wiring + idempotent deploy seed + Wave 0 route tests
+- [x] 12-03-PLAN.md — ModelResponse schema + models.py router (GET /api/models refresh-if-stale + ?free_only) + main.py wiring + idempotent deploy seed + Wave 0 route tests
 
 ### Phase 13: Preferences + Per-Thread Model
 
@@ -226,7 +226,7 @@ Phases execute in numeric order: 9 → 10 → 11 → 12 → 13 → 14 → 15 (Ph
 | 9. Crypto + Encrypted Key Storage | v1.2 | 3/3 | Complete   | 2026-06-19 |
 | 10. OAuth PKCE Connect | v1.2 | 4/4 | Complete   | 2026-06-22 |
 | 11. Per-Request Key + Model Resolution | v1.2 | 4/4 | Complete   | 2026-06-23 |
-| 12. Model Cache + Catalog | v1.2 | 2/3 | In Progress|  |
+| 12. Model Cache + Catalog | v1.2 | 3/3 | Complete   | 2026-06-23 |
 | 13. Preferences + Per-Thread Model | v1.2 | 0/TBD | Not started | - |
 | 14. Usage/Cost + Settings/Key-State UX | v1.2 | 0/TBD | Not started | - |
 | 15. Options UI Capstone + Demo Gating | v1.2 | 0/TBD | Not started | - |
