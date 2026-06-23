@@ -179,5 +179,7 @@ This document evolves at phase transitions and milestone boundaries.
 
 **Current milestone:** v1.2 User Options & BYOK — scoped 2026-06-18. **Phase 9 complete** (Crypto + Encrypted Key Storage Foundation): KEY-02 + SEC-02 validated — encrypted BYOK key storage live on dev (Fernet/MultiFernet round-trip + rotation, ciphertext-only RLS `user_api_keys` table, REVOKE + hardened FROM-table allowlist provably blocking Text-to-SQL exfiltration incl. comma/schema bypass vectors). Prod apply deferred to the deploy step (D-03). Pre-existing RPC `42501 SET LOCAL role` issue logged for Phase 11 (D-09-A).
 
+**Phase 12 complete** (2026-06-23) — Model Cache + Catalog: MODEL-01/02/03/04/07 validated. `GET /api/models[?free_only]` serves a Supabase-backed (`model_cache`, migration 030) catalog with defensive free/paid tagging, guarded per-Mtok price + context-length hints, curated `POPULAR_MODELS` popularity, and lazy refresh-if-stale (24h TTL, serve-stale-on-failure). Catalog is never-empty **by design** after gap closure (CR-01): corrective migration 031 relaxed `model_cache.name` to nullable + a `name → model_id` coalesce + empty-catalog guard, so one nameless upstream model can no longer empty the cold cache. Inverted RLS (permissive SELECT, service-role-only writes) live on dev; prod 031 apply deferred to deploy (D-03).
+
 ---
-*Last updated: 2026-06-18 — v1.2 Phase 9 (Crypto + Encrypted Key Storage Foundation) complete.*
+*Last updated: 2026-06-23 — v1.2 Phase 12 (Model Cache + Catalog) complete.*
