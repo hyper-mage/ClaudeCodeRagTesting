@@ -130,8 +130,8 @@ Plans:
 
 **Wave 1**
 
-- [ ] 12-01-PLAN.md — config (POPULAR_MODELS + model_cache_ttl_seconds) + model_catalog_service pure functions (defensive free/paid + per-Mtok + popularity + refresh-if-stale) + Wave 0 unit tests + offline fixture
-- [ ] 12-02-PLAN.md — [BLOCKING] migration 030 (model_cache table + global-read/service-role-write RLS) + apply to dev Supabase
+- [x] 12-01-PLAN.md — config (POPULAR_MODELS + model_cache_ttl_seconds) + model_catalog_service pure functions (defensive free/paid + per-Mtok + popularity + refresh-if-stale) + Wave 0 unit tests + offline fixture
+- [x] 12-02-PLAN.md — [BLOCKING] migration 030 (model_cache table + global-read/service-role-write RLS) + apply to dev Supabase
 
 **Wave 2** *(blocked on Wave 1)*
 
@@ -226,7 +226,7 @@ Phases execute in numeric order: 9 → 10 → 11 → 12 → 13 → 14 → 15 (Ph
 | 9. Crypto + Encrypted Key Storage | v1.2 | 3/3 | Complete   | 2026-06-19 |
 | 10. OAuth PKCE Connect | v1.2 | 4/4 | Complete   | 2026-06-22 |
 | 11. Per-Request Key + Model Resolution | v1.2 | 4/4 | Complete   | 2026-06-23 |
-| 12. Model Cache + Catalog | v1.2 | 0/3 | Planned | - |
+| 12. Model Cache + Catalog | v1.2 | 2/3 | In Progress|  |
 | 13. Preferences + Per-Thread Model | v1.2 | 0/TBD | Not started | - |
 | 14. Usage/Cost + Settings/Key-State UX | v1.2 | 0/TBD | Not started | - |
 | 15. Options UI Capstone + Demo Gating | v1.2 | 0/TBD | Not started | - |
