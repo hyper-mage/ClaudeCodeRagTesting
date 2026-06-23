@@ -31,7 +31,7 @@ Full phase detail archived in `milestones/v1.1-ROADMAP.md`. Audit: passed, 23/23
 
 - [x] **Phase 9: Crypto + Encrypted Key Storage Foundation** - Fernet encryption, `user_api_keys` table with RLS, SQL-tool lockdown (completed 2026-06-19)
 - [x] **Phase 10: OAuth PKCE — Backend Exchange + Frontend Connect** - Connect/disconnect an OpenRouter account with no manual key paste (completed 2026-06-22)
-- [ ] **Phase 11: Per-Request Key + Model Resolution (chat-loop seam)** - Every chat runs on the right user's key + model, fail-closed, no cross-user bleed
+- [x] **Phase 11: Per-Request Key + Model Resolution (chat-loop seam)** - Every chat runs on the right user's key + model, fail-closed, no cross-user bleed (completed 2026-06-23)
 - [ ] **Phase 12: Model Cache + Catalog** - Searchable, auto-refreshing model list with free/paid + popularity + price hints
 - [ ] **Phase 13: Preferences + Per-Thread Model** - Default model, per-thread model selection, persisted theme storage
 - [ ] **Phase 14: Usage/Cost Display + Settings/Key-State UX** - Per-message cost, balance, low-balance warning, per-thread totals, settings page
@@ -109,7 +109,7 @@ Plans:
 
 **Wave 3** *(blocked on Waves 1-2)*
 
-- [ ] 11-04-PLAN.md — chat.py _resolve_key_and_model (fail-closed three-branch + three-tier) + budget fifth-read fix + SSE scrub/402/429 + usage persist + demo-mode signal
+- [x] 11-04-PLAN.md — chat.py _resolve_key_and_model (fail-closed three-branch + three-tier) + budget fifth-read fix + SSE scrub/402/429 + usage persist + demo-mode signal
 
 ### Phase 12: Model Cache + Catalog
 
@@ -217,7 +217,7 @@ Phases execute in numeric order: 9 → 10 → 11 → 12 → 13 → 14 → 15 (Ph
 |-------|-----------|----------------|--------|-----------|
 | 9. Crypto + Encrypted Key Storage | v1.2 | 3/3 | Complete   | 2026-06-19 |
 | 10. OAuth PKCE Connect | v1.2 | 4/4 | Complete   | 2026-06-22 |
-| 11. Per-Request Key + Model Resolution | v1.2 | 3/4 | In Progress|  |
+| 11. Per-Request Key + Model Resolution | v1.2 | 4/4 | Complete   | 2026-06-23 |
 | 12. Model Cache + Catalog | v1.2 | 0/TBD | Not started | - |
 | 13. Preferences + Per-Thread Model | v1.2 | 0/TBD | Not started | - |
 | 14. Usage/Cost + Settings/Key-State UX | v1.2 | 0/TBD | Not started | - |
