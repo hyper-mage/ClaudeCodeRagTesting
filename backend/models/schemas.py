@@ -25,8 +25,11 @@ class ThreadCreate(BaseModel):
 class ThreadResponse(BaseModel):
     id: str
     title: str | None
-    created_at: datetime
-    updated_at: datetime
+    # Optional so the PATCH /{id} model-pin response (which returns the updated
+    # row from .update().execute()) validates even when the driver echoes a
+    # partial row; real list/create/get rows always carry both timestamps.
+    created_at: datetime | None = None
+    updated_at: datetime | None = None
     model: str | None = None  # Phase 13 — per-thread model pin (rides every thread read; null = default tier, D-05)
 
 
