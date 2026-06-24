@@ -154,12 +154,31 @@ Plans:
   3. User can toggle light/dark theme and it persists per user (`user_preferences.theme`), mirrored to `localStorage` for flash-free first paint.
   4. A thread pinned to a model that is later deprecated falls back to the default at send time with a user-visible notice, rather than crashing the thread.
 
-**Plans**: TBD
+**Plans**: 6 plans
 **UI hint**: yes
 
 Plans:
 
-- [ ] TBD (refined during /gsd:plan-phase 13)
+**Wave 1**
+
+- [ ] 13-01-PLAN.md — combined additive migration (user_preferences + RLS, threads.model, messages.role 'notice') + Pydantic schemas + Wave 0 backend test scaffolds (RED)
+
+**Wave 2** *(blocked on Wave 1)*
+
+- [ ] 13-02-PLAN.md — [BLOCKING] apply migration 20240301000032 to dev Supabase + live schema probes
+
+**Wave 3** *(blocked on Waves 1-2)*
+
+- [ ] 13-03-PLAN.md — preferences router (GET/PUT /api/preferences upsert) + PATCH /api/threads/{id} set/clear model + main.py wiring
+- [ ] 13-04-PLAN.md — deprecation fallback in chat.py (notice insert + model override + history filter) — SC#4 / D-06
+
+**Wave 4** *(blocked on Wave 3)*
+
+- [ ] 13-05-PLAN.md — frontend primitives: theme bootstrap (FOUC-free) + Tailwind dark variant + core-surface tokens + hand-rolled ModelSelector + ThemeToggle + Wave 0 fe tests
+
+**Wave 5** *(blocked on Wave 4)*
+
+- [ ] 13-06-PLAN.md — wire per-thread selector header row + default-model selector + theme toggle + DeprecationNotice + theme reconcile + light-mode core surfaces + human-verify checkpoint
 
 ### Phase 14: Usage/Cost Display + Settings/Key-State UX
 
