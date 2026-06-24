@@ -2,9 +2,9 @@
 gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: User Options & BYOK
-status: verifying
-stopped_at: Completed 999.1-03-PLAN.md (auto-create-on-send; human-verify approved-with-caveat)
-last_updated: "2026-06-24T17:08:33.727Z"
+status: ready_to_plan
+stopped_at: Phase 999.1 complete (3/3) — ready to discuss Phase 999.2
+last_updated: 2026-06-24T17:33:43.794Z
 last_activity: 2026-06-24
 progress:
   total_phases: 9
@@ -21,13 +21,13 @@ progress:
 See: .planning/PROJECT.md (updated 2026-05-20 after v1.1 completion)
 
 **Core value:** The agent can intelligently search and reason across a structured board game knowledge base -- finding rules, comparing mechanics, and recommending games -- using the right tool for the job, transparently.
-**Current focus:** Phase 999.1 — chat-empty-state-ux
+**Current focus:** Phase 999.2 — cost guardrail burn script
 
 ## Current Position
 
-Phase: 999.1 (chat-empty-state-ux) — COMPLETE (ready for verification)
-Plan: 3 of 3 (all plans done)
-Status: Phase complete — ready for verification
+Phase: 999.2
+Plan: Not started
+Status: Ready to plan
 Progress: [██████████] 100%
 Last activity: 2026-06-24
 
