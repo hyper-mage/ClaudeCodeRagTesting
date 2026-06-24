@@ -27,10 +27,48 @@ class ThreadResponse(BaseModel):
     title: str | None
     created_at: datetime
     updated_at: datetime
+    model: str | None = None  # Phase 13 — per-thread model pin (rides every thread read; null = default tier, D-05)
 
 
 class ThreadWithMessages(ThreadResponse):
     messages: list["MessageResponse"]
+
+
+# ----- User preferences + per-thread model (Phase 13, MODEL-05 / MODEL-06 / PREF-02) -----
+
+class PreferencesResponse(BaseModel):
+    """GET /api/preferences — the user's resolved preferences (MODEL-05 / PREF-02).
+
+    theme is ALWAYS present on the wire (never None): the endpoint fills the
+    'dark' default for a brand-new user with no row. default_model stays None
+    when the user has not pinned one (null = owner default tier, D-05).
+    """
+    default_model: str | None = None
+    theme: str = "dark"
+
+
+class PreferencesUpdate(BaseModel):
+    """PUT /api/preferences body — a PARTIAL update (RESEARCH Pattern 2).
+
+    Both fields default to None so the endpoint's model_dump(exclude_unset=True)
+    sends ONLY the keys the client actually provided — a theme-only body must NOT
+    carry default_model (which would clobber the other field in the upsert).
+    theme is a Literal so an invalid value (e.g. "purple") is rejected at
+    validation time (422) before it can poison the stored row (T-13-01).
+    """
+    default_model: str | None = None
+    theme: Literal["light", "dark"] | None = None
+
+
+class ThreadModelUpdate(BaseModel):
+    """PATCH /api/threads/{id} body — set or clear the per-thread model pin (MODEL-06).
+
+    null is a DELIBERATE, explicit value (clears the pin back to the default tier,
+    D-05). The PATCH endpoint writes model explicitly — it does NOT use
+    exclude_unset (RESEARCH Pattern 3 caution), so {model: null} round-trips as a
+    real clear rather than being skipped.
+    """
+    model: str | None = None
 
 
 class MessageCreate(BaseModel):
