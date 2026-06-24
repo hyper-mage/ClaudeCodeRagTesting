@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: User Options & BYOK
 status: executing
-stopped_at: Completed 13-03-PLAN.md
-last_updated: "2026-06-24T23:37:28.202Z"
+stopped_at: Completed 13-04-PLAN.md
+last_updated: "2026-06-24T23:47:41.307Z"
 last_activity: 2026-06-24
 progress:
   total_phases: 9
   completed_phases: 5
   total_plans: 24
-  completed_plans: 21
+  completed_plans: 22
   percent: 56
 ---
 
@@ -26,9 +26,9 @@ See: .planning/PROJECT.md (updated 2026-05-20 after v1.1 completion)
 ## Current Position
 
 Phase: 13 (preferences-per-thread-model) — EXECUTING
-Plan: 3 of 6
+Plan: 4 of 6
 Status: Ready to execute
-Progress: [█████████░] 88%
+Progress: [█████████░] 92%
 Last activity: 2026-06-24
 
 ## Performance Metrics
@@ -81,6 +81,7 @@ v1.2 roadmap-shaping decisions (to be promoted to PROJECT.md at phase transition
 - [Phase 13]: [13-01]: 13-01 authored migration only (Plan 02 owns db push); 8 Wave 0 backend tests RED by design (routers.preferences absent, PATCH/notice logic absent) — Plans 03/04 turn them green. test_thread_model_wins_when_set added without regression (7/7 in resolution suite).
 - [Phase ?]: [Phase 13]: [13-03]: GET/PUT /api/preferences ship the prefs write side (partial upsert exclude_unset keyed on user_id, JWT-bound, updated_at explicit) + PATCH /api/threads/{id} sets/clears threads.model (explicit-null clear, ownership re-check -> 404); preferences router wired into main.py. Resolution (chat.py) UNCHANGED. 6 Wave-0 RED tests GREEN; ThreadResponse timestamps made Optional so the PATCH echo row validates.
 - [Phase ?]: [Phase 13]: [13-03]: 4 full-suite non-green items are out of scope (deferred-items.md): 2 test_deprecated_model_fallback.py = Plan 13-04 RED (chat.py notice-role), 2 test_record_manager.py = pre-existing fixture debt. resolution suite 13/13 green incl. test_thread_model_wins_when_set on the now-real threads.model column.
+- [Phase ?]: [13-04]: at-send deprecated-pin fallback in chat.py event_generator — non-empty model_cache membership check (Assumption A2 guard); persisted role='notice' row with LOCKED UI-SPEC copy; model OVERRIDDEN to user/owner default in the CALLER (_resolve_key_and_model stays pure 3-tier, Open Question 2); history map filters role in (user,assistant) so notice never reaches the LLM; cache reads defensive (T-13-CRASH). Both test_deprecated_model_fallback.py GREEN; full suite 203 passed (2 pre-existing record_manager errors out of scope).
 
 ### Pending Todos
 
@@ -99,10 +100,10 @@ v1.2 roadmap-shaping decisions (to be promoted to PROJECT.md at phase transition
 
 ## Session Continuity
 
-Last session: 2026-06-24T23:37:28.192Z
-Stopped at: Completed 13-03-PLAN.md
+Last session: 2026-06-24T23:46:44.754Z
+Stopped at: Completed 13-04-PLAN.md
 Resume file: None
-Next: Phase 999.1 is complete and ready for verification (`/gsd-verify-work`). Two out-of-scope follow-ups parked in deferred-items + Blockers (free-model chat failure D-999.1-LLM-A; demo-bootstrap failure D-999.1-DEMO-A) — resolve in a future testing/ops pass before the next live LLM round-trip; do NOT create new plans for them.
+Next: Phase 13 plans 05-06 remain (4/6 executed). 13-04 shipped the at-send deprecated-pin fallback (notice row + model override + history filter) in chat.py — test_deprecated_model_fallback.py GREEN, full backend suite 203 passed (2 pre-existing record_manager fixture errors out of scope, deferred-items.md).
 
 ## Operator Next Steps
 
