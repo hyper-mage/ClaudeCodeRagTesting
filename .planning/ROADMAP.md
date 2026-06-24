@@ -205,11 +205,11 @@ Plans:
 
 **Goal:** Make the first chat message "just work": auto-create a thread on send for any null-thread state (cold start AND after deleting the active thread), and replace the bland text-only empty-state with a welcoming headline + 2–3 tappable board-game example prompts. Frontend-only UX fix; the "block input until + New Chat" alternative was rejected (D-01). Caught during Phase 3 UAT.
 **Requirements:** TBD (backlog phase — derived decisions D-01..D-04 from CONTEXT.md + the approved UI-SPEC)
-**Plans:** 3 plans
+**Plans:** 1/3 plans executed
 
 Plans:
 
-- [ ] 999.1-01-PLAN.md — Wave 0 test runner (vitest+RTL+jsdom) + closure-proof sendMessage(threadId) + loadMessages clobber guard
+- [x] 999.1-01-PLAN.md — Wave 0 test runner (vitest+RTL+jsdom) + closure-proof sendMessage(threadId) + loadMessages clobber guard
 - [ ] 999.1-02-PLAN.md — Welcoming empty-state (headline + sub-line + board-game example chips) in ChatContainer
 - [ ] 999.1-03-PLAN.md — Auto-create-on-send wiring in ChatPage.handleSend (+ create-failure feedback) + live human-verify checkpoint
 

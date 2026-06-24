@@ -4,13 +4,13 @@ milestone: v1.2
 milestone_name: User Options & BYOK
 status: executing
 stopped_at: Phase 999.1 UI-SPEC approved
-last_updated: "2026-06-24T01:41:45.054Z"
-last_activity: 2026-06-24 -- Phase 999.1 planning complete
+last_updated: "2026-06-24T01:57:43.898Z"
+last_activity: 2026-06-24
 progress:
   total_phases: 9
   completed_phases: 4
   total_plans: 18
-  completed_plans: 15
+  completed_plans: 16
   percent: 44
 ---
 
@@ -21,15 +21,15 @@ progress:
 See: .planning/PROJECT.md (updated 2026-05-20 after v1.1 completion)
 
 **Core value:** The agent can intelligently search and reason across a structured board game knowledge base -- finding rules, comparing mechanics, and recommending games -- using the right tool for the job, transparently.
-**Current focus:** Phase 999.1 — chat empty state ux
+**Current focus:** Phase 999.1 — chat-empty-state-ux
 
 ## Current Position
 
-Phase: 999.1
-Plan: Not started
+Phase: 999.1 (chat-empty-state-ux) — EXECUTING
+Plan: 2 of 3
 Status: Ready to execute
-Progress: [█████████░] 86%
-Last activity: 2026-06-24 -- Phase 999.1 planning complete
+Progress: [█████████░] 89%
+Last activity: 2026-06-24
 
 ## Performance Metrics
 
@@ -68,6 +68,9 @@ v1.2 roadmap-shaping decisions (to be promoted to PROJECT.md at phase transition
 - [Phase ?]: [Phase 10]: FE PKCE round-trip stores code_verifier + CSRF state in sessionStorage (NOT localStorage) so a same-tab hard-refresh on the callback is the SUCCESS path (D-07); the callback reads them from sessionStorage (not React state), validates returnedState !== storedState before the bearer'd exchange POST, and renders a LOCKED generic failure sentence that never interpolates the caught error / HTTP status / sk-or- fragment (D-06). Shared startOpenRouterConnect() helper in lib/pkce.ts powers both the Connect CTA and the callback Retry (Plan 10-03).
 - [Phase ?]: [Phase 10]: SEC-01 frontend half landed — lib/sentry.ts scrubs /sk-or-v1-[A-Za-z0-9_-]+/g -> [redacted-key] in BOTH beforeSend (message/exception/request.url incl. callback URL) and beforeBreadcrumb (message/data), additive beside the existing Authorization/sb-…-auth-token rules (Plan 10-03).
 - [Phase ?]: Plan 10-04 Tasks 1-2 shipped: /settings + callback routes, IconSidebar Settings gear (rail + drawer), display-only connection dot on chat route (MobileTopBar + IconSidebar desktop) via useKeyStatus, no polling. Task 3 prod round-trip is a blocking human-verify checkpoint, pending the real user.
+- [Phase ?]: [Phase 999.1]: Frontend component-test runner installed (vitest + @testing-library/react + jsdom); npm run test = vitest run (no watch); shared src/test/utils.tsx (renderWithProviders + mockSSEResponse + makeApiMock/makeAuthMock) reused by Plans 02/03.
+- [Phase ?]: [Phase 999.1]: useChat.sendMessage is closure-proof via effectiveThreadId = opts?.threadId ?? threadId (deps unchanged); loadMessages gains an isStreaming no-clobber guard so the thread-switch effect cannot wipe the optimistic bubble mid-send.
+- [Phase ?]: [Phase 999.1]: Auth in tests supplied via a vi.mock factory (makeAuthMock over a mutable authMockState), NOT by exporting the production AuthContext; react-refresh ESLint rule disabled for test files only — AuthContext.tsx left byte-identical to HEAD.
 
 ### Pending Todos
 
@@ -84,9 +87,9 @@ v1.2 roadmap-shaping decisions (to be promoted to PROJECT.md at phase transition
 
 ## Session Continuity
 
-Last session: 2026-06-24T00:12:00.950Z
+Last session: 2026-06-24T01:56:39.161Z
 Stopped at: Phase 999.1 UI-SPEC approved
-Resume file: .planning/phases/999.1-chat-empty-state-ux/999.1-UI-SPEC.md
+Resume file: None
 Next: Execute Plan 10-04 (wire routing in App.tsx + IconSidebar gear + chat-header connection dot).
 
 ## Operator Next Steps
