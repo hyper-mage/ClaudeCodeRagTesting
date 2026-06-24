@@ -6,6 +6,8 @@ import MobileDrawer from '../components/MobileDrawer'
 import { IconNavRow } from '../components/IconSidebar'
 import { apiFetch } from '../lib/api'
 import { useChat } from '../hooks/useChat'
+import * as Sentry from '@sentry/react'
+import { useToast } from '../contexts/ToastContext'
 
 interface Thread {
   id: string
@@ -23,6 +25,7 @@ export default function ChatPage() {
   const openDrawer = () => setIsDrawerOpen(true)
   const { messages, isStreaming, sendMessage, loadMessages, cancel, retryLastUserMessage } =
     useChat(activeThreadId)
+  const { showToast } = useToast()
 
   useEffect(() => {
     return () => { cancel() }
@@ -59,8 +62,36 @@ export default function ChatPage() {
   }
 
   const handleSend = async (content: string) => {
-    await sendMessage(content)
-    // Reload threads to pick up title changes
+    // Auto-create-on-send (D-01/D-04): a message sent while no thread is active —
+    // cold start OR the post-delete null state — silently creates an untitled thread
+    // first, then sends into it. One code path covers both null states.
+    let targetId = activeThreadId
+    if (targetId === null) {
+      try {
+        // Untitled create (body {}) — the backend titles the thread from the first
+        // message (D-03); no placeholder "New Chat" is ever persisted.
+        const thread = await apiFetch('/api/threads', {
+          method: 'POST',
+          body: JSON.stringify({}),
+        })
+        targetId = thread.id
+        setThreads(prev => [thread, ...prev])
+        setActiveThreadId(thread.id) // updates the sidebar; NOT relied on for the send (stale closure)
+      } catch (err) {
+        // Create-failure feedback (Pitfall 5): never a silent dead-end. Reuse the
+        // existing generic send-failure toast copy — do NOT interpolate the caught
+        // error / HTTP status / response body (T-999.1-08).
+        Sentry.captureException(err)
+        showToast("The assistant didn't respond. Tap the message to retry.", 'error')
+        return
+      }
+    }
+    // targetId is guaranteed non-null here: it was either already set, or the create
+    // succeeded (a failed create returns above before reaching this point).
+    // Explicit threadId defeats the React stale closure (Pitfall 1) so the optimistic
+    // user bubble renders on the very first send instead of silently no-opping.
+    await sendMessage(content, { threadId: targetId as string })
+    // Reload threads to pick up the backend auto-generated title (D-03).
     loadThreads()
   }
 
