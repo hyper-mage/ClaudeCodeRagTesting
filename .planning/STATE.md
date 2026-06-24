@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: User Options & BYOK
-status: planning
-stopped_at: Phase 999.1 context gathered
-last_updated: "2026-06-24T00:05:04.153Z"
-last_activity: 2026-06-23
+status: executing
+stopped_at: Phase 999.1 UI-SPEC approved
+last_updated: "2026-06-24T01:41:45.054Z"
+last_activity: 2026-06-24 -- Phase 999.1 planning complete
 progress:
   total_phases: 9
   completed_phases: 4
-  total_plans: 15
+  total_plans: 18
   completed_plans: 15
   percent: 44
 ---
@@ -27,9 +27,9 @@ See: .planning/PROJECT.md (updated 2026-05-20 after v1.1 completion)
 
 Phase: 999.1
 Plan: Not started
-Status: Ready to plan
+Status: Ready to execute
 Progress: [█████████░] 86%
-Last activity: 2026-06-23
+Last activity: 2026-06-24 -- Phase 999.1 planning complete
 
 ## Performance Metrics
 
@@ -84,9 +84,9 @@ v1.2 roadmap-shaping decisions (to be promoted to PROJECT.md at phase transition
 
 ## Session Continuity
 
-Last session: 2026-06-24T00:05:04.147Z
-Stopped at: Phase 999.1 context gathered
-Resume file: .planning/phases/999.1-chat-empty-state-ux/999.1-CONTEXT.md
+Last session: 2026-06-24T00:12:00.950Z
+Stopped at: Phase 999.1 UI-SPEC approved
+Resume file: .planning/phases/999.1-chat-empty-state-ux/999.1-UI-SPEC.md
 Next: Execute Plan 10-04 (wire routing in App.tsx + IconSidebar gear + chat-header connection dot).
 
 ## Operator Next Steps
