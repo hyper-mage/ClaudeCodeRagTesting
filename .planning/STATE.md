@@ -4,13 +4,13 @@ milestone: v1.2
 milestone_name: User Options & BYOK
 status: executing
 stopped_at: Phase 13 UI-SPEC approved
-last_updated: "2026-06-24T23:05:23.860Z"
-last_activity: 2026-06-24 -- Phase 13 planning complete
+last_updated: "2026-06-24T23:21:54.122Z"
+last_activity: 2026-06-24
 progress:
   total_phases: 9
   completed_phases: 5
   total_plans: 24
-  completed_plans: 18
+  completed_plans: 19
   percent: 56
 ---
 
@@ -21,15 +21,15 @@ progress:
 See: .planning/PROJECT.md (updated 2026-05-20 after v1.1 completion)
 
 **Core value:** The agent can intelligently search and reason across a structured board game knowledge base -- finding rules, comparing mechanics, and recommending games -- using the right tool for the job, transparently.
-**Current focus:** Phase 999.2 — cost guardrail burn script
+**Current focus:** Phase 13 — preferences-per-thread-model
 
 ## Current Position
 
-Phase: 999.2
-Plan: Not started
+Phase: 13 (preferences-per-thread-model) — EXECUTING
+Plan: 2 of 6
 Status: Ready to execute
-Progress: [██████████] 100%
-Last activity: 2026-06-24 -- Phase 13 planning complete
+Progress: [████████░░] 79%
+Last activity: 2026-06-24
 
 ## Performance Metrics
 
@@ -75,6 +75,10 @@ v1.2 roadmap-shaping decisions (to be promoted to PROJECT.md at phase transition
 - [Phase ?]: [Phase 999.1]: Chat empty-state chips rendered inline in ChatContainer (no EmptyState extraction); filled bg-gray-800 treatment never bg-blue-600; anon D&D cue preserved as an isAnon-gated text-xs hint line; chip tap sends immediately via onSend(q); EXAMPLE_PROMPTS is module-level UPPER_SNAKE_CASE.
 - [Phase ?]: [Phase 999.1]: Auto-create-on-send wired in ChatPage.handleSend (D-01/D-04) — null activeThreadId POSTs /api/threads {}, then sendMessage(content,{threadId:newId}) passes the server-issued id BY VALUE (closure-proof, no flushSync/no create-in-hook); skipNextLoadRef suppresses the post-create load-effect clobber of the optimistic bubble; create failures Sentry+generic-toast and abort the send (T-999.1-06/07/08).
 - [Phase ?]: [Phase 999.1]: Live human-verify (999.1-03-03) surfaced a post-stream refetch clobber — Plan 01's adding isStreaming to loadMessages deps made the thread-load effect re-fire on stream-END, refetching /api/threads/{id} and wiping the streamed reply. Fix ad43b9a: in-stream guard moved to isStreamingRef; loadMessages deps reduced to [threadId] only. Checkpoint APPROVED-WITH-CAVEAT — live LLM streamed answer+title deferred to a separate :free-model provider error (deferred-items D-999.1-LLM-A), NOT a phase defect.
+- [Phase 13]: [13-01]: user_preferences mirrors user_api_keys own-row RLS but OMITS REVOKE SELECT — prefs are non-secret (T-13-03 accept); own-row RLS is the only isolation (migration 20240301000032, authored not applied).
+- [Phase 13]: [13-01]: default_model is plain TEXT, NOT a FK to model_cache (D-06) — a deprecated-but-pinned slug must persist so the at-send fallback notice can fire; threads.model added nullable, no DEFAULT/backfill (D-05).
+- [Phase 13]: [13-01]: messages_role_check (Postgres auto-named from migration 000002 inline CHECK) DROP+re-ADD'd to allow 'notice' — the persisted deprecation line, excluded from LLM history (D-06). Confirms RESEARCH A1.
+- [Phase 13]: [13-01]: 13-01 authored migration only (Plan 02 owns db push); 8 Wave 0 backend tests RED by design (routers.preferences absent, PATCH/notice logic absent) — Plans 03/04 turn them green. test_thread_model_wins_when_set added without regression (7/7 in resolution suite).
 
 ### Pending Todos
 
@@ -93,9 +97,9 @@ v1.2 roadmap-shaping decisions (to be promoted to PROJECT.md at phase transition
 
 ## Session Continuity
 
-Last session: 2026-06-24T19:04:53.781Z
+Last session: 2026-06-24T23:20:30.421Z
 Stopped at: Phase 13 UI-SPEC approved
-Resume file: .planning/phases/13-preferences-per-thread-model/13-UI-SPEC.md
+Resume file: None
 Next: Phase 999.1 is complete and ready for verification (`/gsd-verify-work`). Two out-of-scope follow-ups parked in deferred-items + Blockers (free-model chat failure D-999.1-LLM-A; demo-bootstrap failure D-999.1-DEMO-A) — resolve in a future testing/ops pass before the next live LLM round-trip; do NOT create new plans for them.
 
 ## Operator Next Steps

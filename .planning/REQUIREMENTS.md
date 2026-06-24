@@ -21,8 +21,8 @@ Requirements for this milestone. Each maps to a roadmap phase (continues numberi
 - [x] **MODEL-02**: Each model is tagged as free or paid
 - [x] **MODEL-03**: Popular models are marked (curated) in the picker
 - [x] **MODEL-04**: The model list auto-refreshes to pick up newly added models
-- [ ] **MODEL-05**: User can set a default model
-- [ ] **MODEL-06**: User can select a model per chat thread, persisted on the thread
+- [x] **MODEL-05**: User can set a default model
+- [x] **MODEL-06**: User can select a model per chat thread, persisted on the thread
 - [x] **MODEL-07**: Picker shows context-length and per-Mtok price hints per model
 - [ ] **MODEL-08**: User can favorite/pin models to the top of the picker
 
@@ -42,7 +42,7 @@ Requirements for this milestone. Each maps to a roadmap phase (continues numberi
 ### Preferences & UI (PREF)
 
 - [ ] **PREF-01**: User can access a settings/account page (key status, default model, theme, profile)
-- [ ] **PREF-02**: User can toggle light/dark theme, persisted per user
+- [x] **PREF-02**: User can toggle light/dark theme, persisted per user
 
 ### Security Hardening (SEC)
 
@@ -97,8 +97,8 @@ Each requirement maps to exactly one phase. Phases continue numbering from v1.1 
 | MODEL-02 | Phase 12 | Complete |
 | MODEL-03 | Phase 12 | Complete |
 | MODEL-04 | Phase 12 | Complete |
-| MODEL-05 | Phase 13 | Pending |
-| MODEL-06 | Phase 13 | Pending |
+| MODEL-05 | Phase 13 | Complete |
+| MODEL-06 | Phase 13 | Complete |
 | MODEL-07 | Phase 12 | Complete |
 | MODEL-08 | Phase 15 | Pending |
 | COST-01 | Phase 14 | Pending |
@@ -109,7 +109,7 @@ Each requirement maps to exactly one phase. Phases continue numbering from v1.1 
 | DEMO-02 | Phase 15 | Pending |
 | DEMO-03 | Phase 11 | Pending |
 | PREF-01 | Phase 14 | Pending |
-| PREF-02 | Phase 13 | Pending |
+| PREF-02 | Phase 13 | Complete |
 | SEC-01 | Phase 11 | Pending |
 | SEC-02 | Phase 9 | Complete |
 | SEC-03 | Phase 15 | Pending |
