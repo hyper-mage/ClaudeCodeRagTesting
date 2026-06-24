@@ -1,10 +1,11 @@
 ---
 phase: 13
 slug: preferences-per-thread-model
-status: draft
+status: approved
 shadcn_initialized: false
 preset: none
 created: 2026-06-24
+reviewed_at: 2026-06-24
 ---
 
 # Phase 13 — UI Design Contract
