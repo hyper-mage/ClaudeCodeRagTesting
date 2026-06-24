@@ -20,4 +20,14 @@ export default defineConfig([
       globals: globals.browser,
     },
   },
+  {
+    // Test files and shared test utilities are never HMR-loaded by Vite's dev
+    // server, so the react-refresh constraint (one-component-export-per-file)
+    // does not apply. Test helpers legitimately co-export render helpers, mock
+    // factories, and provider components from a single utils module.
+    files: ['**/*.test.{ts,tsx}', 'src/test/**/*.{ts,tsx}'],
+    rules: {
+      'react-refresh/only-export-components': 'off',
+    },
+  },
 ])
