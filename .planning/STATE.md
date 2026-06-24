@@ -4,13 +4,13 @@ milestone: v1.2
 milestone_name: User Options & BYOK
 status: executing
 stopped_at: Phase 999.1 UI-SPEC approved
-last_updated: "2026-06-24T01:57:43.898Z"
+last_updated: "2026-06-24T02:07:26.494Z"
 last_activity: 2026-06-24
 progress:
   total_phases: 9
   completed_phases: 4
   total_plans: 18
-  completed_plans: 16
+  completed_plans: 17
   percent: 44
 ---
 
@@ -26,9 +26,9 @@ See: .planning/PROJECT.md (updated 2026-05-20 after v1.1 completion)
 ## Current Position
 
 Phase: 999.1 (chat-empty-state-ux) — EXECUTING
-Plan: 2 of 3
+Plan: 3 of 3
 Status: Ready to execute
-Progress: [█████████░] 89%
+Progress: [█████████░] 94%
 Last activity: 2026-06-24
 
 ## Performance Metrics
@@ -71,6 +71,7 @@ v1.2 roadmap-shaping decisions (to be promoted to PROJECT.md at phase transition
 - [Phase ?]: [Phase 999.1]: Frontend component-test runner installed (vitest + @testing-library/react + jsdom); npm run test = vitest run (no watch); shared src/test/utils.tsx (renderWithProviders + mockSSEResponse + makeApiMock/makeAuthMock) reused by Plans 02/03.
 - [Phase ?]: [Phase 999.1]: useChat.sendMessage is closure-proof via effectiveThreadId = opts?.threadId ?? threadId (deps unchanged); loadMessages gains an isStreaming no-clobber guard so the thread-switch effect cannot wipe the optimistic bubble mid-send.
 - [Phase ?]: [Phase 999.1]: Auth in tests supplied via a vi.mock factory (makeAuthMock over a mutable authMockState), NOT by exporting the production AuthContext; react-refresh ESLint rule disabled for test files only — AuthContext.tsx left byte-identical to HEAD.
+- [Phase ?]: [Phase 999.1]: Chat empty-state chips rendered inline in ChatContainer (no EmptyState extraction); filled bg-gray-800 treatment never bg-blue-600; anon D&D cue preserved as an isAnon-gated text-xs hint line; chip tap sends immediately via onSend(q); EXAMPLE_PROMPTS is module-level UPPER_SNAKE_CASE.
 
 ### Pending Todos
 
@@ -87,10 +88,10 @@ v1.2 roadmap-shaping decisions (to be promoted to PROJECT.md at phase transition
 
 ## Session Continuity
 
-Last session: 2026-06-24T01:56:39.161Z
-Stopped at: Phase 999.1 UI-SPEC approved
+Last session: 2026-06-24T02:07:10.942Z
+Stopped at: Completed 999.1-02-PLAN.md (empty-state chips)
 Resume file: None
-Next: Execute Plan 10-04 (wire routing in App.tsx + IconSidebar gear + chat-header connection dot).
+Next: Execute Plan 999.1-03 (auto-create-on-send wiring in ChatPage.handleSend + create-failure feedback + live human-verify checkpoint).
 
 ## Operator Next Steps
 
