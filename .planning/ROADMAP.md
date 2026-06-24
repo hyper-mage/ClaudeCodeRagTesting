@@ -169,7 +169,7 @@ Plans:
 
 **Wave 3** *(blocked on Waves 1-2)*
 
-- [ ] 13-03-PLAN.md — preferences router (GET/PUT /api/preferences upsert) + PATCH /api/threads/{id} set/clear model + main.py wiring
+- [x] 13-03-PLAN.md — preferences router (GET/PUT /api/preferences upsert) + PATCH /api/threads/{id} set/clear model + main.py wiring
 - [ ] 13-04-PLAN.md — deprecation fallback in chat.py (notice insert + model override + history filter) — SC#4 / D-06
 
 **Wave 4** *(blocked on Wave 3)*
@@ -253,6 +253,6 @@ Phases execute in numeric order: 9 → 10 → 11 → 12 → 13 → 14 → 15 (Ph
 | 10. OAuth PKCE Connect | v1.2 | 4/4 | Complete   | 2026-06-22 |
 | 11. Per-Request Key + Model Resolution | v1.2 | 4/4 | Complete   | 2026-06-23 |
 | 12. Model Cache + Catalog | v1.2 | 4/4 | Complete    | 2026-06-23 |
-| 13. Preferences + Per-Thread Model | v1.2 | 2/6 | In Progress|  |
+| 13. Preferences + Per-Thread Model | v1.2 | 3/6 | In Progress|  |
 | 14. Usage/Cost + Settings/Key-State UX | v1.2 | 0/TBD | Not started | - |
 | 15. Options UI Capstone + Demo Gating | v1.2 | 0/TBD | Not started | - |

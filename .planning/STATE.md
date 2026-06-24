@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: User Options & BYOK
 status: executing
-stopped_at: Phase 13 UI-SPEC approved
-last_updated: "2026-06-24T23:21:54.122Z"
+stopped_at: Completed 13-03-PLAN.md
+last_updated: "2026-06-24T23:37:28.202Z"
 last_activity: 2026-06-24
 progress:
   total_phases: 9
   completed_phases: 5
   total_plans: 24
-  completed_plans: 19
+  completed_plans: 21
   percent: 56
 ---
 
@@ -26,9 +26,9 @@ See: .planning/PROJECT.md (updated 2026-05-20 after v1.1 completion)
 ## Current Position
 
 Phase: 13 (preferences-per-thread-model) — EXECUTING
-Plan: 2 of 6
+Plan: 3 of 6
 Status: Ready to execute
-Progress: [████████░░] 79%
+Progress: [█████████░] 88%
 Last activity: 2026-06-24
 
 ## Performance Metrics
@@ -79,6 +79,8 @@ v1.2 roadmap-shaping decisions (to be promoted to PROJECT.md at phase transition
 - [Phase 13]: [13-01]: default_model is plain TEXT, NOT a FK to model_cache (D-06) — a deprecated-but-pinned slug must persist so the at-send fallback notice can fire; threads.model added nullable, no DEFAULT/backfill (D-05).
 - [Phase 13]: [13-01]: messages_role_check (Postgres auto-named from migration 000002 inline CHECK) DROP+re-ADD'd to allow 'notice' — the persisted deprecation line, excluded from LLM history (D-06). Confirms RESEARCH A1.
 - [Phase 13]: [13-01]: 13-01 authored migration only (Plan 02 owns db push); 8 Wave 0 backend tests RED by design (routers.preferences absent, PATCH/notice logic absent) — Plans 03/04 turn them green. test_thread_model_wins_when_set added without regression (7/7 in resolution suite).
+- [Phase ?]: [Phase 13]: [13-03]: GET/PUT /api/preferences ship the prefs write side (partial upsert exclude_unset keyed on user_id, JWT-bound, updated_at explicit) + PATCH /api/threads/{id} sets/clears threads.model (explicit-null clear, ownership re-check -> 404); preferences router wired into main.py. Resolution (chat.py) UNCHANGED. 6 Wave-0 RED tests GREEN; ThreadResponse timestamps made Optional so the PATCH echo row validates.
+- [Phase ?]: [Phase 13]: [13-03]: 4 full-suite non-green items are out of scope (deferred-items.md): 2 test_deprecated_model_fallback.py = Plan 13-04 RED (chat.py notice-role), 2 test_record_manager.py = pre-existing fixture debt. resolution suite 13/13 green incl. test_thread_model_wins_when_set on the now-real threads.model column.
 
 ### Pending Todos
 
@@ -97,8 +99,8 @@ v1.2 roadmap-shaping decisions (to be promoted to PROJECT.md at phase transition
 
 ## Session Continuity
 
-Last session: 2026-06-24T23:20:30.421Z
-Stopped at: Phase 13 UI-SPEC approved
+Last session: 2026-06-24T23:37:28.192Z
+Stopped at: Completed 13-03-PLAN.md
 Resume file: None
 Next: Phase 999.1 is complete and ready for verification (`/gsd-verify-work`). Two out-of-scope follow-ups parked in deferred-items + Blockers (free-model chat failure D-999.1-LLM-A; demo-bootstrap failure D-999.1-DEMO-A) — resolve in a future testing/ops pass before the next live LLM round-trip; do NOT create new plans for them.
 
