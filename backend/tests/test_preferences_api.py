@@ -1,0 +1,121 @@
+"""Wave 0 (Plan 13-01) RED scaffolds for the preferences API — MODEL-05 + PREF-02.
+
+Written BEFORE routers.preferences exists, so on first run these FAIL at the
+`from main import app` → `routers.preferences` import (RED). They go GREEN once
+Plan 13-03 ships the router (GET/PUT /api/preferences), the upsert that binds
+user_id from the JWT (never the body), and main.py wiring.
+
+Contract under test:
+  - test_put_then_get_default_model     — PUT {default_model} upserts; GET returns it (MODEL-05).
+  - test_get_defaults_for_new_user      — no row → GET returns {"default_model": None, "theme": "dark"}.
+  - test_theme_persist_and_validate     — PUT {theme:"light"} persists; the upsert payload binds
+                                          user_id from the dependency-override JWT, NEVER the body
+                                          (IDOR / cross-user mitigation, T-13-02).
+
+Patches mirror test_models_api.py exactly:
+  - app.dependency_overrides[get_user_id] = lambda: "user-uuid"   (auth gate)
+  - patch("routers.preferences.get_supabase", return_value=mock_db)
+  - clear app.dependency_overrides in a finally.
+"""
+from unittest.mock import MagicMock, patch
+
+_USER = "user-uuid"
+
+
+def _mock_db_with_pref_row(row: dict | None):
+    """Fake supabase whose user_preferences select().eq().maybe_single().execute()
+    returns `row` (or None). The upsert chain returns the same shape so a PUT can
+    read back the persisted row."""
+    db = MagicMock()
+    select_exec = (
+        db.table.return_value.select.return_value.eq.return_value
+        .maybe_single.return_value.execute
+    )
+    select_exec.return_value = MagicMock(data=row)
+    db.table.return_value.upsert.return_value.execute.return_value = MagicMock(
+        data=[row] if row else None
+    )
+    return db
+
+
+def test_put_then_get_default_model() -> None:
+    """MODEL-05: PUT {default_model:"x/y"} upserts the row; a subsequent GET returns it."""
+    from fastapi.testclient import TestClient
+
+    from auth import get_user_id
+    from main import app
+
+    stored = {"user_id": _USER, "default_model": "anthropic/claude-3.5-sonnet", "theme": "dark"}
+    db = _mock_db_with_pref_row(stored)
+
+    app.dependency_overrides[get_user_id] = lambda: _USER
+    try:
+        with patch("routers.preferences.get_supabase", return_value=db):
+            client = TestClient(app)
+            put = client.put("/api/preferences", json={"default_model": "anthropic/claude-3.5-sonnet"})
+            assert put.status_code == 200, f"PUT failed: {put.status_code} {put.text}"
+            get = client.get("/api/preferences")
+            assert get.status_code == 200, f"GET failed: {get.status_code} {get.text}"
+            assert get.json()["default_model"] == "anthropic/claude-3.5-sonnet"
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_get_defaults_for_new_user() -> None:
+    """MODEL-05: a brand-new user with NO preferences row gets the resolved defaults
+    {"default_model": None, "theme": "dark"} (maybe_single guard → endpoint fills theme)."""
+    from fastapi.testclient import TestClient
+
+    from auth import get_user_id
+    from main import app
+
+    db = _mock_db_with_pref_row(None)  # no row exists
+
+    app.dependency_overrides[get_user_id] = lambda: _USER
+    try:
+        with patch("routers.preferences.get_supabase", return_value=db):
+            resp = TestClient(app).get("/api/preferences")
+    finally:
+        app.dependency_overrides.clear()
+
+    assert resp.status_code == 200, f"GET failed: {resp.status_code} {resp.text}"
+    body = resp.json()
+    assert body == {"default_model": None, "theme": "dark"}, body
+
+
+def test_theme_persist_and_validate() -> None:
+    """PREF-02: PUT {theme:"light"} persists; the upsert payload binds user_id from the
+    dependency-override JWT, NEVER from the body (IDOR / cross-user mitigation, T-13-02)."""
+    from fastapi.testclient import TestClient
+
+    from auth import get_user_id
+    from main import app
+
+    stored = {"user_id": _USER, "default_model": None, "theme": "light"}
+    db = _mock_db_with_pref_row(stored)
+
+    app.dependency_overrides[get_user_id] = lambda: _USER
+    try:
+        with patch("routers.preferences.get_supabase", return_value=db):
+            # An attacker-supplied user_id in the body must be ignored.
+            resp = TestClient(app).put(
+                "/api/preferences",
+                json={"theme": "light", "user_id": "attacker-uuid"},
+            )
+    finally:
+        app.dependency_overrides.clear()
+
+    assert resp.status_code == 200, f"PUT failed: {resp.status_code} {resp.text}"
+    assert resp.json()["theme"] == "light"
+
+    # The upsert payload MUST bind the JWT user_id, never the body's.
+    upsert = db.table.return_value.upsert
+    upsert.assert_called()
+    payload = upsert.call_args.args[0]
+    if isinstance(payload, list):
+        payload = payload[0]
+    assert payload["user_id"] == _USER, f"user_id not bound from JWT: {payload}"
+    assert payload.get("user_id") != "attacker-uuid"
+    assert payload["theme"] == "light"
+    # exclude_unset upsert must NOT carry default_model when the client sent only theme.
+    assert "default_model" not in payload, f"theme-only PUT clobbered default_model: {payload}"

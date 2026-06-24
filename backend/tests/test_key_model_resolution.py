@@ -310,3 +310,33 @@ def test_model_fallthrough_absent_p13_schema():
     assert api_key == "sk-or-v1-PLAIN"
     assert mode == "user"
     assert is_user_key is True
+
+
+def test_thread_model_wins_when_set():
+    """MODEL-06: once the P13 threads.model column exists, a thread_row carrying
+    model="thread/pinned" resolves to that pin OVER the user_preferences default —
+    proving no regression in the model tier order once the column is live.
+
+    The thread_row is the already-fetched SELECT * row (D-03 / Pattern 2): reading
+    its "model" key is an in-memory dict read, not a DB query. The user_preferences
+    default is DIFFERENT and must lose to the thread pin.
+    """
+    from routers import chat
+
+    settings = _fake_settings()
+    body = MagicMock(spec=[])  # no per-message override
+    # thread_row carries a live per-thread pin; user_preferences default differs.
+    db = _db_with_key_row("sk-or-v1-CIPHER", pref_model="user/default-pref")
+
+    with patch.object(chat, "get_settings", return_value=settings), \
+         patch.object(chat, "decrypt_key", side_effect=lambda c: "sk-or-v1-PLAIN"):
+        api_key, model, mode, is_user_key = chat._resolve_key_and_model(
+            db, "user-1", {"id": "t1", "model": "thread/pinned"}, body
+        )
+
+    assert model == "thread/pinned"  # the per-thread pin wins over the user default
+    assert model != "user/default-pref"
+    assert model != "owner/default-model"
+    assert api_key == "sk-or-v1-PLAIN"
+    assert mode == "user"
+    assert is_user_key is True
