@@ -21,16 +21,11 @@ export default function ChatPage() {
   const [activeThreadId, setActiveThreadId] = useState<string | null>(null)
   const [isDrawerOpen, setIsDrawerOpen] = useState(false)
   const hamburgerRef = useRef<HTMLButtonElement>(null)
-  // Pitfall 2 (optimistic-bubble clobber): when handleSend auto-creates a thread and
-  // calls setActiveThreadId, the loadMessages effect re-runs for the brand-new thread
-  // and would fetch `[]`, wiping the just-appended optimistic user bubble. The new
-  // thread has no server-side messages yet, so that load is pure clobber — skip it
-  // once. (useChat.loadMessages also guards on isStreaming; this closes the closure-
-  // timing window deterministically.)
-  const skipNextLoadRef = useRef(false)
   const closeDrawer = () => setIsDrawerOpen(false)
   const openDrawer = () => setIsDrawerOpen(true)
-  const { messages, isStreaming, sendMessage, loadMessages, cancel, retryLastUserMessage } =
+  // useChat owns thread loading + abort-on-switch (CR-01). skipNextLoad requests a one-shot
+  // skip of the next [threadId] load for a freshly auto-created thread (see handleSend).
+  const { messages, isStreaming, sendMessage, skipNextLoad, cancel, retryLastUserMessage } =
     useChat(activeThreadId)
   const { showToast } = useToast()
 
@@ -46,15 +41,6 @@ export default function ChatPage() {
   useEffect(() => {
     loadThreads()
   }, [loadThreads])
-
-  useEffect(() => {
-    if (skipNextLoadRef.current) {
-      // Skip the clobbering load for a freshly auto-created thread (see ref comment).
-      skipNextLoadRef.current = false
-      return
-    }
-    loadMessages()
-  }, [loadMessages])
 
   const handleNewThread = async () => {
     const thread = await apiFetch('/api/threads', {
@@ -88,9 +74,10 @@ export default function ChatPage() {
         })
         targetId = thread.id
         setThreads(prev => [thread, ...prev])
-        // Suppress the one loadMessages the next setActiveThreadId triggers — the new
+        // Suppress the one [threadId] load the next setActiveThreadId triggers — the new
         // thread has no server messages and the load would clobber the optimistic bubble.
-        skipNextLoadRef.current = true
+        // Must be requested BEFORE setActiveThreadId so the flag is set when the effect fires.
+        skipNextLoad()
         setActiveThreadId(thread.id) // updates the sidebar; NOT relied on for the send (stale closure)
       } catch (err) {
         // Create-failure feedback (Pitfall 5): never a silent dead-end. Reuse the

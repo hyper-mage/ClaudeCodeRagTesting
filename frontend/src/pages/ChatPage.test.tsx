@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { screen, waitFor, within } from '@testing-library/react'
+import { screen, waitFor, within, act } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
 import type { ReactElement } from 'react'
@@ -260,5 +260,86 @@ describe('ChatPage auto-create-on-send (D-01 / D-03 / D-04)', () => {
     // ...so the streamed reply persists and the server clobber payload never appears.
     expect(screen.getByText('Hi there')).toBeInTheDocument()
     expect(screen.queryByText('CLOBBERED')).not.toBeInTheDocument()
+  })
+
+  it('Test 8 (CR-01 regression): switching to a different thread mid-stream aborts the stream and loads the new thread', async () => {
+    // Repro for CR-01: switching to a DIFFERENT existing thread WHILE a stream is in flight
+    // previously showed the old thread's content — loadMessages was guarded by isStreamingRef
+    // so the new thread never loaded, and nothing aborted the old stream. The fix moves the
+    // load + abort into useChat's [threadId] effect.
+    const user = userEvent.setup()
+
+    // A never-resolving stream so the first thread's send stays in flight across the switch.
+    let releaseReader: (() => void) | null = null
+    let capturedSignal: AbortSignal | null = null
+    const pendingReader: ReadableStreamDefaultReader<Uint8Array> = {
+      read: () =>
+        new Promise(resolve => {
+          releaseReader = () => resolve({ done: true, value: undefined })
+        }),
+      releaseLock: () => {},
+      cancel: async () => {},
+      closed: Promise.resolve(undefined),
+    }
+    mockedApiStream.mockImplementation(async (_url: string, init?: RequestInit) => {
+      capturedSignal = (init?.signal as AbortSignal) ?? null
+      return {
+        ok: true,
+        status: 200,
+        body: { getReader: () => pendingReader },
+      } as unknown as Response
+    })
+
+    // Two pre-existing threads in the sidebar; t-b has distinct server content.
+    routeApiFetch({
+      threadsList: () => [
+        { id: 't-a', title: 'Thread A', created_at: '', updated_at: '' },
+        { id: 't-b', title: 'Thread B', created_at: '', updated_at: '' },
+      ],
+      threadMessages: {
+        't-a': { messages: [] },
+        't-b': { messages: [{ id: 'b1', role: 'assistant', content: 'THREAD-B-CONTENT' }] },
+      },
+    })
+    renderChatPage()
+
+    // Select Thread A (desktop sidebar copy — index 0; the drawer copy is index 1).
+    const threadAEls = await screen.findAllByText('Thread A')
+    await user.click(threadAEls[0])
+
+    // Send into Thread A — the stream hangs on the pending reader (isStreaming stays true).
+    await typeAndSend(user, 'in thread A')
+    await waitFor(() => expect(mockedApiStream).toHaveBeenCalledTimes(1))
+    expect(mockedApiStream.mock.calls[0][0]).toContain('/api/threads/t-a/messages')
+    await waitFor(() => expect(capturedSignal).not.toBeNull())
+    expect(capturedSignal!.aborted).toBe(false)
+    // The optimistic user bubble for thread A is on screen.
+    expect(await screen.findByText('in thread A')).toBeInTheDocument()
+
+    // Switch to a DIFFERENT existing thread mid-stream.
+    const threadBEls = await screen.findAllByText('Thread B')
+    await user.click(threadBEls[0])
+
+    // (a) the in-flight stream's AbortController was aborted on switch.
+    await waitFor(() => expect(capturedSignal!.aborted).toBe(true))
+
+    // (b) the newly selected thread's messages were fetched and rendered — NOT the old
+    // thread's optimistic/streamed content.
+    await waitFor(() =>
+      expect(
+        mockedApiFetch.mock.calls.some(
+          ([p, o]) => p === '/api/threads/t-b' && (o as RequestInit | undefined)?.method !== 'POST'
+        )
+      ).toBe(true)
+    )
+    expect(await screen.findByText('THREAD-B-CONTENT')).toBeInTheDocument()
+    expect(screen.queryByText('in thread A')).not.toBeInTheDocument()
+
+    // Release the (now-aborted) reader so the hung send settles cleanly. The call lives in an
+    // async closure so TS does not narrow releaseReader to `never` at this point.
+    await act(async () => {
+      releaseReader?.()
+      await Promise.resolve()
+    })
   })
 })

@@ -64,14 +64,101 @@ describe('useChat.sendMessage — closure-proof explicit threadId (D-01)', () =>
   })
 })
 
-describe('useChat.loadMessages — no-clobber while streaming (D-02 / Pitfall 2)', () => {
+describe('useChat.loadMessages — unconditional fetch contract (CR-01)', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    mockedApiStream.mockResolvedValue(streamReply())
   })
 
-  it('Test 4: does not replace messages while a send is in flight', async () => {
-    // A never-resolving stream so isStreaming stays true across the loadMessages call.
+  it('Test 4: loadMessages unconditionally fetches the thread and replaces messages', async () => {
+    // The old in-stream guard inside loadMessages is GONE (CR-01): the clobber protection now
+    // lives in the [threadId] effect + skipNextLoad, not in loadMessages itself. So a direct
+    // call to loadMessages with a threadId always fetches and replaces.
+    mockedApiFetch.mockResolvedValue({
+      messages: [{ id: 'srv-1', role: 'user', content: 'from-server' }],
+    })
+
+    const { result } = renderHook(() => useChat('t-existing'), { wrapper: ProvidersWrapper })
+
+    // The mount [threadId] effect already loaded the thread once.
+    await waitFor(() =>
+      expect(result.current.messages.some(m => m.content === 'from-server')).toBe(true)
+    )
+
+    // Append an optimistic bubble, then call loadMessages directly: it replaces with the
+    // server payload (no guard), proving loadMessages is now unconditional.
+    act(() => {
+      result.current.setMessages(prev => [
+        ...prev,
+        { id: 'opt', role: 'user', content: 'optimistic' },
+      ])
+    })
+    expect(result.current.messages.some(m => m.content === 'optimistic')).toBe(true)
+
+    await act(async () => {
+      await result.current.loadMessages()
+    })
+
+    // The fetch landed and replaced everything — the optimistic bubble is gone.
+    expect(result.current.messages.some(m => m.content === 'from-server')).toBe(true)
+    expect(result.current.messages.some(m => m.content === 'optimistic')).toBe(false)
+  })
+
+  it('Test 5: loadMessages with a null threadId clears messages and does not fetch', async () => {
+    const { result } = renderHook(() => useChat(null), { wrapper: ProvidersWrapper })
+
+    // Seed some state, then load with a null thread — the !threadId branch clears it.
+    act(() => {
+      result.current.setMessages([{ id: 'x', role: 'user', content: 'stale' }])
+    })
+    expect(result.current.messages).toHaveLength(1)
+
+    await act(async () => {
+      await result.current.loadMessages()
+    })
+
+    expect(result.current.messages).toHaveLength(0)
+    expect(mockedApiFetch).not.toHaveBeenCalled()
+  })
+
+  it('Test 6: skipNextLoad suppresses exactly one [threadId] load (auto-created thread)', async () => {
+    // Simulate ChatPage's auto-create handoff: request the one-shot skip, THEN point the hook at
+    // a fresh thread. The [threadId] effect must consume the flag and NOT fetch (which would
+    // clobber the optimistic bubble). The very next switch must load normally again.
+    mockedApiFetch.mockResolvedValue({ messages: [] })
+
+    const { result, rerender } = renderHook(({ id }) => useChat(id), {
+      wrapper: ProvidersWrapper,
+      initialProps: { id: 't-a' as string | null },
+    })
+
+    // Mount load for t-a fired.
+    await waitFor(() => expect(mockedApiFetch).toHaveBeenCalledTimes(1))
+    expect(mockedApiFetch.mock.calls[0][0]).toBe('/api/threads/t-a')
+
+    // Request the skip, then switch to the freshly auto-created thread.
+    act(() => {
+      result.current.skipNextLoad()
+    })
+    rerender({ id: 't-new' })
+
+    // No fetch for t-new — the one-shot skip consumed it.
+    await waitFor(() => expect(result.current).toBeTruthy())
+    const fetchedNew = mockedApiFetch.mock.calls.some(([p]) => p === '/api/threads/t-new')
+    expect(fetchedNew).toBe(false)
+    expect(mockedApiFetch).toHaveBeenCalledTimes(1)
+
+    // A subsequent genuine switch loads normally (flag was one-shot).
+    rerender({ id: 't-b' })
+    await waitFor(() =>
+      expect(mockedApiFetch.mock.calls.some(([p]) => p === '/api/threads/t-b')).toBe(true)
+    )
+  })
+
+  it('Test 7: switching threads mid-stream aborts the in-flight stream and loads the new thread (CR-01)', async () => {
+    // A never-resolving stream so the first thread's send stays in flight across the switch.
     let releaseReader: (() => void) | null = null
+    let capturedSignal: AbortSignal | null = null
     const pendingReader: ReadableStreamDefaultReader<Uint8Array> = {
       read: () =>
         new Promise(resolve => {
@@ -81,40 +168,50 @@ describe('useChat.loadMessages — no-clobber while streaming (D-02 / Pitfall 2)
       cancel: async () => {},
       closed: Promise.resolve(undefined),
     }
-    mockedApiStream.mockResolvedValue({
-      ok: true,
-      status: 200,
-      body: { getReader: () => pendingReader },
-    } as unknown as Response)
+    mockedApiStream.mockImplementation(async (_url: string, init?: RequestInit) => {
+      capturedSignal = (init?.signal as AbortSignal) ?? null
+      return {
+        ok: true,
+        status: 200,
+        body: { getReader: () => pendingReader },
+      } as unknown as Response
+    })
+    mockedApiFetch.mockResolvedValue({
+      messages: [{ id: 'srv-b', role: 'assistant', content: 'thread-b-content' }],
+    })
 
-    // loadMessages would (without the guard) replace messages with this payload.
-    mockedApiFetch.mockResolvedValue({ messages: [{ id: 'srv-1', role: 'user', content: 'from-server' }] })
+    const { result, rerender } = renderHook(({ id }) => useChat(id), {
+      wrapper: ProvidersWrapper,
+      initialProps: { id: 't-a' as string | null },
+    })
 
-    const { result } = renderHook(() => useChat('t-existing'), { wrapper: ProvidersWrapper })
-
-    // Start a send (do not await — it hangs on the pending reader, keeping isStreaming true).
+    // Start a send into t-a (do not await — it hangs on the pending reader).
     let sendPromise!: Promise<void>
     await act(async () => {
-      sendPromise = result.current.sendMessage('hi')
-      // Let the optimistic state + isStreaming flush.
+      sendPromise = result.current.sendMessage('hi', { threadId: 't-a' })
       await Promise.resolve()
     })
-
     await waitFor(() => expect(result.current.isStreaming).toBe(true))
+    expect(capturedSignal).not.toBeNull()
+    expect(capturedSignal!.aborted).toBe(false)
 
-    const before = result.current.messages
-    expect(before.some(m => m.content === 'hi')).toBe(true)
+    // Switch to a DIFFERENT existing thread mid-stream.
+    rerender({ id: 't-b' })
 
-    // Call loadMessages mid-stream — it must NOT clobber the optimistic messages.
-    await act(async () => {
-      await result.current.loadMessages()
-    })
+    // (a) the in-flight stream's AbortController was aborted on switch.
+    await waitFor(() => expect(capturedSignal!.aborted).toBe(true))
+    // isStreaming was reset by the abort-on-switch effect.
+    await waitFor(() => expect(result.current.isStreaming).toBe(false))
 
-    // Messages unchanged: still the optimistic bubble, never the server payload.
-    expect(result.current.messages.some(m => m.content === 'hi')).toBe(true)
-    expect(result.current.messages.some(m => m.content === 'from-server')).toBe(false)
+    // (b) the new thread's messages were fetched and rendered (not t-a's streamed content).
+    await waitFor(() =>
+      expect(mockedApiFetch.mock.calls.some(([p]) => p === '/api/threads/t-b')).toBe(true)
+    )
+    await waitFor(() =>
+      expect(result.current.messages.some(m => m.content === 'thread-b-content')).toBe(true)
+    )
 
-    // Cleanly finish the in-flight send.
+    // Release the (now-aborted) reader to settle the hung send promise cleanly.
     await act(async () => {
       releaseReader?.()
       await sendPromise

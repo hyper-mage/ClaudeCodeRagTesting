@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from 'react'
+import { useState, useCallback, useRef, useEffect } from 'react'
 import { apiFetch, apiStream } from '../lib/api'
 import * as Sentry from '@sentry/react'
 import { useToast } from '../contexts/ToastContext'
@@ -32,15 +32,18 @@ export interface Message {
 export function useChat(threadId: string | null) {
   const [messages, setMessages] = useState<Message[]>([])
   const [isStreaming, setIsStreaming] = useState(false)
-  // Mirror of isStreaming for the loadMessages guard. Kept in a ref (not a dep) so that
-  // toggling isStreaming does NOT re-create loadMessages and thus does NOT re-fire the
-  // thread-load effect when a stream STARTS or STOPS. Listing isStreaming in the deps
-  // caused loadMessages to re-run on stream-end and refetch `/api/threads/{id}`, clobbering
-  // the freshly-streamed assistant reply (and any error bubble) the instant the send
-  // finished — the "no response / retry popup flashed then vanished" regression. The load
-  // effect must fire ONLY on threadId change.
+  // Ref mirror of isStreaming, used by the re-entrancy guard in sendMessage (WR-01) and the
+  // abort-on-switch effect below. Kept in a ref (not a dep) so toggling isStreaming does NOT
+  // re-create loadMessages; the thread-load effect must fire ONLY on threadId change, never on
+  // stream start/stop (the latter caused the post-stream refetch clobber — "no response / retry
+  // popup flashed then vanished").
   const isStreamingRef = useRef(false)
   const abortRef = useRef<AbortController | null>(null)
+  // One-shot suppression of the [threadId] load effect. ChatPage sets this (via skipNextLoad)
+  // right before pointing the hook at a freshly auto-created thread: that thread has no server
+  // messages yet and the send into it is intentional, so we must neither abort the in-flight
+  // send nor fetch `[]` (which would clobber the optimistic user bubble). See CR-01.
+  const skipNextLoadRef = useRef(false)
   const { showToast } = useToast()
 
   const loadMessages = useCallback(async () => {
@@ -48,11 +51,6 @@ export function useChat(threadId: string | null) {
       setMessages([])
       return
     }
-    // Pitfall 2: do not clobber the optimistic/streaming bubble. When the thread-switch
-    // effect re-runs mid-send (e.g. Plan 03 calls setActiveThreadId on a freshly-created
-    // thread), an unconditional replace would fetch `[]` and wipe the just-appended bubble.
-    // Read the ref, not the state, so this guard does not add isStreaming to the deps.
-    if (isStreamingRef.current) return
     try {
       const data = await apiFetch(`/api/threads/${threadId}`)
       setMessages(data.messages.map((m: Record<string, unknown>) => ({
@@ -64,12 +62,40 @@ export function useChat(threadId: string | null) {
     }
   }, [threadId])
 
+  // Thread-load + abort-on-switch (CR-01). Owns loading for the hook — ChatPage no longer runs
+  // its own load effect. Fires only on threadId change (loadMessages is stable per threadId).
+  useEffect(() => {
+    if (skipNextLoadRef.current) {
+      // Freshly auto-created thread: the send into it is intentional — do NOT abort it and do
+      // NOT load (no server messages yet; a load would clobber the optimistic user bubble).
+      // Consume the one-shot flag.
+      skipNextLoadRef.current = false
+      return
+    }
+    // Genuine thread switch (or initial mount): abort any in-flight stream from the previous
+    // thread so its deltas don't bleed into the new thread, then load the newly selected thread.
+    abortRef.current?.abort()
+    abortRef.current = null
+    isStreamingRef.current = false
+    setIsStreaming(false)
+    void loadMessages()
+  }, [threadId, loadMessages])
+
+  // Request a one-shot skip of the next [threadId] load effect (ChatPage uses this right before
+  // pointing the hook at a freshly auto-created thread). See skipNextLoadRef / CR-01.
+  const skipNextLoad = useCallback(() => {
+    skipNextLoadRef.current = true
+  }, [])
+
   const sendMessage = useCallback(async (content: string, opts?: { retry?: boolean; threadId?: string }) => {
     // Pitfall 1 (stale closure): an explicit threadId from the caller must win over the
     // closured one so a message sent against a null-thread state (a freshly-created thread
     // id passed in by Plan 03) actually fires instead of silently no-opping.
     const effectiveThreadId = opts?.threadId ?? threadId
-    if (!effectiveThreadId || isStreaming) return
+    // WR-01: re-entrancy guard reads the ref (synchronously up-to-date), not the isStreaming
+    // STATE (stale within the same tick), so a rapid double-send / double-chip-tap can't slip a
+    // second stream through before React re-renders. The isStreaming STATE still drives rendering.
+    if (!effectiveThreadId || isStreamingRef.current) return
     const isRetry = opts?.retry === true
 
     // Add user message optimistically (skip on retry — the prior user row is preserved on the backend
@@ -258,7 +284,9 @@ export function useChat(threadId: string | null) {
       isStreamingRef.current = false
       setIsStreaming(false)
     }
-  }, [threadId, isStreaming, showToast])
+    // isStreaming dropped from deps (WR-01): the guard now reads isStreamingRef.current, so the
+    // STATE is no longer referenced in this callback.
+  }, [threadId, showToast])
 
   const cancel = useCallback(() => {
     abortRef.current?.abort()
@@ -274,8 +302,10 @@ export function useChat(threadId: string | null) {
     const lastUser = [...messages].reverse().find(m => m.role === 'user')
     if (!lastUser) return
     setMessages(prev => prev.filter(m => m.role !== 'error'))
-    void sendMessage(lastUser.content, { retry: true })
-  }, [messages, isStreaming, sendMessage])
+    // WR-05: pass the current thread explicitly so retry targets it deterministically (matching
+    // the explicit-threadId send path) rather than relying solely on the closured threadId.
+    void sendMessage(lastUser.content, { retry: true, threadId: threadId ?? undefined })
+  }, [messages, isStreaming, sendMessage, threadId])
 
   return {
     messages,
@@ -283,6 +313,7 @@ export function useChat(threadId: string | null) {
     isStreaming,
     sendMessage,
     loadMessages,
+    skipNextLoad,
     cancel,
     retryLastUserMessage,
   }
