@@ -32,6 +32,14 @@ export interface Message {
 export function useChat(threadId: string | null) {
   const [messages, setMessages] = useState<Message[]>([])
   const [isStreaming, setIsStreaming] = useState(false)
+  // Mirror of isStreaming for the loadMessages guard. Kept in a ref (not a dep) so that
+  // toggling isStreaming does NOT re-create loadMessages and thus does NOT re-fire the
+  // thread-load effect when a stream STARTS or STOPS. Listing isStreaming in the deps
+  // caused loadMessages to re-run on stream-end and refetch `/api/threads/{id}`, clobbering
+  // the freshly-streamed assistant reply (and any error bubble) the instant the send
+  // finished — the "no response / retry popup flashed then vanished" regression. The load
+  // effect must fire ONLY on threadId change.
+  const isStreamingRef = useRef(false)
   const abortRef = useRef<AbortController | null>(null)
   const { showToast } = useToast()
 
@@ -43,7 +51,8 @@ export function useChat(threadId: string | null) {
     // Pitfall 2: do not clobber the optimistic/streaming bubble. When the thread-switch
     // effect re-runs mid-send (e.g. Plan 03 calls setActiveThreadId on a freshly-created
     // thread), an unconditional replace would fetch `[]` and wipe the just-appended bubble.
-    if (isStreaming) return
+    // Read the ref, not the state, so this guard does not add isStreaming to the deps.
+    if (isStreamingRef.current) return
     try {
       const data = await apiFetch(`/api/threads/${threadId}`)
       setMessages(data.messages.map((m: Record<string, unknown>) => ({
@@ -53,7 +62,7 @@ export function useChat(threadId: string | null) {
     } catch {
       // Preserve previous silent-on-error behavior (old code had `if (res.ok)`)
     }
-  }, [threadId, isStreaming])
+  }, [threadId])
 
   const sendMessage = useCallback(async (content: string, opts?: { retry?: boolean; threadId?: string }) => {
     // Pitfall 1 (stale closure): an explicit threadId from the caller must win over the
@@ -78,6 +87,7 @@ export function useChat(threadId: string | null) {
     // Add placeholder assistant message
     const assistantId = crypto.randomUUID()
     setMessages(prev => [...prev, { id: assistantId, role: 'assistant', content: '' }])
+    isStreamingRef.current = true
     setIsStreaming(true)
 
     // Abort any in-flight request
@@ -245,6 +255,7 @@ export function useChat(threadId: string | null) {
       )
     } finally {
       abortRef.current = null
+      isStreamingRef.current = false
       setIsStreaming(false)
     }
   }, [threadId, isStreaming, showToast])

@@ -217,4 +217,48 @@ describe('ChatPage auto-create-on-send (D-01 / D-03 / D-04)', () => {
     // Sanity: chips share the layout.
     expect(within(document.body).getByRole('button', { name: 'How do you win Azul?' })).toBeInTheDocument()
   })
+
+  it('Test 7 (regression): streamed reply survives stream-end — no post-stream refetch clobber', async () => {
+    // Repro for the live-checkpoint failure: loadMessages listed isStreaming in its deps,
+    // so the thread-load effect re-fired when the stream STOPPED, refetching
+    // /api/threads/t-new and clobbering the freshly-streamed reply (and any error bubble)
+    // the instant the send finished — "no response / retry popup flashed then vanished".
+    // The fix moves the in-stream guard to a ref so loadMessages depends on [threadId] only.
+    // jsdom masked it before because findByText resolved in the transient pre-clobber window.
+    const user = userEvent.setup()
+    // If a post-stream refetch happens, it would replace the reply with this server payload.
+    routeApiFetch({
+      threadsList: () => [],
+      threadMessages: {
+        't-new': { messages: [{ id: 'srv', role: 'assistant', content: 'CLOBBERED' }] },
+      },
+    })
+    renderChatPage()
+
+    await screen.findByRole('heading', { name: /board game/i })
+    await typeAndSend(user, 'How do you win Azul?')
+
+    // Streamed reply appears.
+    expect(await screen.findByText('Hi there')).toBeInTheDocument()
+
+    // Wait until the send fully settles past `await sendMessage` (loadThreads ran → 2nd GET
+    // /api/threads). By this point the buggy post-stream load-effect would already have fired.
+    await waitFor(() => {
+      const getThreadsCalls = mockedApiFetch.mock.calls.filter(
+        ([p, o]) => p === '/api/threads' && (o as RequestInit | undefined)?.method !== 'POST'
+      )
+      expect(getThreadsCalls.length).toBeGreaterThanOrEqual(2)
+    })
+
+    // The per-thread messages endpoint was NEVER refetched for the auto-created thread...
+    const getThreadMessages = mockedApiFetch.mock.calls.filter(
+      ([p, o]) =>
+        /^\/api\/threads\/[^/]+$/.test(p as string) &&
+        (o as RequestInit | undefined)?.method !== 'POST'
+    )
+    expect(getThreadMessages).toHaveLength(0)
+    // ...so the streamed reply persists and the server clobber payload never appears.
+    expect(screen.getByText('Hi there')).toBeInTheDocument()
+    expect(screen.queryByText('CLOBBERED')).not.toBeInTheDocument()
+  })
 })
