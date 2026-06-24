@@ -40,6 +40,10 @@ export function useChat(threadId: string | null) {
       setMessages([])
       return
     }
+    // Pitfall 2: do not clobber the optimistic/streaming bubble. When the thread-switch
+    // effect re-runs mid-send (e.g. Plan 03 calls setActiveThreadId on a freshly-created
+    // thread), an unconditional replace would fetch `[]` and wipe the just-appended bubble.
+    if (isStreaming) return
     try {
       const data = await apiFetch(`/api/threads/${threadId}`)
       setMessages(data.messages.map((m: Record<string, unknown>) => ({
@@ -49,10 +53,14 @@ export function useChat(threadId: string | null) {
     } catch {
       // Preserve previous silent-on-error behavior (old code had `if (res.ok)`)
     }
-  }, [threadId])
+  }, [threadId, isStreaming])
 
-  const sendMessage = useCallback(async (content: string, opts?: { retry?: boolean }) => {
-    if (!threadId || isStreaming) return
+  const sendMessage = useCallback(async (content: string, opts?: { retry?: boolean; threadId?: string }) => {
+    // Pitfall 1 (stale closure): an explicit threadId from the caller must win over the
+    // closured one so a message sent against a null-thread state (a freshly-created thread
+    // id passed in by Plan 03) actually fires instead of silently no-opping.
+    const effectiveThreadId = opts?.threadId ?? threadId
+    if (!effectiveThreadId || isStreaming) return
     const isRetry = opts?.retry === true
 
     // Add user message optimistically (skip on retry — the prior user row is preserved on the backend
@@ -80,8 +88,8 @@ export function useChat(threadId: string | null) {
       abortRef.current = controller
 
       const url = isRetry
-        ? `/api/threads/${threadId}/messages?retry=true`
-        : `/api/threads/${threadId}/messages`
+        ? `/api/threads/${effectiveThreadId}/messages?retry=true`
+        : `/api/threads/${effectiveThreadId}/messages`
       const res = await apiStream(url, {
         method: 'POST',
         body: JSON.stringify({ content }),
