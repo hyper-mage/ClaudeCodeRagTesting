@@ -740,7 +740,15 @@ async def send_message(
         .order("created_at")
         .execute()
     )
-    messages = [{"role": m["role"], "content": m["content"]} for m in history.data]
+    # T-13-NOTICE-HISTORY (Pitfall 3): keep ONLY user/assistant turns in the LLM
+    # context. Persisted 'notice' rows (the at-send deprecation line, D-06) are a
+    # FE-render/persistence artifact — they must never flow back into the model on
+    # this or any future turn.
+    messages = [
+        {"role": m["role"], "content": m["content"]}
+        for m in history.data
+        if m["role"] in ("user", "assistant")
+    ]
 
     async def event_generator():
         full_content = ""
@@ -795,6 +803,53 @@ async def send_message(
                     "Connect your OpenRouter account to chat.",
                 )
                 return
+
+            # --- Deprecated-pin fallback (SC#4 / D-06, Open Question 2) -----------
+            # If the thread is pinned to a model that is no longer in the Phase 12
+            # model_cache, degrade gracefully: persist a role 'notice' line (D-06),
+            # then OVERRIDE the turn's model to the default so the call runs on the
+            # fallback instead of crashing. _resolve_key_and_model stays a pure
+            # 3-tier resolver — the override lives here in the caller.
+            thread_model = thread.data.get("model") if thread.data else None
+            if thread_model:
+                try:
+                    # Read the live cache as a set of model_ids. Assumption A2: a
+                    # mid-refresh / empty cache must NOT flag a valid pin as
+                    # deprecated — only treat "absent" as deprecated when the cache
+                    # actually has rows.
+                    cache_rows = (
+                        db.table("model_cache").select("model_id").execute()
+                    )
+                    cached_ids = {
+                        r["model_id"]
+                        for r in (cache_rows.data or [])
+                        if isinstance(r, dict) and r.get("model_id")
+                    }
+                    if cached_ids and thread_model not in cached_ids:
+                        # Pinned model is gone from the live cache → deprecated.
+                        default_model = (
+                            _safe_user_default_model(db, user_id)
+                            or settings.llm_model
+                        )
+                        # Composed server-side from controlled strings, inserted
+                        # as plain text (FE escapes on render) — no HTML (T-13-XSS).
+                        # LOCKED UI-SPEC copy (Copywriting Contract).
+                        db.table("messages").insert({
+                            "thread_id": thread_id,
+                            "user_id": user_id,
+                            "role": "notice",
+                            "content": (
+                                f'Model "{thread_model}" is no longer available '
+                                f"— using {default_model} instead."
+                            ),
+                        }).execute()
+                        # OVERRIDE the resolved model for THIS turn (fallback).
+                        model = default_model
+                except Exception as e:  # T-13-CRASH: a cache-read error never crashes the turn
+                    logger.warning(
+                        f"model_cache deprecation check failed; skipping notice: "
+                        f"{scrub_secrets(str(e))}"
+                    )
 
             # --- Token budget (Phase 6) ------------------------------------------
             budget = TokenBudget(

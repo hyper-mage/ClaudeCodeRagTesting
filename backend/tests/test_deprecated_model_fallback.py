@@ -50,7 +50,14 @@ def _build_fake_db(thread_model: str | None, history_rows: list[dict],
     """
     db = MagicMock()
 
+    # Memoize one mock per table name so call records (e.g. messages.insert)
+    # accumulate on a STABLE object — the assertions below re-fetch
+    # db.table("messages") and must see the handler's inserts.
+    _tables: dict = {}
+
     def _table(name: str):
+        if name in _tables:
+            return _tables[name]
         tbl = MagicMock()
         if name == "threads":
             row = {"id": "t1", "user_id": _USER, "title": "x", "model": thread_model}
@@ -74,6 +81,7 @@ def _build_fake_db(thread_model: str | None, history_rows: list[dict],
             )
         else:
             tbl.select.return_value.eq.return_value.execute.return_value = MagicMock(data=None)
+        _tables[name] = tbl
         return tbl
 
     db.table.side_effect = _table
