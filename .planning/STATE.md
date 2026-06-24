@@ -2,9 +2,9 @@
 gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: User Options & BYOK
-status: ready_to_plan
-stopped_at: Phase 999.1 complete (3/3) — ready to discuss Phase 999.2
-last_updated: 2026-06-24T17:33:43.794Z
+status: planning
+stopped_at: Phase 13 context gathered
+last_updated: "2026-06-24T18:43:50.759Z"
 last_activity: 2026-06-24
 progress:
   total_phases: 9
@@ -93,9 +93,9 @@ v1.2 roadmap-shaping decisions (to be promoted to PROJECT.md at phase transition
 
 ## Session Continuity
 
-Last session: 2026-06-24T17:07:00.136Z
-Stopped at: Completed 999.1-03-PLAN.md (auto-create-on-send; human-verify approved-with-caveat). Phase 999.1 is 3/3 — ALL PLANS DONE.
-Resume file: None
+Last session: 2026-06-24T18:43:50.753Z
+Stopped at: Phase 13 context gathered
+Resume file: .planning/phases/13-preferences-per-thread-model/13-CONTEXT.md
 Next: Phase 999.1 is complete and ready for verification (`/gsd-verify-work`). Two out-of-scope follow-ups parked in deferred-items + Blockers (free-model chat failure D-999.1-LLM-A; demo-bootstrap failure D-999.1-DEMO-A) — resolve in a future testing/ops pass before the next live LLM round-trip; do NOT create new plans for them.
 
 ## Operator Next Steps
