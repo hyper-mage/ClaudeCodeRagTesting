@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: User Options & BYOK
-status: executing
-stopped_at: Phase 999.1 UI-SPEC approved
-last_updated: "2026-06-24T02:07:26.494Z"
+status: verifying
+stopped_at: Completed 999.1-03-PLAN.md (auto-create-on-send; human-verify approved-with-caveat)
+last_updated: "2026-06-24T17:08:33.727Z"
 last_activity: 2026-06-24
 progress:
   total_phases: 9
-  completed_phases: 4
+  completed_phases: 5
   total_plans: 18
-  completed_plans: 17
-  percent: 44
+  completed_plans: 18
+  percent: 56
 ---
 
 # Project State
@@ -25,10 +25,10 @@ See: .planning/PROJECT.md (updated 2026-05-20 after v1.1 completion)
 
 ## Current Position
 
-Phase: 999.1 (chat-empty-state-ux) — EXECUTING
-Plan: 3 of 3
-Status: Ready to execute
-Progress: [█████████░] 94%
+Phase: 999.1 (chat-empty-state-ux) — COMPLETE (ready for verification)
+Plan: 3 of 3 (all plans done)
+Status: Phase complete — ready for verification
+Progress: [██████████] 100%
 Last activity: 2026-06-24
 
 ## Performance Metrics
@@ -36,6 +36,7 @@ Last activity: 2026-06-24
 - Phases planned: 7 (Phases 9-15)
 - Phases complete: 1/7 (Phase 9)
 - Plans complete: 6 (Phase 9: 3/3; Phase 10: 3/4 — 10-01 migration 028 ~14 min; 10-02 backend exchange path ~4 min, 3 tasks, 7 files, 12 tests green; 10-03 FE connect core ~5 min, 3 tasks, 5 files, build green + new files lint-clean)
+- Phase 999.1: 3/3 — 999.1-01 runner+closure-proof send; 999.1-02 ~7 min empty-state chips (2 files, 12 tests green); 999.1-03 ~25 min auto-create-on-send (3 files, 7 ChatPage tests, full suite 19/19 green, tsc+lint clean) — human-verify APPROVED-WITH-CAVEAT (deliverable verified live; live LLM streamed round-trip deferred to a separate provider error, deferred-items D-999.1-LLM-A)
 - Requirements mapped: 26/26 ✓
 
 ## Accumulated Context
@@ -72,6 +73,8 @@ v1.2 roadmap-shaping decisions (to be promoted to PROJECT.md at phase transition
 - [Phase ?]: [Phase 999.1]: useChat.sendMessage is closure-proof via effectiveThreadId = opts?.threadId ?? threadId (deps unchanged); loadMessages gains an isStreaming no-clobber guard so the thread-switch effect cannot wipe the optimistic bubble mid-send.
 - [Phase ?]: [Phase 999.1]: Auth in tests supplied via a vi.mock factory (makeAuthMock over a mutable authMockState), NOT by exporting the production AuthContext; react-refresh ESLint rule disabled for test files only — AuthContext.tsx left byte-identical to HEAD.
 - [Phase ?]: [Phase 999.1]: Chat empty-state chips rendered inline in ChatContainer (no EmptyState extraction); filled bg-gray-800 treatment never bg-blue-600; anon D&D cue preserved as an isAnon-gated text-xs hint line; chip tap sends immediately via onSend(q); EXAMPLE_PROMPTS is module-level UPPER_SNAKE_CASE.
+- [Phase ?]: [Phase 999.1]: Auto-create-on-send wired in ChatPage.handleSend (D-01/D-04) — null activeThreadId POSTs /api/threads {}, then sendMessage(content,{threadId:newId}) passes the server-issued id BY VALUE (closure-proof, no flushSync/no create-in-hook); skipNextLoadRef suppresses the post-create load-effect clobber of the optimistic bubble; create failures Sentry+generic-toast and abort the send (T-999.1-06/07/08).
+- [Phase ?]: [Phase 999.1]: Live human-verify (999.1-03-03) surfaced a post-stream refetch clobber — Plan 01's adding isStreaming to loadMessages deps made the thread-load effect re-fire on stream-END, refetching /api/threads/{id} and wiping the streamed reply. Fix ad43b9a: in-stream guard moved to isStreamingRef; loadMessages deps reduced to [threadId] only. Checkpoint APPROVED-WITH-CAVEAT — live LLM streamed answer+title deferred to a separate :free-model provider error (deferred-items D-999.1-LLM-A), NOT a phase defect.
 
 ### Pending Todos
 
@@ -85,13 +88,15 @@ v1.2 roadmap-shaping decisions (to be promoted to PROJECT.md at phase transition
 - [Phase 14 gap]: OpenRouter `/api/v1/key` exact balance field names are MEDIUM confidence — validate live against a real OAuth-provisioned key; tolerate null `limit_remaining` for pay-as-you-go.
 - [v1.2+]: Supabase free-tier `pg_cron` availability affects any future scheduled model-refresh upgrade (lazy TTL is the v1.2 baseline; pg_cron is documented-optional).
 - [tech debt]: Nyquist test-coverage validation incomplete for several v1.1 phases — run `/gsd:validate-phase N` when convenient.
+- [testing/ops, out-of-scope of 999.1]: Chat completion fails for the configured :free OpenRouter model (nvidia/nemotron-3-super-120b-a12b:free) — HTTP 200 then in-band SSE event: error (free-tier rate-limit/provider). Affects ANY chat on ANY thread. Revisit LLM_MODEL/provider for a reliable live round-trip. Logged deferred-items D-999.1-LLM-A. No new plan.
+- [testing/ops, pre-existing]: POST /api/demo/bootstrap fails ('Couldn't start the demo') — blocks the anon-session / anon-hint live check; untouched by Phase 999.1. Logged deferred-items D-999.1-DEMO-A; relevant to Phase 15 demo-fallback gating. No new plan.
 
 ## Session Continuity
 
-Last session: 2026-06-24T02:07:10.942Z
-Stopped at: Completed 999.1-02-PLAN.md (empty-state chips)
+Last session: 2026-06-24T17:07:00.136Z
+Stopped at: Completed 999.1-03-PLAN.md (auto-create-on-send; human-verify approved-with-caveat). Phase 999.1 is 3/3 — ALL PLANS DONE.
 Resume file: None
-Next: Execute Plan 999.1-03 (auto-create-on-send wiring in ChatPage.handleSend + create-failure feedback + live human-verify checkpoint).
+Next: Phase 999.1 is complete and ready for verification (`/gsd-verify-work`). Two out-of-scope follow-ups parked in deferred-items + Blockers (free-model chat failure D-999.1-LLM-A; demo-bootstrap failure D-999.1-DEMO-A) — resolve in a future testing/ops pass before the next live LLM round-trip; do NOT create new plans for them.
 
 ## Operator Next Steps
 
