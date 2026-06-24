@@ -5,6 +5,21 @@
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Agentic RAG</title>
+    <!--
+      Flash-free theme bootstrap (PREF-02 / D-02). Runs synchronously BEFORE the module
+      bundle so the <html> dark class is set on first paint with no FOUC. This is a tiny
+      mirror of src/lib/themeBootstrap.ts applyStoredTheme() (the unit-tested source of
+      truth) — keep the boolean identical. Any non-"dark" stored value resolves to light
+      (T-13-THEME defensive).
+    -->
+    <script>
+      document.documentElement.classList.toggle(
+        "dark",
+        localStorage.theme === "dark" ||
+          (!("theme" in localStorage) &&
+            window.matchMedia("(prefers-color-scheme: dark)").matches)
+      );
+    </script>
   </head>
   <body>
     <div id="root"></div>

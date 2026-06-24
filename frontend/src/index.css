@@ -1,6 +1,40 @@
 @import "tailwindcss";
 @plugin "@tailwindcss/typography";
 
+/*
+ * Tailwind v4 class-strategy dark mode (RESEARCH Pattern 4, verified against
+ * tailwindcss.com/docs/dark-mode). :where() — NOT :is() — keeps the variant at zero
+ * specificity so dark utilities never out-rank base utilities (Pitfall in RESEARCH).
+ * The <html> dark class is set pre-mount by the inline script in index.html (D-02).
+ */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/*
+ * Core-surface palette tokens (D-01, Open Question 1 Option A). Plan 06 consumes these on the
+ * four core surfaces (chat / sidebar / login / composer) so light mode reads coherently without
+ * rewriting every bare utility. Resolved values are the UI-SPEC § Color contract for each theme.
+ * blue-600 / red-600 stay literal utilities (theme-invariant accent + destructive).
+ *
+ * :root = light theme baseline; .dark overrides = the existing dark palette.
+ */
+:root {
+  --surface-bg: #ffffff;        /* white     — page background (chat area, login)   */
+  --surface-secondary: #f9fafb; /* gray-50   — sidebar, header bar, cards            */
+  --surface-tertiary: #f3f4f6;  /* gray-100  — chips, assistant bubble, hover        */
+  --text-primary: #111827;      /* gray-900  — primary text                          */
+  --text-muted: #4b5563;        /* gray-600  — muted caption text (AA on white)      */
+  --border: #d1d5db;            /* gray-300  — borders / input outlines              */
+}
+
+.dark {
+  --surface-bg: #030712;        /* gray-950  — page background                       */
+  --surface-secondary: #111827; /* gray-900  — sidebar, header bar, inputs, cards    */
+  --surface-tertiary: #1f2937;  /* gray-800  — chips, assistant bubble, hover        */
+  --text-primary: #ffffff;      /* white     — primary text                          */
+  --text-muted: #9ca3af;        /* gray-400  — muted caption text                    */
+  --border: #1f2937;            /* gray-800  — borders                               */
+}
+
 body {
   margin: 0;
 }
