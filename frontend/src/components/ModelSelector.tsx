@@ -72,9 +72,14 @@ function contextHint(contextLength: number | null): string | null {
  * selected row carries a blue-600 check/left-border.
  */
 export default function ModelSelector({ value, onSelect, placeholder, extraOption, models }: Props) {
+  // An empty array prop ([]) means "no catalog yet" — NOT an authoritative empty list — so the
+  // selector still lazy-fetches on open. (An empty [] is truthy, which otherwise pinned 'loaded'
+  // and silently showed an empty panel when the parent's one-time fetch hadn't populated.)
+  const suppliedModels = models && models.length > 0 ? models : undefined
+
   const [open, setOpen] = useState(false)
-  const [fetched, setFetched] = useState<ModelResponse[] | null>(models ?? null)
-  const [state, setState] = useState<LoadState>(models ? 'loaded' : 'idle')
+  const [fetched, setFetched] = useState<ModelResponse[] | null>(suppliedModels ?? null)
+  const [state, setState] = useState<LoadState>(suppliedModels ? 'loaded' : 'idle')
   const [activeIndex, setActiveIndex] = useState(0)
   // Open upward when the trigger sits too low for the panel to fit below (e.g. the
   // default-model control in the sidebar footer) — otherwise the list spills off-screen.
@@ -85,7 +90,7 @@ export default function ModelSelector({ value, onSelect, placeholder, extraOptio
   const listRef = useRef<HTMLUListElement>(null)
   const listboxId = useId()
 
-  const rows: ModelResponse[] = models ?? fetched ?? []
+  const rows: ModelResponse[] = suppliedModels ?? fetched ?? []
 
   // Build the flat option list: optional extraOption first (value null), then the catalog rows.
   const options: { key: string; value: string | null; label: string; model: ModelResponse | null }[] =
@@ -95,7 +100,7 @@ export default function ModelSelector({ value, onSelect, placeholder, extraOptio
     ]
 
   const loadModels = useCallback(async () => {
-    if (models) return // caller-supplied list — never fetch
+    if (suppliedModels) return // caller-supplied non-empty list — never fetch
     setState('loading')
     try {
       const data = (await apiFetch('/api/models')) as ModelResponse[]
@@ -105,7 +110,7 @@ export default function ModelSelector({ value, onSelect, placeholder, extraOptio
       // House style: never surface the caught error / HTTP code in copy.
       setState('error')
     }
-  }, [models])
+  }, [suppliedModels])
 
   const openMenu = useCallback(() => {
     setOpen(true)
@@ -121,9 +126,9 @@ export default function ModelSelector({ value, onSelect, placeholder, extraOptio
   // so fetch the catalog on mount when a value is set and no list was supplied.
   // When value is null we stay lazy (fetch on open) so the trigger just shows the placeholder.
   useEffect(() => {
-    if (value != null && !models && state === 'idle') void loadModels()
+    if (value != null && !suppliedModels && state === 'idle') void loadModels()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [value, models])
+  }, [value, suppliedModels])
 
   // Decide drop direction when the menu opens: flip up if there isn't ~enough room below
   // the trigger and there's more room above. Re-measured each open (layout may have changed).
@@ -252,7 +257,11 @@ export default function ModelSelector({ value, onSelect, placeholder, extraOptio
             </button>
           )}
 
-          {state === 'loaded' && (
+          {state === 'loaded' && options.length === 0 && (
+            <p className="px-3 py-2 text-sm text-gray-600 dark:text-gray-400">No models available.</p>
+          )}
+
+          {state === 'loaded' && options.length > 0 && (
             <ul
               ref={listRef}
               id={listboxId}

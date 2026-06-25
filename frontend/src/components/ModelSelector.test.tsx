@@ -172,4 +172,26 @@ describe('ModelSelector (a11y contract — UI-SPEC LOCKED)', () => {
 
     expect(onSelect).toHaveBeenCalledWith(null)
   })
+
+  it('treats an empty models=[] prop as "no catalog" and lazy-fetches on open (regression)', async () => {
+    const user = userEvent.setup()
+    mockApiFetch.mockResolvedValue(MODELS)
+    // An empty array is truthy — it must NOT pin a silent empty "loaded" panel.
+    renderWithProviders(<ModelSelector value={null} onSelect={vi.fn()} placeholder="Pick a model" models={[]} />)
+
+    await user.click(screen.getByRole('button', { name: /pick a model/i }))
+    await screen.findByRole('listbox')
+    expect(screen.getAllByRole('option').length).toBe(MODELS.length)
+    expect(mockApiFetch).toHaveBeenCalledWith('/api/models')
+  })
+
+  it('shows an empty-state when the catalog genuinely loads zero models', async () => {
+    const user = userEvent.setup()
+    mockApiFetch.mockResolvedValue([])
+    renderWithProviders(<ModelSelector value={null} onSelect={vi.fn()} placeholder="Pick a model" />)
+
+    await user.click(screen.getByRole('button', { name: /pick a model/i }))
+    expect(await screen.findByText('No models available.')).toBeInTheDocument()
+    expect(screen.queryByRole('listbox')).not.toBeInTheDocument()
+  })
 })
