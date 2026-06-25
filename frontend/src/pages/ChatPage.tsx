@@ -54,10 +54,14 @@ export default function ChatPage() {
 
   // One-time catalog fetch so both selectors render model names synchronously (no per-selector
   // fetch). Silent on failure — each ModelSelector falls back to its own lazy fetch + error UI.
+  // Only set when the payload is actually an array: a malformed/unexpected response must never
+  // poison `models` (a non-array would crash ModelSelector's rows.map — T-13-CRASH defensive).
   useEffect(() => {
     let cancelled = false
     apiFetch('/api/models')
-      .then((data: ModelResponse[]) => { if (!cancelled) setModels(data ?? []) })
+      .then((data: unknown) => {
+        if (!cancelled && Array.isArray(data)) setModels(data as ModelResponse[])
+      })
       .catch(() => {})
     return () => { cancelled = true }
   }, [])
