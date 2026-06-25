@@ -23,8 +23,10 @@ export interface ToolEvent {
 }
 
 export interface Message {
+  // 'notice' is the persisted deprecation-fallback line (Plan 04, role='notice'); it arrives from
+  // GET /api/threads/{id} like any other row and renders via DeprecationNotice (not a bubble).
   id: string
-  role: 'user' | 'assistant' | 'error'
+  role: 'user' | 'assistant' | 'error' | 'notice'
   content: string
   toolsUsed?: ToolEvent[]
 }

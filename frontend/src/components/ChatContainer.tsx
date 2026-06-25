@@ -1,6 +1,7 @@
 import MessageBubble from './MessageBubble'
 import ChatInput from './ChatInput'
 import ErrorMessageBubble from './ErrorMessageBubble'
+import DeprecationNotice from './DeprecationNotice'
 import { useAuth } from '../contexts/AuthContext'
 
 interface ToolEvent {
@@ -14,7 +15,7 @@ interface ToolEvent {
 
 interface Message {
   id: string
-  role: 'user' | 'assistant' | 'error'
+  role: 'user' | 'assistant' | 'error' | 'notice'
   content: string
   toolsUsed?: ToolEvent[]
 }
@@ -70,6 +71,8 @@ export default function ChatContainer({ messages, onSend, isStreaming, onRetry }
         {messages.map(msg =>
           msg.role === 'error' ? (
             <ErrorMessageBubble key={msg.id} onRetry={onRetry} isStreaming={isStreaming} />
+          ) : msg.role === 'notice' ? (
+            <DeprecationNotice key={msg.id} content={msg.content} />
           ) : (
             <MessageBubble
               key={msg.id}
