@@ -76,6 +76,9 @@ export default function ModelSelector({ value, onSelect, placeholder, extraOptio
   const [fetched, setFetched] = useState<ModelResponse[] | null>(models ?? null)
   const [state, setState] = useState<LoadState>(models ? 'loaded' : 'idle')
   const [activeIndex, setActiveIndex] = useState(0)
+  // Open upward when the trigger sits too low for the panel to fit below (e.g. the
+  // default-model control in the sidebar footer) — otherwise the list spills off-screen.
+  const [dropUp, setDropUp] = useState(false)
 
   const rootRef = useRef<HTMLDivElement>(null)
   const triggerRef = useRef<HTMLButtonElement>(null)
@@ -121,6 +124,18 @@ export default function ModelSelector({ value, onSelect, placeholder, extraOptio
     if (value != null && !models && state === 'idle') void loadModels()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [value, models])
+
+  // Decide drop direction when the menu opens: flip up if there isn't ~enough room below
+  // the trigger and there's more room above. Re-measured each open (layout may have changed).
+  useEffect(() => {
+    if (!open) return
+    const rect = triggerRef.current?.getBoundingClientRect()
+    if (!rect) return
+    const PANEL_MAX = 320 // ~ max-h-72 list + chrome
+    const spaceBelow = window.innerHeight - rect.bottom
+    const spaceAbove = rect.top
+    setDropUp(spaceBelow < PANEL_MAX && spaceAbove > spaceBelow)
+  }, [open])
 
   // Seed the active row to the selected one (or 0) each time the menu opens with rows present.
   useEffect(() => {
@@ -222,7 +237,7 @@ export default function ModelSelector({ value, onSelect, placeholder, extraOptio
       </button>
 
       {open && (
-        <div className="absolute z-50 mt-1 w-full overflow-hidden rounded border border-gray-300 bg-gray-50 shadow-lg dark:border-gray-700 dark:bg-gray-900">
+        <div className={`absolute left-0 z-50 w-full overflow-hidden rounded border border-gray-300 bg-gray-50 shadow-lg dark:border-gray-700 dark:bg-gray-900 ${dropUp ? 'bottom-full mb-1' : 'top-full mt-1'}`}>
           {state === 'loading' && (
             <p className="px-3 py-2 text-sm text-gray-600 dark:text-gray-400">{COPY.loading}</p>
           )}
