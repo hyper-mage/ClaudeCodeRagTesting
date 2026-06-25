@@ -292,7 +292,7 @@ export default function DocumentsPage() {
 
   return (
     <DragDropProvider onDragEnd={handleDragEnd}>
-      <div className="flex-1 bg-gray-950 text-white flex flex-col md:flex-row overflow-hidden">
+      <div className="flex-1 bg-white text-gray-900 flex flex-col md:flex-row overflow-hidden dark:bg-gray-950 dark:text-white">
         <MobileTopBar
           title="Documents"
           onOpenDrawer={openDrawer}
@@ -300,7 +300,7 @@ export default function DocumentsPage() {
           isDrawerOpen={isDrawerOpen}
         />
         {/* Tree Sidebar */}
-        <div className="hidden md:flex w-64 bg-gray-900 border-r border-gray-800 flex-col h-full overflow-y-auto">
+        <div className="hidden md:flex w-64 bg-gray-50 border-r border-gray-200 flex-col h-full overflow-y-auto dark:bg-gray-900 dark:border-gray-800">
           <FolderTree
             folders={folders}
             selectedFolderId={selectedFolderId}

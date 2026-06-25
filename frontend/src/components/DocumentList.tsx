@@ -27,7 +27,7 @@ export default function DocumentList({ documents, onDelete }: Props) {
       {documents.map(doc => (
         <div
           key={doc.id}
-          className="group flex items-center px-3 py-2 hover:bg-gray-800 text-sm border-b border-gray-800"
+          className="group flex items-center px-3 py-2 hover:bg-gray-100 text-sm border-b border-gray-200 dark:hover:bg-gray-800 dark:border-gray-800"
         >
           <div className="flex-1 min-w-0">
             <p className="truncate text-gray-200">{doc.filename}</p>

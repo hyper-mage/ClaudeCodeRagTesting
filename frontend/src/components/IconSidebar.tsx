@@ -15,24 +15,24 @@ export default function IconSidebar() {
   const isSettings = location.pathname === '/settings'
 
   return (
-    <div className="hidden md:flex w-14 bg-gray-900 border-r border-gray-800 flex-col items-center py-3 h-screen shrink-0">
+    <div className="hidden md:flex w-14 bg-gray-100 border-r border-gray-200 flex-col items-center py-3 h-screen shrink-0 dark:bg-gray-900 dark:border-gray-800">
       <button
         onClick={() => navigate('/')}
-        className={`p-2 rounded mb-2 ${isChat ? 'bg-gray-800 text-white' : 'text-gray-500 hover:text-white'}`}
+        className={`p-2 rounded mb-2 ${isChat ? 'bg-gray-200 text-gray-900 dark:bg-gray-800 dark:text-white' : 'text-gray-500 hover:text-gray-900 dark:hover:text-white'}`}
         title="Chat"
       >
         <MessageSquare size={20} />
       </button>
       <button
         onClick={() => navigate('/documents')}
-        className={`p-2 rounded mb-2 ${isDocs ? 'bg-gray-800 text-white' : 'text-gray-500 hover:text-white'}`}
+        className={`p-2 rounded mb-2 ${isDocs ? 'bg-gray-200 text-gray-900 dark:bg-gray-800 dark:text-white' : 'text-gray-500 hover:text-gray-900 dark:hover:text-white'}`}
         title="Documents"
       >
         <FileText size={20} />
       </button>
       <button
         onClick={() => navigate('/settings')}
-        className={`p-2 rounded mb-2 ${isSettings ? 'bg-gray-800 text-white' : 'text-gray-500 hover:text-white'}`}
+        className={`p-2 rounded mb-2 ${isSettings ? 'bg-gray-200 text-gray-900 dark:bg-gray-800 dark:text-white' : 'text-gray-500 hover:text-gray-900 dark:hover:text-white'}`}
         title="Settings"
       >
         <Settings size={20} />
@@ -46,7 +46,7 @@ export default function IconSidebar() {
       <DemoPill />
       <button
         onClick={signOut}
-        className="p-2 rounded text-gray-500 hover:text-white"
+        className="p-2 rounded text-gray-500 hover:text-gray-900 dark:hover:text-white"
         title="Sign Out"
       >
         <LogOut size={20} />
@@ -85,24 +85,24 @@ export function IconNavRow({ onNavigate }: IconNavRowProps) {
   }
 
   return (
-    <div className="flex items-center gap-2 px-3 py-3 border-b border-gray-800">
+    <div className="flex items-center gap-2 px-3 py-3 border-b border-gray-200 dark:border-gray-800">
       <button
         onClick={() => handleNavigate('/')}
-        className={`p-2 rounded ${isChat ? 'bg-gray-800 text-white' : 'text-gray-500 hover:text-white'}`}
+        className={`p-2 rounded ${isChat ? 'bg-gray-200 text-gray-900 dark:bg-gray-800 dark:text-white' : 'text-gray-500 hover:text-gray-900 dark:hover:text-white'}`}
         title="Chat"
       >
         <MessageSquare size={20} />
       </button>
       <button
         onClick={() => handleNavigate('/documents')}
-        className={`p-2 rounded ${isDocs ? 'bg-gray-800 text-white' : 'text-gray-500 hover:text-white'}`}
+        className={`p-2 rounded ${isDocs ? 'bg-gray-200 text-gray-900 dark:bg-gray-800 dark:text-white' : 'text-gray-500 hover:text-gray-900 dark:hover:text-white'}`}
         title="Documents"
       >
         <FileText size={20} />
       </button>
       <button
         onClick={() => handleNavigate('/settings')}
-        className={`p-2 rounded ${isSettings ? 'bg-gray-800 text-white' : 'text-gray-500 hover:text-white'}`}
+        className={`p-2 rounded ${isSettings ? 'bg-gray-200 text-gray-900 dark:bg-gray-800 dark:text-white' : 'text-gray-500 hover:text-gray-900 dark:hover:text-white'}`}
         title="Settings"
       >
         <Settings size={20} />
@@ -111,7 +111,7 @@ export function IconNavRow({ onNavigate }: IconNavRowProps) {
       <DemoPill />
       <button
         onClick={handleSignOut}
-        className="p-2 rounded text-gray-500 hover:text-white"
+        className="p-2 rounded text-gray-500 hover:text-gray-900 dark:hover:text-white"
         title="Sign Out"
       >
         <LogOut size={20} />
