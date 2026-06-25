@@ -21,7 +21,15 @@ describe('ChatContainer empty-state (D-02)', () => {
 
   it('Test 1: renders the headline and exactly the example-prompt chips when messages is empty', () => {
     renderWithProviders(
-      <ChatContainer messages={[]} onSend={vi.fn()} isStreaming={false} onRetry={vi.fn()} />
+      <ChatContainer
+        messages={[]}
+        onSend={vi.fn()}
+        isStreaming={false}
+        onRetry={vi.fn()}
+        activeThreadId={null}
+        threadModel={null}
+        onThreadModelChange={vi.fn()}
+      />
     )
 
     // Headline is a real heading element.
@@ -37,7 +45,15 @@ describe('ChatContainer empty-state (D-02)', () => {
     const user = userEvent.setup()
     const onSend = vi.fn()
     renderWithProviders(
-      <ChatContainer messages={[]} onSend={onSend} isStreaming={false} onRetry={vi.fn()} />
+      <ChatContainer
+        messages={[]}
+        onSend={onSend}
+        isStreaming={false}
+        onRetry={vi.fn()}
+        activeThreadId={null}
+        threadModel={null}
+        onThreadModelChange={vi.fn()}
+      />
     )
 
     await user.click(screen.getByRole('button', { name: 'How do you win Azul?' }))
@@ -48,7 +64,15 @@ describe('ChatContainer empty-state (D-02)', () => {
 
   it('Test 3a: anon users see the D&D hint AND all three chips (shared layout)', () => {
     renderWithProviders(
-      <ChatContainer messages={[]} onSend={vi.fn()} isStreaming={false} onRetry={vi.fn()} />,
+      <ChatContainer
+        messages={[]}
+        onSend={vi.fn()}
+        isStreaming={false}
+        onRetry={vi.fn()}
+        activeThreadId={null}
+        threadModel={null}
+        onThreadModelChange={vi.fn()}
+      />,
       { isAnon: true }
     )
 
@@ -60,7 +84,15 @@ describe('ChatContainer empty-state (D-02)', () => {
 
   it('Test 3b: authed users do NOT see the D&D hint but DO see the same three chips', () => {
     renderWithProviders(
-      <ChatContainer messages={[]} onSend={vi.fn()} isStreaming={false} onRetry={vi.fn()} />,
+      <ChatContainer
+        messages={[]}
+        onSend={vi.fn()}
+        isStreaming={false}
+        onRetry={vi.fn()}
+        activeThreadId={null}
+        threadModel={null}
+        onThreadModelChange={vi.fn()}
+      />,
       { isAnon: false }
     )
 
@@ -77,6 +109,9 @@ describe('ChatContainer empty-state (D-02)', () => {
         onSend={vi.fn()}
         isStreaming={false}
         onRetry={vi.fn()}
+        activeThreadId="t1"
+        threadModel={null}
+        onThreadModelChange={vi.fn()}
       />
     )
 

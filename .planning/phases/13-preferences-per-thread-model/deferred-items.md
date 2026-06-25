@@ -25,3 +25,17 @@
 - **Out of scope:** Documented in STATE.md Pending Todos and in the 13-03 plan's Task 3
   acceptance criteria ("may remain skipped/failing as documented"). Fix in a future
   plan-checker pass.
+
+## D-13-06-A — pre-existing `react-hooks/set-state-in-effect` lint error in ChatPage.tsx
+
+- **Found during:** Plan 13-06 Task 2 (eslint on touched files).
+- **Location:** `frontend/src/pages/ChatPage.tsx` — the mount effect `useEffect(() => { loadThreads() }, [loadThreads])`.
+- **Status:** ERROR — the new `react-hooks/set-state-in-effect` rule flags `loadThreads()` because
+  it transitively calls `setThreads`. It is a false positive (the `setThreads` happens in a
+  microtask after `await apiFetch(...)`, not synchronously in the effect body), and it PRE-EXISTS
+  Plan 13-06 (confirmed via `git stash` → lint on HEAD: identical error at the same effect).
+- **Out of scope (scope boundary):** Plan 13-06 did not author this effect; my NEW effects
+  (catalog fetch, prefs/theme reconcile) use `.then().catch()` async patterns and are NOT flagged.
+  Touching the pre-existing effect to silence the rule is unrelated churn.
+- **Resolution:** address in a future ChatPage lint-cleanup pass (or a project-wide
+  `react-hooks/set-state-in-effect` triage). No new plan needed.

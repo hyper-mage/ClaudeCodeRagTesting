@@ -103,12 +103,12 @@ export default function MobileDrawer({ isOpen, onClose, children, triggerRef }: 
         onPointerMove={swipe.onPointerMove}
         onPointerUp={swipe.onPointerUp}
         onPointerCancel={swipe.onPointerCancel}
-        className={`fixed left-0 top-0 z-50 h-dvh w-72 bg-gray-900 border-r border-gray-800 flex flex-col transition-transform duration-250 ease-out ${
+        className={`fixed left-0 top-0 z-50 h-dvh w-72 bg-gray-50 border-r border-gray-200 text-gray-900 dark:bg-gray-900 dark:border-gray-800 dark:text-white flex flex-col transition-transform duration-250 ease-out ${
           isOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
       >
-        <div className="flex items-center justify-between p-3 border-b border-gray-800">
-          <h2 className="text-base font-semibold text-white">Menu</h2>
+        <div className="flex items-center justify-between p-3 border-b border-gray-200 dark:border-gray-800">
+          <h2 className="text-base font-semibold text-gray-900 dark:text-white">Menu</h2>
           <button
             ref={closeButtonRef}
             aria-label="Close menu"

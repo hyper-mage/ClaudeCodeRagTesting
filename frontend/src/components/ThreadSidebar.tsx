@@ -1,3 +1,5 @@
+import type { ReactNode } from 'react'
+
 interface Thread {
   id: string
   title: string | null
@@ -11,6 +13,11 @@ interface Props {
   onSelectThread: (id: string) => void
   onNewThread: () => void
   onDeleteThread: (id: string) => void
+  /**
+   * Optional footer slot rendered BELOW the thread list (Plan 06): hosts the default-model
+   * control + theme toggle. Temporary spot until the Phase-14 settings page absorbs it.
+   */
+  footer?: ReactNode
 }
 
 /**
@@ -27,13 +34,14 @@ export function ThreadListContent({
   onSelectThread,
   onNewThread,
   onDeleteThread,
+  footer,
 }: Props) {
   return (
     <>
       <div className="p-3">
         <button
           onClick={onNewThread}
-          className="w-full py-2 px-3 bg-blue-600 hover:bg-blue-700 rounded text-sm font-medium"
+          className="w-full py-2 px-3 bg-blue-600 hover:bg-blue-700 rounded text-sm font-medium text-white"
         >
           + New Chat
         </button>
@@ -48,8 +56,8 @@ export function ThreadListContent({
           threads.map(thread => (
             <div
               key={thread.id}
-              className={`group flex items-center px-3 py-2 cursor-pointer text-sm hover:bg-gray-800 ${
-                thread.id === activeThreadId ? 'bg-gray-800' : ''
+              className={`group flex items-center px-3 py-2 cursor-pointer text-sm text-gray-900 hover:bg-gray-100 dark:text-gray-100 dark:hover:bg-gray-800 ${
+                thread.id === activeThreadId ? 'bg-gray-100 dark:bg-gray-800' : ''
               }`}
               onClick={() => onSelectThread(thread.id)}
             >
@@ -64,13 +72,17 @@ export function ThreadListContent({
           ))
         )}
       </div>
+      {footer && (
+        <div className="shrink-0 border-t border-gray-200 p-3 dark:border-gray-800">{footer}</div>
+      )}
     </>
   )
 }
 
 export default function ThreadSidebar(props: Props) {
   return (
-    <div className="hidden md:flex w-64 bg-gray-900 border-r border-gray-800 flex-col h-full">
+    // Core-surface light token (D-01): gray-50 in light, gray-900 in dark.
+    <div className="hidden md:flex w-64 bg-gray-50 border-r border-gray-200 text-gray-900 dark:bg-gray-900 dark:border-gray-800 dark:text-white flex-col h-full">
       <ThreadListContent {...props} />
     </div>
   )
