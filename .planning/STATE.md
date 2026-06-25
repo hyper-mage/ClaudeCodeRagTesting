@@ -3,8 +3,8 @@ gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: User Options & BYOK
 status: completed
-stopped_at: Completed 13-04-PLAN.md
-last_updated: "2026-06-25T16:24:26.074Z"
+stopped_at: Phase 14 context gathered
+last_updated: "2026-06-25T21:27:59.670Z"
 last_activity: 2026-06-25 -- Phase 13 marked complete
 progress:
   total_phases: 9
@@ -100,9 +100,9 @@ v1.2 roadmap-shaping decisions (to be promoted to PROJECT.md at phase transition
 
 ## Session Continuity
 
-Last session: 2026-06-24T23:46:44.754Z
-Stopped at: Completed 13-04-PLAN.md
-Resume file: None
+Last session: 2026-06-25T21:27:59.664Z
+Stopped at: Phase 14 context gathered
+Resume file: .planning/phases/14-usage-cost-display-settings-key-state-ux/14-CONTEXT.md
 Next: Phase 13 plans 05-06 remain (4/6 executed). 13-04 shipped the at-send deprecated-pin fallback (notice row + model override + history filter) in chat.py — test_deprecated_model_fallback.py GREEN, full backend suite 203 passed (2 pre-existing record_manager fixture errors out of scope, deferred-items.md).
 
 ## Operator Next Steps
