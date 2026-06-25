@@ -1,6 +1,7 @@
 ---
 phase: 13-preferences-per-thread-model
 plan: 06
+status: complete
 subsystem: ui
 tags: [react, vite, tailwind, model-selector, theme, vitest, sse, preferences]
 
@@ -161,3 +162,15 @@ NOTE: the live LLM round-trip on a chosen model is separately deferred (D-999.1-
 ---
 *Phase: 13-preferences-per-thread-model*
 *Autonomous tasks completed: 2026-06-25 — Task 4 human-verify checkpoint pending*
+
+---
+
+## Human-verify outcome (2026-06-25) — APPROVED
+
+The user ran the live stack and **approved** Task 4. Three issues were found during verification and fixed inline before approval (all on master, full fe suite stayed green):
+
+1. **Dropdown clipped behind the UI** (`a8dcf9b`) — `ModelSelector` opened downward only, so the sidebar-footer default-model selector spilled off-screen. Now measures the trigger on open and renders the panel **above** it (`bottom-full`) when there isn't room below; the chat-header selector still drops down.
+2. **Light mode only covered chat surfaces** (`77bcf1a`) — extended the light palette to the persistent `IconSidebar` rail, `DocumentsPage` + tree sidebar, `DocumentList`, and `MobileTopBar` (converted hardcoded dark classes to the light-default + `dark:` override pattern). NOTE: the `/settings` page content itself is **Phase 14** (PREF-01) — only the rail's Settings button is themed here.
+3. **Silent-empty dropdown** (`3eed48a`) — `ChatPage` seeds `models` to `[]` and passes it down before its one-time fetch resolves; `[]` is truthy, so `ModelSelector` pinned a message-less `loaded` state and never lazy-fetched. Now treats an empty `models` prop as "no catalog" (lazy-fetch on open) and renders an explicit `No models available.` empty-state. +2 regression tests (ModelSelector now 10 tests).
+
+Post-fix: ModelSelector 10/10, full frontend suite 56 tests green, `tsc -b` + eslint clean. User confirmed the dropdown lists models and the per-thread/default selectors are usable. The live LLM round-trip on a chosen model remains separately deferred (D-999.1-LLM-A — `:free`-model provider error), per plan.

@@ -35,7 +35,7 @@ Full phase detail archived in `milestones/v1.1-ROADMAP.md`. Audit: passed, 23/23
  (completed 2026-06-23)
 - [x] **Phase 12: Model Cache + Catalog** - Searchable, auto-refreshing model list with free/paid + popularity + price hints
  (completed 2026-06-23)
-- [ ] **Phase 13: Preferences + Per-Thread Model** - Default model, per-thread model selection, persisted theme storage
+- [x] **Phase 13: Preferences + Per-Thread Model** - Default model, per-thread model selection, persisted theme storage (completed 2026-06-25)
 - [ ] **Phase 14: Usage/Cost Display + Settings/Key-State UX** - Per-message cost, balance, low-balance warning, per-thread totals, settings page
 - [ ] **Phase 15: Options UI Capstone + Demo-Fallback Gating** - Model picker, favorites, key-gated selection, demo banner, demo-fallback flag (gated on SEC-03)
 
@@ -178,7 +178,7 @@ Plans:
 
 **Wave 5** *(blocked on Wave 4)*
 
-- [ ] 13-06-PLAN.md — wire per-thread selector header row + default-model selector + theme toggle + DeprecationNotice + theme reconcile + light-mode core surfaces + human-verify checkpoint
+- [x] 13-06-PLAN.md — wire per-thread selector header row + default-model selector + theme toggle + DeprecationNotice + theme reconcile + light-mode core surfaces + human-verify checkpoint
 
 ### Phase 14: Usage/Cost Display + Settings/Key-State UX
 
@@ -253,6 +253,6 @@ Phases execute in numeric order: 9 → 10 → 11 → 12 → 13 → 14 → 15 (Ph
 | 10. OAuth PKCE Connect | v1.2 | 4/4 | Complete   | 2026-06-22 |
 | 11. Per-Request Key + Model Resolution | v1.2 | 4/4 | Complete   | 2026-06-23 |
 | 12. Model Cache + Catalog | v1.2 | 4/4 | Complete    | 2026-06-23 |
-| 13. Preferences + Per-Thread Model | v1.2 | 5/6 | In Progress|  |
+| 13. Preferences + Per-Thread Model | v1.2 | 6/6 | Complete   | 2026-06-25 |
 | 14. Usage/Cost + Settings/Key-State UX | v1.2 | 0/TBD | Not started | - |
 | 15. Options UI Capstone + Demo Gating | v1.2 | 0/TBD | Not started | - |
