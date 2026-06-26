@@ -4,8 +4,8 @@ milestone: v1.2
 milestone_name: User Options & BYOK
 status: executing
 stopped_at: Phase 14 UI-SPEC approved
-last_updated: "2026-06-26T02:00:16.721Z"
-last_activity: 2026-06-26 -- Phase 14 planning complete
+last_updated: "2026-06-26T02:01:54.212Z"
+last_activity: 2026-06-26 -- Phase 14 execution started
 progress:
   total_phases: 9
   completed_phases: 6
@@ -21,15 +21,15 @@ progress:
 See: .planning/PROJECT.md (updated 2026-05-20 after v1.1 completion)
 
 **Core value:** The agent can intelligently search and reason across a structured board game knowledge base -- finding rules, comparing mechanics, and recommending games -- using the right tool for the job, transparently.
-**Current focus:** Phase 13 — preferences-per-thread-model
+**Current focus:** Phase 14 — Usage/Cost Display + Settings/Key-State UX
 
 ## Current Position
 
-Phase: 13 — COMPLETE
-Plan: 4 of 6
-Status: Ready to execute
+Phase: 14 (Usage/Cost Display + Settings/Key-State UX) — EXECUTING
+Plan: 1 of 5
+Status: Executing Phase 14
 Progress: [█████████░] 92%
-Last activity: 2026-06-26 -- Phase 14 planning complete
+Last activity: 2026-06-26 -- Phase 14 execution started
 
 ## Performance Metrics
 
