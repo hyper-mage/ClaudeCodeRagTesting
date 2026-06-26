@@ -166,6 +166,27 @@ def test_429_402_distinct_codes(monkeypatch):
     assert payload_402["error"] not in ("upstream_error", "[An error occurred]")
 
 
+def test_unauthorized_code_on_401(monkeypatch):
+    """SC#4 / D-09 (backend half): a mid-stream OpenRouter 401 (stored key rejected
+    as invalid/revoked) surfaces the structured code `no_api_key` — the SAME code the
+    pre-flight no-key path emits — so the FE [Reconnect] mapping is reused and the
+    failure does NOT dead-end on the generic `upstream_error` bubble."""
+    lines = _drive_with_raising_stream(monkeypatch, _status_error(401, "unauthorized"))
+    payload = _sse_error_payload(lines)
+    assert payload["error"] == "no_api_key"
+    assert payload["error"] not in ("upstream_error", "[An error occurred]")
+
+
+def test_forbidden_code_on_403(monkeypatch):
+    """SC#4 / D-09 (backend half): a mid-stream OpenRouter 403 surfaces the distinct
+    structured code `forbidden` — separate from payment_required (402), no_api_key
+    (401), and the generic upstream_error (else)."""
+    lines = _drive_with_raising_stream(monkeypatch, _status_error(403, "forbidden"))
+    payload = _sse_error_payload(lines)
+    assert payload["error"] == "forbidden"
+    assert payload["error"] not in ("upstream_error", "[An error occurred]")
+
+
 def test_logging_filter_scrubs_exc_info():
     """SEC-01 (logs closure): the _ScrubFilter (plan 11-04 Task 2) scrubs the
     FORMATTED record including the exc_info traceback — not just getMessage().
