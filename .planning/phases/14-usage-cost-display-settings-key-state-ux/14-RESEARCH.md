@@ -554,22 +554,25 @@ Not a rename/refactor/migration phase — but the D-06 relocation touches runtim
 | A3 | Sync `httpx.get` in the async `/balance` handler is acceptable (matches `exchange_code` norm) | Standard Stack alternatives | Low — on-demand, single-user, 15s timeout; negligible event-loop block. Switch to `AsyncClient` only if a perf concern surfaces. |
 | A4 | `/api/v1/credits` requires a management key (so it's unsuitable for OAuth inference keys) | Alternatives Considered | Low — COST-02 locks `/api/v1/key` regardless; this only justifies not switching. |
 
-## Open Questions
+## Open Questions (RESOLVED)
 
-1. **403 → `forbidden` code: add a backend branch or map `upstream_error`?**
+1. **403 → `forbidden` code: add a backend branch or map `upstream_error`?** — **RESOLVED**
    - What we know: `chat.py` emits `no_api_key`/`rate_limit`/`payment_required`/`upstream_error`; D-09 + UI-SPEC need a 403-specific recovery (`[Reconnect]`/`[Use demo]`). [VERIFIED: codebase]
    - What's unclear: whether to add `elif e.status_code == 403:` emitting `forbidden`, or to treat `upstream_error` as the 403 trigger.
    - Recommendation: Add the explicit `forbidden` branch in `chat.py` (mirror the 402 branch). It's a few lines, keeps the taxonomy honest, and makes the FE mapping unambiguous. Cover with a test in `test_error_surfacing.py`.
+   - **RESOLUTION:** Add the explicit `forbidden` 403 branch — implemented by Plan 14-01 Task 2. **Plan-check addendum:** the mid-stream **401** case (revoked/rejected stored key) was a blind spot here — it must ALSO get an explicit `elif e.status_code == 401:` branch emitting `no_api_key`, since SC#4 enumerates 401/402/403. Added to Plan 14-01 Task 2 during plan revision.
 
-2. **`[Use demo]` button visibility (403 recovery).**
+2. **`[Use demo]` button visibility (403 recovery).** — **RESOLVED**
    - What we know: UI-SPEC says `[Use demo]` renders only when demo fallback is eligible (the `mode`/eligibility signal). `demo_fallback_enabled` defaults OFF in dev+prod this phase. [VERIFIED: config.py:37]
    - What's unclear: there is no per-turn "demo eligibility" signal on the error path today (the `mode:"demo"` signal only rides the `done` event of a *successful* demo turn).
    - Recommendation: Since demo is OFF this phase, render `[Reconnect]` alone for 403 (the UI-SPEC's stated Phase-14 prod default). Wiring a live demo-eligibility signal is a Phase 15 concern (DEMO-01/02). Plan the typed bubble to accept an optional `demoEligible` prop defaulting false.
+   - **RESOLUTION:** `[Reconnect]` alone for 403 this phase; typed bubble accepts optional `demoEligible` prop (default false). Demo eligibility deferred to Phase 15 — implemented by Plan 14-03.
 
-3. **Balance refresh trigger timing.**
+3. **Balance refresh trigger timing.** — **RESOLVED**
    - What we know: fetch on demand only — "settings open / after a turn" (UI-SPEC, REQUIREMENTS out-of-scope: no polling).
    - What's unclear: whether "after a turn" should debounce/cache (Claude's discretion).
    - Recommendation: Fetch on `SettingsPage` mount and after a successful `done` event (optionally throttle to once per N seconds). Keep `useKeyStatus`'s no-poll contract; do not add a Realtime subscription.
+   - **RESOLUTION:** On-demand fetch (SettingsPage mount + after `done`), no polling/Realtime — implemented by Plan 14-02.
 
 ---
 

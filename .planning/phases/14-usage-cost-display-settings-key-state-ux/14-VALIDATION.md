@@ -1,8 +1,8 @@
 ---
 phase: 14
 slug: usage-cost-display-settings-key-state-ux
-status: draft
-nyquist_compliant: false
+status: approved
+nyquist_compliant: true
 wave_0_complete: false
 created: 2026-06-25
 ---
@@ -38,9 +38,20 @@ created: 2026-06-25
 
 | Task ID | Plan | Wave | Requirement | Threat Ref | Secure Behavior | Test Type | Automated Command | File Exists | Status |
 |---------|------|------|-------------|------------|-----------------|-----------|-------------------|-------------|--------|
-| (filled by planner from RESEARCH.md §Validation Architecture) | | | | | | | | | ⬜ pending |
+| 14-01-01 | 01 | 1 | COST-01/02/03/04, PREF-01 | T-14 balance | RED stubs: no `sk-or-` in `/balance` response; mid-stream 401→`no_api_key`, 403→`forbidden` | unit (RED) | `pytest test_keys_balance.py test_thread_usage_exposed.py "test_error_surfacing.py::test_unauthorized_code_on_401" "test_error_surfacing.py::test_forbidden_code_on_403" -q` | ❌ W0 (authored here) | ⬜ pending |
+| 14-01-02 | 01 | 1 | COST-01/04, PREF-01 | T-14 leak | `MessageResponse.usage` survives history load; chat.py 401→`no_api_key`/403→`forbidden` before `else` | unit (GREEN) | `pytest test_thread_usage_exposed.py test_error_surfacing.py -q` | ✅ | ⬜ pending |
+| 14-01-03 | 01 | 1 | COST-02/03 | T-14 balance | `/api/keys/balance` decrypt in-memory, `scrub_secrets`, fixed 502, no `exc_info`, server-computed `is_low`, returns only `{connected,limit_remaining,is_low}` | unit (GREEN) | `pytest test_keys_balance.py -q` | ✅ | ⬜ pending |
+| 14-02-01 | 02 | 2 | COST-01/04, PREF-01 | — | `useChat` captures `done.usage` + typed `errorType` (no toast on key path) | build/lint + browser | `cd frontend && npm run build && npm run lint` | N/A (no FE test fw) | ⬜ pending |
+| 14-02-02 | 02 | 2 | COST-02/03 | — | `useKeyStatus` exposes balance + `isLow` + loading/error; no polling | build/lint + browser | `cd frontend && npm run build && npm run lint` | N/A (no FE test fw) | ⬜ pending |
+| 14-03-01 | 03 | 3 | COST-01 | — | per-message cost caption `$0.0021 · 1.2k tok`; omit when `usage.cost` null | build/lint + browser | `cd frontend && npm run build && npm run lint` | N/A (no FE test fw) | ⬜ pending |
+| 14-03-02 | 03 | 3 | PREF-01 | T-14 recovery | typed recovery bubble keyed on `errorType` (401/403→`[Reconnect]`, 402→`[Add credits ⇗]`+`[Reconnect]`) | build/lint + browser | `cd frontend && npm run build && npm run lint` | N/A (no FE test fw) | ⬜ pending |
+| 14-03-03 | 03 | 3 | COST-04 | — | per-thread `Σ` total summed from persisted `messages.usage`; hidden when sum=0 | build/lint + browser | `cd frontend && npm run build && npm run lint` | N/A (no FE test fw) | ⬜ pending |
+| 14-04-01 | 04 | 3 | COST-03 | — | IconSidebar key dot tri-state (green/amber/gray); amber on `isLow` | build/lint + browser | `cd frontend && npm run build && npm run lint` | N/A (no FE test fw) | ⬜ pending |
+| 14-04-02 | 04 | 3 | COST-03 | — | MobileTopBar key dot mirrors tri-state | build/lint + browser | `cd frontend && npm run build && npm run lint` | N/A (no FE test fw) | ⬜ pending |
+| 14-05-01 | 05 | 3 | COST-02/03, PREF-01 | — | Settings 3 sections; tri-state copy (2 live: connected, no-key; Demo reserved→P15); balance line + amber warning; no `mode==='demo'` UI | build/lint + browser | `cd frontend && npm run build && npm run lint` | N/A (no FE test fw) | ⬜ pending |
+| 14-05-02 | 05 | 3 | PREF-01 | — | ChatPage temp mounts removed (`:176` DefaultModelSelector, `:179` ThemeToggle) | build/lint + browser | `cd frontend && npm run build && npm run lint` | N/A (no FE test fw) | ⬜ pending |
 
-*Status: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky*
+*Status: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky · File Exists ❌ W0 = authored by the Wave 0 RED task (14-01-01)*
 
 ---
 
@@ -68,11 +79,11 @@ created: 2026-06-25
 
 ## Validation Sign-Off
 
-- [ ] All tasks have `<automated>` verify or Wave 0 dependencies
-- [ ] Sampling continuity: no 3 consecutive tasks without automated verify
-- [ ] Wave 0 covers all MISSING references
-- [ ] No watch-mode flags
-- [ ] Feedback latency < 30s
-- [ ] `nyquist_compliant: true` set in frontmatter
+- [x] All tasks have `<automated>` verify or Wave 0 dependencies
+- [x] Sampling continuity: no 3 consecutive tasks without automated verify
+- [x] Wave 0 covers all MISSING references (14-01-01 authors the 3 backend test files RED before 14-01-02/03 turn them green)
+- [x] No watch-mode flags
+- [x] Feedback latency < 30s
+- [x] `nyquist_compliant: true` set in frontmatter
 
-**Approval:** pending
+**Approval:** approved 2026-06-25

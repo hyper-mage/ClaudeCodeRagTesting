@@ -35,7 +35,7 @@ Full phase detail archived in `milestones/v1.1-ROADMAP.md`. Audit: passed, 23/23
  (completed 2026-06-23)
 - [x] **Phase 12: Model Cache + Catalog** - Searchable, auto-refreshing model list with free/paid + popularity + price hints
  (completed 2026-06-23)
-- [x] **Phase 13: Preferences + Per-Thread Model** - Default model, per-thread model selection, persisted theme storage (completed 2026-06-25)
+- [x] **Phase 13: Preferences + Per-Thread Model** - Default model, per-thread model selection, persisted theme storage (completed 2026-06-25)
 - [ ] **Phase 14: Usage/Cost Display + Settings/Key-State UX** - Per-message cost, balance, low-balance warning, per-thread totals, settings page
 - [ ] **Phase 15: Options UI Capstone + Demo-Fallback Gating** - Model picker, favorites, key-gated selection, demo banner, demo-fallback flag (gated on SEC-03)
 
@@ -192,12 +192,24 @@ Plans:
   3. User is warned when their balance is low, and sees a running cost total per chat thread.
   4. User can open a settings/account page that always shows current key state ("Demo mode" vs "Your key: connected" vs "No key — connect to chat") with masked label + balance; a mid-chat 401/402/403 surfaces a recoverable action (reconnect / pick demo / add credits) instead of a dead-end.
 
-**Plans**: TBD
+**Plans**: 5 plans
 **UI hint**: yes
 
 Plans:
 
-- [ ] TBD (refined during /gsd:plan-phase 14)
+**Wave 1**
+
+- [ ] 14-01-PLAN.md — backend foundation: Wave 0 tests (RED) + MessageResponse.usage read-path fix + BalanceResponse + GET /api/keys/balance + low_balance_threshold_usd config + chat.py `forbidden` 403 branch
+
+**Wave 2** *(blocked on Wave 1)*
+
+- [ ] 14-02-PLAN.md — FE hooks contract: useChat (Usage + usage/errorType on Message, done.usage capture, typed-error stamping, no-toast key path) + useKeyStatus (balance fetch + derived isLow + loading/error)
+
+**Wave 3** *(blocked on Wave 2 — three parallel plans, disjoint files)*
+
+- [ ] 14-03-PLAN.md — chat render surfaces: per-message cost caption (MessageBubble) + typed recovery bubble (ErrorMessageBubble) + Σ thread total + usage/type passthrough (ChatContainer)
+- [ ] 14-04-PLAN.md — amber low-balance status dot (IconSidebar + MobileTopBar tri-state)
+- [ ] 14-05-PLAN.md — settings consolidation: SettingsPage grow to 3 theme-aware sections (tri-state copy + balance/warning lines + relocated Default model + Theme) + ChatPage prefsControls removal
 
 ### Phase 15: Options UI Capstone + Demo-Fallback Gating
 
@@ -254,5 +266,5 @@ Phases execute in numeric order: 9 → 10 → 11 → 12 → 13 → 14 → 15 (Ph
 | 11. Per-Request Key + Model Resolution | v1.2 | 4/4 | Complete   | 2026-06-23 |
 | 12. Model Cache + Catalog | v1.2 | 4/4 | Complete    | 2026-06-23 |
 | 13. Preferences + Per-Thread Model | v1.2 | 6/6 | Complete   | 2026-06-25 |
-| 14. Usage/Cost + Settings/Key-State UX | v1.2 | 0/TBD | Not started | - |
+| 14. Usage/Cost + Settings/Key-State UX | v1.2 | 0/5 | Planned | - |
 | 15. Options UI Capstone + Demo Gating | v1.2 | 0/TBD | Not started | - |
