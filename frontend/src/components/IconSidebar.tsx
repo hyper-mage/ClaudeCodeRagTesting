@@ -8,11 +8,23 @@ export default function IconSidebar() {
   const location = useLocation()
   const navigate = useNavigate()
   const { signOut } = useAuth()
-  const { status } = useKeyStatus()
+  const { status, isLow } = useKeyStatus()
 
   const isChat = location.pathname === '/'
   const isDocs = location.pathname === '/documents'
   const isSettings = location.pathname === '/settings'
+
+  const connected = status?.connected ?? false
+  const dotFill = !connected
+    ? 'bg-gray-400 dark:bg-gray-500'
+    : isLow
+      ? 'bg-amber-500'
+      : 'bg-green-500'
+  const dotLabel = !connected
+    ? 'OpenRouter not connected'
+    : isLow
+      ? 'OpenRouter balance low'
+      : 'OpenRouter connected'
 
   return (
     <div className="hidden md:flex w-14 bg-gray-100 border-r border-gray-200 flex-col items-center py-3 h-screen shrink-0 dark:bg-gray-900 dark:border-gray-800">
@@ -40,8 +52,8 @@ export default function IconSidebar() {
       <div className="flex-1" />
       <span
         role="status"
-        aria-label={status?.connected ? 'OpenRouter connected' : 'OpenRouter not connected'}
-        className={`h-2 w-2 rounded-full mb-2 ${status?.connected ? 'bg-green-500' : 'bg-gray-500'}`}
+        aria-label={dotLabel}
+        className={`h-2 w-2 rounded-full mb-2 ${dotFill}`}
       />
       <DemoPill />
       <button

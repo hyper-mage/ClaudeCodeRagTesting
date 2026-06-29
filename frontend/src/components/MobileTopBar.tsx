@@ -16,7 +16,20 @@ interface Props {
  * surface carries the "+ New Chat" CTA, so the top bar is title-only.
  */
 export default function MobileTopBar({ title, onOpenDrawer, hamburgerRef, isDrawerOpen }: Props) {
-  const { status } = useKeyStatus()
+  const { status, isLow } = useKeyStatus()
+
+  const connected = status?.connected ?? false
+  const dotFill = !connected
+    ? 'bg-gray-400 dark:bg-gray-500'
+    : isLow
+      ? 'bg-amber-500'
+      : 'bg-green-500'
+  const dotLabel = !connected
+    ? 'OpenRouter not connected'
+    : isLow
+      ? 'OpenRouter balance low'
+      : 'OpenRouter connected'
+
   return (
     <div className="md:hidden h-12 bg-gray-100 border-b border-gray-200 flex items-center px-2 shrink-0 dark:bg-gray-900 dark:border-gray-800">
       <button
@@ -34,8 +47,8 @@ export default function MobileTopBar({ title, onOpenDrawer, hamburgerRef, isDraw
       </h1>
       <span
         role="status"
-        aria-label={status?.connected ? 'OpenRouter connected' : 'OpenRouter not connected'}
-        className={`h-2 w-2 rounded-full ${status?.connected ? 'bg-green-500' : 'bg-gray-500'}`}
+        aria-label={dotLabel}
+        className={`h-2 w-2 rounded-full ${dotFill}`}
       />
       <div className="h-11 w-11 flex items-center justify-center">
         <DemoPill />
