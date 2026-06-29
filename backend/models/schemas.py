@@ -84,6 +84,12 @@ class MessageResponse(BaseModel):
     role: str
     content: str
     tools_used: list[dict] | None = None
+    # Phase 14 (COST-01 / COST-04, D-01/D-02) — the per-message usage capture
+    # (cost + token counts) Phase 11 already writes to messages.usage JSONB. It
+    # MUST be declared here or FastAPI's response_model strips it on history load
+    # even though select('*') returns it (Pitfall 1) — without this, per-message
+    # cost and the per-thread Σ total cannot survive a reload.
+    usage: dict | None = None
     created_at: datetime
 
 
@@ -123,6 +129,21 @@ class KeyStatusResponse(BaseModel):
     connected: bool
     masked_label: str | None = None
     connected_at: str | None = None
+
+
+class BalanceResponse(BaseModel):
+    """GET /api/keys/balance — non-secret derived balance state (COST-02 / COST-03, T-14-01).
+
+    NEVER carries the sk-or-… key or the raw OpenRouter body: only the boolean
+    connection state, the reported remaining credit, and a server-computed low flag.
+    limit_remaining is null for a pay-as-you-go (uncapped) account (D-04), in which
+    case is_low is unconditionally False. is_low is computed server-side from
+    low_balance_threshold_usd (D-03) — the threshold itself never crosses to the
+    client, so it cannot be tampered (T-14-04).
+    """
+    connected: bool
+    limit_remaining: float | None = None
+    is_low: bool = False
 
 
 # ----- Model catalog (Phase 12, MODEL-01 / MODEL-07, D-10) -----
