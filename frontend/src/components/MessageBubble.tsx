@@ -1,15 +1,40 @@
 import { useState } from 'react'
 import ReactMarkdown from 'react-markdown'
 import ToolCallCard from './ToolCallCard'
-import type { ToolEvent } from '../hooks/useChat'
+import type { ToolEvent, Usage } from '../hooks/useChat'
 
 interface Props {
   role: 'user' | 'assistant'
   content: string
   toolsUsed?: ToolEvent[]
+  /** Per-message cost/tokens as reported by OpenRouter (D-01). Drives the muted cost caption
+   *  on assistant bubbles only. Shown exactly as reported — never recomputed client-side. */
+  usage?: Usage
 }
 
-export default function MessageBubble({ role, content, toolsUsed }: Props) {
+// Format a token count per the locked copy: `1.2k` for >= 1000 (one decimal, drop a trailing
+// `.0`), otherwise the integer (`840`). Pure display helper.
+function formatTokens(n: number): string {
+  if (n >= 1000) {
+    const k = (n / 1000).toFixed(1)
+    return `${k.endsWith('.0') ? k.slice(0, -2) : k}k`
+  }
+  return String(n)
+}
+
+// Muted per-message cost caption (UI-SPEC § Copywriting — `${cost} · ${tokens} tok`).
+// The cost segment AND the `·` separator are omitted when usage.cost is null/absent (e.g. a
+// free model); renders nothing when there is no displayable figure at all. Locked muted token
+// `text-gray-600 dark:text-gray-400` (NOT gray-500 on white — Phase 13 contrast guardrail).
+function CostLine({ usage }: { usage: Usage }) {
+  const costPart = usage.cost != null ? `$${usage.cost.toFixed(4)}` : null
+  const tokensPart = usage.total_tokens != null ? `${formatTokens(usage.total_tokens)} tok` : null
+  const text = [costPart, tokensPart].filter(Boolean).join(' · ')
+  if (!text) return null
+  return <div className="text-xs text-gray-600 dark:text-gray-400 mt-1">{text}</div>
+}
+
+export default function MessageBubble({ role, content, toolsUsed, usage }: Props) {
   const [showTools, setShowTools] = useState(true)
   const hasTools = role === 'assistant' && toolsUsed && toolsUsed.length > 0
 
@@ -76,6 +101,7 @@ export default function MessageBubble({ role, content, toolsUsed }: Props) {
         ) : (
           content
         )}
+        {role === 'assistant' && usage && <CostLine usage={usage} />}
       </div>
     </div>
   )
