@@ -22,6 +22,16 @@ export interface ToolEvent {
   subEvents?: SubEvent[]
 }
 
+// Per-message cost + token usage, summed across the tool loop on the backend (Phase 11) and
+// persisted to messages.usage. Arrives live on the `done` SSE event and on history load.
+// All fields optional — a turn may report tokens without a cost (or neither).
+export interface Usage {
+  prompt_tokens?: number
+  completion_tokens?: number
+  total_tokens?: number
+  cost?: number
+}
+
 export interface Message {
   // 'notice' is the persisted deprecation-fallback line (Plan 04, role='notice'); it arrives from
   // GET /api/threads/{id} like any other row and renders via DeprecationNotice (not a bubble).
@@ -29,6 +39,11 @@ export interface Message {
   role: 'user' | 'assistant' | 'error' | 'notice'
   content: string
   toolsUsed?: ToolEvent[]
+  // Per-message cost/tokens (live done.usage + reloaded). Drives the cost caption (Wave 3 Plan 04).
+  usage?: Usage
+  // Structured key-failure code (D-09). When set, the typed ErrorMessageBubble (Wave 3) supplies
+  // the locked recovery copy from the code — `content` stays empty and NO toast fired.
+  errorType?: 'no_api_key' | 'payment_required' | 'forbidden'
 }
 
 export function useChat(threadId: string | null) {
@@ -58,6 +73,9 @@ export function useChat(threadId: string | null) {
       setMessages(data.messages.map((m: Record<string, unknown>) => ({
         ...m,
         toolsUsed: m.tools_used as ToolEvent[] | undefined,
+        // D-02 source-of-truth: persisted per-message usage must survive a reload so the cost
+        // caption + per-thread Σ total reconstruct identically after refresh (read-path fix).
+        usage: m.usage as Usage | undefined,
       })))
     } catch {
       // Preserve previous silent-on-error behavior (old code had `if (res.ok)`)
@@ -229,10 +247,14 @@ export function useChat(threadId: string | null) {
                   )
                 )
               } else if (parsed.message_id) {
-                // done event - update with final message ID
+                // done event - update with final message ID and capture the live turn's summed
+                // usage (cost + tokens). Falls back to any usage already on the message so we never
+                // clobber an existing value with an absent one.
                 setMessages(prev =>
                   prev.map(m =>
-                    m.id === assistantId ? { ...m, id: parsed.message_id } : m
+                    m.id === assistantId
+                      ? { ...m, id: parsed.message_id, usage: parsed.usage ?? m.usage }
+                      : m
                   )
                 )
               } else if (parsed.error !== undefined) {
@@ -261,26 +283,44 @@ export function useChat(threadId: string | null) {
       // (RESEARCH § Pitfall 4 / Standard Stack).
       Sentry.captureException(err)
 
+      // The error SSE branch throws the structured CODE as err.message. A typed key-failure code
+      // (D-09) drives the typed recovery bubble (Wave 3) and suppresses the toast; every other code
+      // (rate_limit, upstream_error) and any network error keeps the generic copy + toast.
+      const KEY_FAILURE_CODES: ReadonlyArray<NonNullable<Message['errorType']>> = [
+        'no_api_key',
+        'payment_required',
+        'forbidden',
+      ]
+      const code = err instanceof Error ? err.message : ''
+      const errorType = KEY_FAILURE_CODES.find(c => c === code)
+
       // Replace the empty assistant placeholder with an in-thread error bubble.
-      // Locked copy per UI-SPEC § Surface 2 + § Copywriting Contract.
+      // Typed key-failure path: stamp errorType + empty content (the bubble renders locked copy from
+      // the code, never parsed.detail — Pitfall 3 / T-14-08). Generic path: locked copy per
+      // UI-SPEC § Surface 2 + § Copywriting Contract.
       setMessages(prev =>
-        prev.map(m =>
-          m.id === assistantId
-            ? {
-                ...m,
-                role: 'error' as const,
-                content:
-                  'The assistant ran into a problem. Try again, or rephrase your question.',
-              }
-            : m
-        )
+        prev.map(m => {
+          if (m.id !== assistantId) return m
+          if (errorType) {
+            return { ...m, role: 'error' as const, errorType, content: '' }
+          }
+          return {
+            ...m,
+            role: 'error' as const,
+            content:
+              'The assistant ran into a problem. Try again, or rephrase your question.',
+          }
+        })
       )
 
-      // Simultaneous 4s red toast (UI-SPEC § Surface 2 dual-surface).
-      showToast(
-        "The assistant didn't respond. Tap the message to retry.",
-        'error'
-      )
+      // Generic stream failures keep the 4s red toast (UI-SPEC § Surface 2 dual-surface). The typed
+      // 401/402/403 recovery path suppresses it — the in-thread bubble is the single surface (D-09).
+      if (!errorType) {
+        showToast(
+          "The assistant didn't respond. Tap the message to retry.",
+          'error'
+        )
+      }
     } finally {
       abortRef.current = null
       isStreamingRef.current = false
