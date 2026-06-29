@@ -3,8 +3,8 @@ gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: User Options & BYOK
 status: executing
-stopped_at: Phase 14 UI-SPEC approved
-last_updated: "2026-06-26T02:01:54.212Z"
+stopped_at: Phase 14 Wave 1 interrupted by weekly quota cap — 14-01 Task 1 (Wave-0 RED tests) committed (c76ae8f), Tasks 2-3 (MessageResponse.usage + 401/403 branches; balance endpoint + config) PENDING; no SUMMARY yet
+last_updated: "2026-06-29T20:08:04.254Z"
 last_activity: 2026-06-26 -- Phase 14 execution started
 progress:
   total_phases: 9
@@ -100,9 +100,9 @@ v1.2 roadmap-shaping decisions (to be promoted to PROJECT.md at phase transition
 
 ## Session Continuity
 
-Last session: 2026-06-25T21:38:09.798Z
-Stopped at: Phase 14 UI-SPEC approved
-Resume file: .planning/phases/14-usage-cost-display-settings-key-state-ux/14-UI-SPEC.md
+Last session: 2026-06-29T20:08:04.247Z
+Stopped at: Phase 14 Wave 1 interrupted by weekly quota cap — 14-01 Task 1 (Wave-0 RED tests) committed (c76ae8f), Tasks 2-3 (MessageResponse.usage + 401/403 branches; balance endpoint + config) PENDING; no SUMMARY yet
+Resume file: .planning/phases/14-usage-cost-display-settings-key-state-ux/14-01-PLAN.md
 Next: Phase 13 plans 05-06 remain (4/6 executed). 13-04 shipped the at-send deprecated-pin fallback (notice row + model override + history filter) in chat.py — test_deprecated_model_fallback.py GREEN, full backend suite 203 passed (2 pre-existing record_manager fixture errors out of scope, deferred-items.md).
 
 ## Operator Next Steps
