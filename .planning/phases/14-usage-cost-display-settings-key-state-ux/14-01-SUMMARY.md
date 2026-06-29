@@ -124,6 +124,10 @@ Optional: set `LOW_BALANCE_THRESHOLD_USD` in `.env` (dev) / `.env.prod` (prod) t
 - Backend read-path + balance proxy + mid-stream key-failure codes are all in place; the Phase 14 frontend surfaces (usage/cost display, balance indicator, [Reconnect] on mid-chat 401) can now consume real data.
 - No blockers introduced. STATE.md/ROADMAP.md intentionally NOT modified (worktree mode — orchestrator owns those writes after the wave).
 
+## Self-Check: PASSED
+
+All modified files exist on disk (`schemas.py`, `config.py`, `chat.py`, `keys.py`) and all task commits are reachable (`4228ee9`, `2e190ce`, `c28d940`; Task-1 RED `c76ae8f`). Working tree clean.
+
 ---
 *Phase: 14-usage-cost-display-settings-key-state-ux*
 *Completed: 2026-06-29*
