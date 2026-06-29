@@ -50,6 +50,12 @@ class Settings(BaseSettings):
     # degrading into a rate-limit DoS.
     model_cache_ttl_seconds: int = Field(default=86400, ge=0)
 
+    # Low-balance threshold (Phase 14 COST-03 / D-03) — GET /api/keys/balance
+    # computes is_low SERVER-SIDE as (limit_remaining < this) and never sends the
+    # threshold to the client (T-14-04). Env override LOW_BALANCE_THRESHOLD_USD
+    # (case-insensitive via pydantic-settings); the 1.00 default makes absence harmless.
+    low_balance_threshold_usd: float = 1.00
+
     # Curated popular-model ranking (Phase 12 D-06/D-07/D-08) — an ORDERED list of
     # OpenRouter model-id slugs; index 0 == most popular → popularity_rank 0. This is a
     # versioned, CODE-REVIEWED constant that ships with the deploy (no DB/env round-trip,

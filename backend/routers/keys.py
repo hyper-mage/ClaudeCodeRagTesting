@@ -21,16 +21,21 @@ SECURITY (T-10-03 / T-10-04 / SEC-01):
   Phase 9 SEC-02 lockdown REVOKEs SELECT from authenticated and keeps the table
   out of the Text-to-SQL allowlist — untouched here).
 """
+import logging
 from datetime import datetime, timezone
 
 import httpx
 from fastapi import APIRouter, Depends, HTTPException
 
 from auth import get_user_id
+from config import get_settings
 from database import get_supabase
-from models.schemas import ExchangeRequest, KeyStatusResponse
-from services.crypto_service import encrypt_key
+from models.schemas import BalanceResponse, ExchangeRequest, KeyStatusResponse
+from services.crypto_service import decrypt_key, encrypt_key
+from services.log_scrub import scrub_secrets
 from services.openrouter_service import exchange_code
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/keys", tags=["keys"])
 
@@ -91,6 +96,55 @@ async def status(user_id: str = Depends(get_user_id)):
         "masked_label": row.data["key_label"],
         "connected_at": row.data["connected_at"],
     }
+
+
+@router.get("/balance", response_model=BalanceResponse)
+async def balance(user_id: str = Depends(get_user_id)) -> BalanceResponse:
+    """Server-side OpenRouter balance proxy (COST-02 / COST-03, T-14-01..04).
+
+    Reads the stored key (service-role client, bound to the JWT sub), decrypts it
+    IN MEMORY for this request only, and proxies OpenRouter GET /api/v1/key. Returns
+    ONLY {connected, limit_remaining, is_low} — never the sk-or-… key, never the raw
+    provider body (T-14-01/03). is_low is computed server-side from the configurable
+    threshold (T-14-04); a null limit_remaining (pay-as-you-go) is never low (D-04).
+    A provider error surfaces a fixed generic 502 with a scrubbed log line and NO
+    exc_info (which could capture the outbound Bearer header — T-14-02).
+    """
+    row = (
+        get_supabase()
+        .table("user_api_keys")
+        .select("encrypted_key")
+        .eq("user_id", user_id)
+        .maybe_single()
+        .execute()
+    )
+    if not row or not isinstance(row.data, dict) or not row.data.get("encrypted_key"):
+        # No connected key → report disconnected; make NO outbound OpenRouter call.
+        return BalanceResponse(connected=False)
+
+    # Decrypt in-memory for this request only — never stored, returned, or logged.
+    key = decrypt_key(row.data["encrypted_key"])
+    try:
+        resp = httpx.get(
+            "https://openrouter.ai/api/v1/key",
+            headers={"Authorization": f"Bearer {key}"},
+            timeout=15,
+        )
+        resp.raise_for_status()
+    except httpx.HTTPError as e:
+        # NO exc_info — the traceback could capture the Bearer header (T-14-02).
+        logger.warning(f"balance fetch failed: {scrub_secrets(str(e))}")
+        raise HTTPException(
+            status_code=502,
+            detail="Couldn't fetch the OpenRouter balance.",
+        )
+
+    data = resp.json().get("data", {})
+    remaining = data.get("limit_remaining")
+    threshold = get_settings().low_balance_threshold_usd
+    is_low = remaining is not None and remaining < threshold
+    # Return ONLY the derived non-secret fields — never resp.json()/resp.text/data.label.
+    return BalanceResponse(connected=True, limit_remaining=remaining, is_low=is_low)
 
 
 @router.delete("", status_code=204)

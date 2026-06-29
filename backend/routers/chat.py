@@ -1217,6 +1217,33 @@ async def send_message(
                     "This model needs credits. Connect your OpenRouter account or "
                     "add credits.",
                 )
+            elif e.status_code == 401:
+                # 401 → no_api_key (SC#4 / D-09 backend half). A mid-stream 401 means
+                # OpenRouter rejected the STORED key as invalid/revoked. Emit the SAME
+                # structured code the pre-flight no-key path uses (chat.py:798-805) so the
+                # FE [Reconnect] mapping is reused — without this it would fall to the
+                # else → upstream_error generic dead-end Retry bubble that SC#4 forbids.
+                logger.warning(
+                    f"Chat unauthorized: {scrub_secrets(str(e))}", exc_info=True
+                )
+                _mark_error_row(db, assistant_msg_id)
+                yield _sse_error(
+                    "no_api_key",
+                    "Connect your OpenRouter account to chat.",
+                )
+            elif e.status_code == 403:
+                # 403 → forbidden, distinct from payment_required (402), no_api_key (401),
+                # and the generic upstream_error (else). The SSE payload carries only the
+                # structured CODE; the FE selects locked UI-SPEC copy from it.
+                logger.warning(
+                    f"Chat forbidden: {scrub_secrets(str(e))}", exc_info=True
+                )
+                _mark_error_row(db, assistant_msg_id)
+                yield _sse_error(
+                    "forbidden",
+                    "The model provider refused this request. Try another model or "
+                    "check your OpenRouter account.",
+                )
             else:
                 logger.error(
                     f"Chat upstream error: {scrub_secrets(str(e))}", exc_info=True
