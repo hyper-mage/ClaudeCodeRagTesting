@@ -4,22 +4,8 @@ import ErrorMessageBubble from './ErrorMessageBubble'
 import DeprecationNotice from './DeprecationNotice'
 import ModelSelector, { type ModelResponse } from './ModelSelector'
 import { useAuth } from '../contexts/AuthContext'
-
-interface ToolEvent {
-  tool: string
-  args_preview: string
-  output?: string
-  call_id?: string
-  subagent?: boolean
-  status: 'running' | 'complete'
-}
-
-interface Message {
-  id: string
-  role: 'user' | 'assistant' | 'error' | 'notice'
-  content: string
-  toolsUsed?: ToolEvent[]
-}
+// Single source of truth for the message shape (incl. usage + errorType) — Plan 02 hook contract.
+import type { Message } from '../hooks/useChat'
 
 interface Props {
   messages: Message[]
@@ -63,6 +49,10 @@ export default function ChatContainer({
   models,
 }: Props) {
   const { isAnon } = useAuth()
+  // Per-thread running total (D-02, COST-04): sum the persisted per-message usage.cost. The
+  // persisted sum is the source of truth, so the total is correct on reload. Free/empty threads
+  // sum to 0 and the Σ caption below is omitted entirely (no `Σ $0.0000` clutter).
+  const threadCost = messages.reduce((s, m) => s + (m.usage?.cost ?? 0), 0)
   return (
     // Core-surface light token (D-01): white in light, gray-950 in dark — no orphan dark panel.
     <div className="flex-1 flex flex-col h-full bg-white text-gray-900 dark:bg-gray-950 dark:text-white">
@@ -83,6 +73,13 @@ export default function ChatContainer({
               models={models}
             />
           </div>
+          {/* Per-thread running total (COST-04). Right-aligned in the SAME h-12 row via ml-auto
+              (no second header row). Muted caption token; rendered only when > 0. */}
+          {threadCost > 0 && (
+            <span className="ml-auto shrink-0 text-xs text-gray-600 dark:text-gray-400">
+              Σ ${threadCost.toFixed(4)}
+            </span>
+          )}
         </div>
       )}
       <div className="flex-1 overflow-y-auto p-4">
@@ -115,7 +112,15 @@ export default function ChatContainer({
         )}
         {messages.map(msg =>
           msg.role === 'error' ? (
-            <ErrorMessageBubble key={msg.id} onRetry={onRetry} isStreaming={isStreaming} />
+            // errorType set → typed recovery variant (D-09); undefined → generic Retry path.
+            // demoEligible is false this phase (Phase 15 owns enabling demo fallback).
+            <ErrorMessageBubble
+              key={msg.id}
+              onRetry={onRetry}
+              isStreaming={isStreaming}
+              type={msg.errorType}
+              demoEligible={false}
+            />
           ) : msg.role === 'notice' ? (
             <DeprecationNotice key={msg.id} content={msg.content} />
           ) : (
@@ -124,6 +129,7 @@ export default function ChatContainer({
               role={msg.role}
               content={msg.content}
               toolsUsed={msg.toolsUsed}
+              usage={msg.usage}
             />
           )
         )}
