@@ -203,7 +203,7 @@ Plans:
 
 **Wave 2** *(blocked on Wave 1)*
 
-- [ ] 14-02-PLAN.md — FE hooks contract: useChat (Usage + usage/errorType on Message, done.usage capture, typed-error stamping, no-toast key path) + useKeyStatus (balance fetch + derived isLow + loading/error)
+- [x] 14-02-PLAN.md — FE hooks contract: useChat (Usage + usage/errorType on Message, done.usage capture, typed-error stamping, no-toast key path) + useKeyStatus (balance fetch + derived isLow + loading/error)
 
 **Wave 3** *(blocked on Wave 2 — three parallel plans, disjoint files)*
 
@@ -266,5 +266,5 @@ Phases execute in numeric order: 9 → 10 → 11 → 12 → 13 → 14 → 15 (Ph
 | 11. Per-Request Key + Model Resolution | v1.2 | 4/4 | Complete   | 2026-06-23 |
 | 12. Model Cache + Catalog | v1.2 | 4/4 | Complete    | 2026-06-23 |
 | 13. Preferences + Per-Thread Model | v1.2 | 6/6 | Complete   | 2026-06-25 |
-| 14. Usage/Cost + Settings/Key-State UX | v1.2 | 1/5 | In Progress|  |
+| 14. Usage/Cost + Settings/Key-State UX | v1.2 | 2/5 | In Progress|  |
 | 15. Options UI Capstone + Demo Gating | v1.2 | 0/TBD | Not started | - |
