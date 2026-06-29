@@ -199,7 +199,7 @@ Plans:
 
 **Wave 1**
 
-- [ ] 14-01-PLAN.md — backend foundation: Wave 0 tests (RED) + MessageResponse.usage read-path fix + BalanceResponse + GET /api/keys/balance + low_balance_threshold_usd config + chat.py `forbidden` 403 branch
+- [x] 14-01-PLAN.md — backend foundation: Wave 0 tests (RED) + MessageResponse.usage read-path fix + BalanceResponse + GET /api/keys/balance + low_balance_threshold_usd config + chat.py `forbidden` 403 branch
 
 **Wave 2** *(blocked on Wave 1)*
 
@@ -266,5 +266,5 @@ Phases execute in numeric order: 9 → 10 → 11 → 12 → 13 → 14 → 15 (Ph
 | 11. Per-Request Key + Model Resolution | v1.2 | 4/4 | Complete   | 2026-06-23 |
 | 12. Model Cache + Catalog | v1.2 | 4/4 | Complete    | 2026-06-23 |
 | 13. Preferences + Per-Thread Model | v1.2 | 6/6 | Complete   | 2026-06-25 |
-| 14. Usage/Cost + Settings/Key-State UX | v1.2 | 0/5 | Planned | - |
+| 14. Usage/Cost + Settings/Key-State UX | v1.2 | 1/5 | In Progress|  |
 | 15. Options UI Capstone + Demo Gating | v1.2 | 0/TBD | Not started | - |
