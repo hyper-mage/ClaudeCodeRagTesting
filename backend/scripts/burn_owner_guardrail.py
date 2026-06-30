@@ -24,12 +24,17 @@ Run (prod target, D-01) — set ENV_FILE in the shell BEFORE launch:
 import argparse
 import os
 import sys
+import time
 
 # Add backend directory to sys.path so imports work when run as a module.
 # (Mirrors scripts/verify_langsmith_routing.py:23-34.)
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
+import httpx
+import openai
+
 from config import get_settings  # load_dotenv(.env or .env.prod) fires HERE (keyed on ENV_FILE)
+from services.llm_service import get_llm_client
 from services.log_scrub import scrub_secrets
 
 
@@ -39,6 +44,20 @@ TRIP_TARGET = 0.10   # the configured guardrail threshold we expect to trip
 HARD_ABORT = 0.25    # 2.5x the trip target — if no block by here, SEC-03 BLOCKER
 MAX_CALLS = 300      # third bound: a call ceiling beside the dollar abort (Pitfall 2)
 PAID_MODEL = "openai/gpt-4o-mini"  # deliberately PAID (D-06) — a free model can't trip a $ cap
+
+# Burn-loop tuning: a sizeable prompt + high max_tokens so each paid call costs enough
+# to reach $0.10 in a bounded number of calls (Pitfall 2 — tiny calls cost ~$0.0001).
+BIG_PROMPT = (
+    "Write an extremely long, exhaustively detailed essay — do not stop early. Cover the "
+    "complete history, core mechanics, strategy, and cultural impact of modern hobby board "
+    "games, with multiple deep paragraphs each on Catan, Carcassonne, Ticket to Ride, "
+    "Pandemic, Gloomhaven, and Terraforming Mars, plus comparisons and worked strategy "
+    "examples. Be as verbose and thorough as you possibly can."
+)
+MAX_TOKENS = 8000           # high output so each call's usage.cost is non-trivial (Pitfall 2)
+SEED_COST_PER_CALL = 0.01   # conservative starting per-call estimate; adapted from usage.cost
+RATE_LIMIT_BACKOFF_S = 5    # 429 back-off — rate limiting is NOT a guardrail trip
+INTER_BATCH_SLEEP_S = 2     # let server-side usage catch up before the between-batch reconcile
 
 
 # --- Pure, importable helpers (zero spend, zero network) -----------------
@@ -111,6 +130,40 @@ def format_block_record(code: int, body: str, running_total: float) -> str:
     return scrub_secrets(line)
 
 
+# --- Live spend poll (mirror routers/keys.py:135-165 — scrubbed, no traceback log) ----
+
+def poll_key_usage(owner_key: str) -> tuple[float | None, float | None]:
+    """Read cumulative spend + (informational) remaining limit from GET /api/v1/key.
+
+    Mirrors routers/keys.py:135-165 — a scrubbed warning with NO error-traceback
+    logging (a traceback could capture the Bearer key, T-999.2-04) and ``del key`` in ``finally``
+    so the plaintext key can't ride a later failure into stack-frame locals. Returns
+    ``(usage_usd, limit_remaining)``; either may be ``None``.
+    """
+    key = owner_key
+    usage = None
+    remaining = None
+    try:
+        resp = httpx.get(
+            "https://openrouter.ai/api/v1/key",
+            headers={"Authorization": f"Bearer {key}"},
+            timeout=15,
+        )
+        resp.raise_for_status()
+        data = resp.json().get("data") or {}
+        usage = data.get("usage")
+        remaining = data.get("limit_remaining")
+        if remaining is not None and not isinstance(remaining, (int, float)):
+            remaining = None
+    except (httpx.HTTPError, ValueError, TypeError, AttributeError) as e:
+        # NO error-traceback logging — a traceback could capture the Bearer header / key (T-999.2-04).
+        print(scrub_secrets(f"WARNING: /api/v1/key poll failed: {e}"))
+    finally:
+        # Drop the plaintext key from this frame ASAP (mirror keys.py:162-165).
+        del key
+    return usage, remaining
+
+
 # --- Safety gate (no repo analog — stdlib argparse; refuse-by-default) ----
 
 def _build_arg_parser() -> argparse.ArgumentParser:
@@ -155,9 +208,104 @@ def main() -> int:
     # Gate first: ZERO network until BOTH --confirm and the prod env are present.
     assert_safe_to_spend(args.confirm)
 
-    # The live pre-flight poll + serial adaptive burn loop land in Task 3, all behind
-    # this gate so nothing spends without --confirm + ENV_FILE=.env.prod.
-    return 0
+    # --- Everything below this line spends REAL money (behind the gate) ---------
+
+    settings = get_settings()
+    owner_key = settings.resolved_llm_api_key  # @property — BARE, never logged
+    if not owner_key:
+        print(scrub_secrets("REFUSING TO RUN: no owner key resolved from .env.prod."))
+        return 1
+
+    # trace=False keeps burn traffic OUT of the prod LangSmith project (Pitfall 5).
+    client = get_llm_client(api_key=owner_key, trace=False)
+
+    # PRE-FLIGHT (D-03 defensive + Pitfall 6): read the STARTING cumulative spend
+    # BEFORE any paid call so Plan 02 measures the delta from a known baseline.
+    start_usage, start_remaining = poll_key_usage(owner_key)
+    print(scrub_secrets(
+        f"pre-flight baseline: usage=${start_usage} limit_remaining={start_remaining}"
+    ))
+    # If the key reports a remaining limit below the $0.25 abort headroom, the account
+    # may hit an account-empty 402 BEFORE the guardrail (Pitfall 6) — abort first.
+    if isinstance(start_remaining, (int, float)) and start_remaining < HARD_ABORT:
+        print(scrub_secrets(
+            f"ABORT: limit_remaining=${start_remaining} < ${HARD_ABORT} hard-abort headroom — "
+            "the account may hit account-empty 402 before the guardrail; top up before running."
+        ))
+        return 1
+
+    running_total = 0.0
+    calls = 0
+    observed_max_cost = SEED_COST_PER_CALL  # adapt upward from the real per-call usage.cost
+
+    while True:
+        abort = should_abort(running_total, calls)
+        if abort is not None:
+            # SEC-03 BLOCKER: the guardrail did NOT trip within the safety bounds.
+            print(scrub_secrets(
+                f"SEC-03 BLOCKER ({abort}): spent ${running_total:.4f} over {calls} calls "
+                "with NO guardrail block — DO NOT enable the demo fallback in prod."
+            ))
+            return 1
+
+        batch = next_batch_size(running_total, observed_max_cost)
+        for _ in range(batch):
+            try:
+                resp = client.chat.completions.create(
+                    model=PAID_MODEL,
+                    messages=[{"role": "user", "content": BIG_PROMPT}],
+                    max_tokens=MAX_TOKENS,
+                )
+            except openai.APIStatusError as e:
+                code = getattr(e, "status_code", None)
+                # Scrub the body so neither the key nor an echoed token survives; the
+                # body text also lets the operator tell a guardrail block apart from an
+                # account-empty 402 (Pitfall 6). NO error-traceback logging anywhere (T-999.2-04).
+                body = scrub_secrets(
+                    getattr(getattr(e, "response", None), "text", "") or str(e)
+                )
+                kind = classify_status(code) if isinstance(code, int) else "unexpected"
+                if kind == "blocked":
+                    # 402/403 — the SEC-03 trip signal (PASS for the block condition).
+                    print(format_block_record(code, body, running_total))
+                    print(scrub_secrets(
+                        f"SEC-03 PASS (block): guardrail BLOCKED at status={code} after "
+                        f"${running_total:.4f} over {calls} calls. Operator: check the "
+                        "OpenRouter account inbox for an email (D-04 #3 — 'no email' is an "
+                        "ACCEPTED finding)."
+                    ))
+                    return 0
+                if kind == "rate_limited":
+                    # 429 — back off and keep probing; NOT the cost guardrail.
+                    print(scrub_secrets(
+                        f"rate-limited (status={code}) — backing off {RATE_LIMIT_BACKOFF_S}s "
+                        "(NOT a guardrail trip)"
+                    ))
+                    time.sleep(RATE_LIMIT_BACKOFF_S)
+                    continue
+                # unexpected (400/401/404/5xx) — surface scrubbed and stop.
+                print(scrub_secrets(f"UNEXPECTED status={code}: {body}"))
+                return 1
+
+            usage = getattr(resp, "usage", None)
+            call_cost = getattr(usage, "cost", 0.0) or 0.0  # USD, always present now
+            running_total += call_cost
+            calls += 1
+            observed_max_cost = max(observed_max_cost, call_cost)
+            print(scrub_secrets(
+                f"call {calls}: cost=${call_cost:.5f} running_total=${running_total:.4f}"
+            ))
+
+            # In-batch safety re-check so a cost spike can't blow past the bounds.
+            if should_abort(running_total, calls) is not None:
+                break
+
+        # Between-batch reconciliation cross-check against the server-side total.
+        server_usage, _ = poll_key_usage(owner_key)
+        print(scrub_secrets(
+            f"reconcile: per-call sum=${running_total:.4f} server usage=${server_usage}"
+        ))
+        time.sleep(INTER_BATCH_SLEEP_S)
 
 
 if __name__ == "__main__":
