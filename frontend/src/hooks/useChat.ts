@@ -261,7 +261,15 @@ export function useChat(threadId: string | null) {
                 // Backend yielded `event: error / data: {error}` — in-band SSE error path
                 // (e.g. upstream LLM 401). Throw so the outer catch handles
                 // bubble + toast + Sentry uniformly (UI-SPEC Surface 2).
-                throw new Error(typeof parsed.error === 'string' ? parsed.error : 'Chat stream error')
+                // IN-02: default an empty/non-string code to 'upstream_error'. The outer
+                // `catch (parseErr)` only re-throws when `parseErr.message` is truthy, so a
+                // bare `new Error('')` (e.g. the generic Exception path yields {"error": ""})
+                // would be silently swallowed as an unparseable line — leaving an empty
+                // assistant bubble with no error surface. A non-empty code keeps it on the
+                // generic error path (toast + bubble).
+                throw new Error(
+                  typeof parsed.error === 'string' && parsed.error ? parsed.error : 'upstream_error'
+                )
               }
             } catch (parseErr) {
               // Re-throw structured chat errors; swallow JSON.parse failures on truncated lines.
