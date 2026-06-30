@@ -131,16 +131,31 @@ async def balance(user_id: str = Depends(get_user_id)) -> BalanceResponse:
             timeout=15,
         )
         resp.raise_for_status()
-    except httpx.HTTPError as e:
-        # NO exc_info — the traceback could capture the Bearer header (T-14-02).
+        # Parse + validate INSIDE the protected block (CR-01). An abnormal-but-2xx
+        # provider body must NOT escape as an unhandled 500 — Starlette would log it
+        # with exc_info and the still-live decrypted `key` local would land in the
+        # traceback's stack-frame locals (defeats T-14-02). Three realistic bodies
+        # raise here and are NOT httpx.HTTPError:
+        #   - non-JSON body            → resp.json() raises json.JSONDecodeError (ValueError)
+        #   - {"data": null}           → `or {}` keeps None.get(...) from raising (AttributeError)
+        #   - non-numeric limit_remaining → coerced to None so `< threshold` can't raise TypeError
+        data = resp.json().get("data") or {}
+        remaining = data.get("limit_remaining")
+        if remaining is not None and not isinstance(remaining, (int, float)):
+            remaining = None
+    except (httpx.HTTPError, ValueError, TypeError, AttributeError) as e:
+        # NO exc_info — the traceback could capture the Bearer header / key (T-14-02).
+        # Every provider/parse failure maps to the SAME fixed, scrubbed generic 502.
         logger.warning(f"balance fetch failed: {scrub_secrets(str(e))}")
         raise HTTPException(
             status_code=502,
             detail="Couldn't fetch the OpenRouter balance.",
         )
+    finally:
+        # Drop the plaintext key from this frame ASAP so no later (post-try) failure
+        # can ride it into an exc_info traceback's stack-frame locals (T-14-02).
+        del key
 
-    data = resp.json().get("data", {})
-    remaining = data.get("limit_remaining")
     threshold = get_settings().low_balance_threshold_usd
     is_low = remaining is not None and remaining < threshold
     # Return ONLY the derived non-secret fields — never resp.json()/resp.text/data.label.

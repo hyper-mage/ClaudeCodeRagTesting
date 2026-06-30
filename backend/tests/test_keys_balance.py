@@ -15,6 +15,7 @@ before the import lands in Task 3) and httpx.get (build a real httpx.Response th
 way test_error_surfacing._status_error does). Function names match the RESEARCH
 Test Map verbatim.
 """
+import logging
 from unittest.mock import MagicMock, patch
 
 import httpx
@@ -129,3 +130,27 @@ def test_balance_provider_error_scrubbed() -> None:
     assert resp.status_code == 502, f"expected 502, got {resp.status_code}: {resp.text}"
     # SEC-01: neither the key nor a raw provider message leaks into the response detail.
     assert "sk-or-" not in resp.text
+
+
+def _bad_json_response(status_code: int = 200) -> httpx.Response:
+    """A 2xx OpenRouter response whose body is NOT JSON, so resp.json() raises
+    json.JSONDecodeError (a ValueError subclass)."""
+    req = httpx.Request("GET", "https://openrouter.ai/api/v1/key")
+    return httpx.Response(status_code, content=b"<html>not json</html>", request=req)
+
+
+def test_balance_malformed_body(caplog) -> None:
+    """CR-01: a malformed-but-2xx provider body must map to the fixed generic 502 —
+    NOT an unhandled 500 whose exc_info traceback would carry the still-live decrypted
+    sk-or-… key from the handler frame's locals (T-14-02). The key appears in NEITHER
+    the response NOR the logs on this parse-failure path."""
+    mock_db = _balance_db({"encrypted_key": "ENCRYPTED"})
+    httpx_mock = MagicMock(return_value=_bad_json_response(200))
+
+    with caplog.at_level(logging.WARNING):
+        resp = _get_balance(mock_db, httpx_mock)
+
+    assert resp.status_code == 502, f"expected 502, got {resp.status_code}: {resp.text}"
+    # SEC-01 / T-14-02: the decrypted key leaks into neither the response nor the logs.
+    assert "sk-or-" not in resp.text
+    assert "sk-or-" not in caplog.text
