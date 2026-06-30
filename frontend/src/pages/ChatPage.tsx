@@ -3,8 +3,6 @@ import ThreadSidebar, { ThreadListContent } from '../components/ThreadSidebar'
 import ChatContainer from '../components/ChatContainer'
 import MobileTopBar from '../components/MobileTopBar'
 import MobileDrawer from '../components/MobileDrawer'
-import DefaultModelSelector from '../components/DefaultModelSelector'
-import ThemeToggle from '../components/ThemeToggle'
 import { IconNavRow } from '../components/IconSidebar'
 import type { ModelResponse } from '../components/ModelSelector'
 import { apiFetch } from '../lib/api'
@@ -26,9 +24,8 @@ export default function ChatPage() {
   const [threads, setThreads] = useState<Thread[]>([])
   const [activeThreadId, setActiveThreadId] = useState<string | null>(null)
   const [isDrawerOpen, setIsDrawerOpen] = useState(false)
-  // The user's default model (PREF) + the shared catalog (so the selectors resolve names without
-  // each firing its own /api/models fetch). Both hydrate from the one-time mount fetches below.
-  const [defaultModel, setDefaultModel] = useState<string | null>(null)
+  // The shared model catalog (so the per-thread selector resolves names without firing its own
+  // /api/models fetch). Hydrates from the one-time mount fetch below.
   const [models, setModels] = useState<ModelResponse[] | undefined>(undefined)
   const hamburgerRef = useRef<HTMLButtonElement>(null)
   const closeDrawer = () => setIsDrawerOpen(false)
@@ -66,16 +63,16 @@ export default function ChatPage() {
     return () => { cancelled = true }
   }, [])
 
-  // Post-login theme reconcile + default-model hydrate (Pitfall 6 / D-04). GET /api/preferences
-  // once on mount: if the server theme differs from the current (localStorage-derived) class,
-  // the server wins — write localStorage + re-apply (a one-frame snap is acceptable per D-02).
-  // Best-effort: a failed GET leaves the localStorage-painted theme untouched.
+  // Post-login theme reconcile (Pitfall 6 / D-04). GET /api/preferences once on mount: if the
+  // server theme differs from the current (localStorage-derived) class, the server wins — write
+  // localStorage + re-apply (a one-frame snap is acceptable per D-02). The default-model hydrate
+  // now lives in SettingsPage (D-06 relocation). Best-effort: a failed GET leaves the
+  // localStorage-painted theme untouched.
   useEffect(() => {
     let cancelled = false
     apiFetch('/api/preferences')
-      .then((prefs: { theme?: string | null; default_model?: string | null } | null) => {
+      .then((prefs: { theme?: string | null } | null) => {
         if (cancelled || !prefs) return
-        if (prefs.default_model !== undefined) setDefaultModel(prefs.default_model ?? null)
         const serverTheme = prefs.theme === 'dark' || prefs.theme === 'light' ? prefs.theme : null
         if (serverTheme) {
           const current = document.documentElement.classList.contains('dark') ? 'dark' : 'light'
@@ -169,18 +166,6 @@ export default function ChatPage() {
   const activeThread = threads.find(t => t.id === activeThreadId)
   const topBarTitle = activeThread?.title || (activeThreadId ? 'New Chat' : 'Chat')
 
-  // The default-model control + theme toggle — a temporary inline cluster reused by the desktop
-  // sidebar footer and the mobile drawer (UI-SPEC § Components; Phase 14 moves it to settings).
-  const prefsControls = (
-    <div className="flex flex-col gap-3">
-      <DefaultModelSelector value={defaultModel} onChange={setDefaultModel} models={models} />
-      <div className="flex items-center justify-between">
-        <span className="text-base font-semibold text-gray-900 dark:text-white">Theme</span>
-        <ThemeToggle />
-      </div>
-    </div>
-  )
-
   return (
     // Core-surface light token (D-01): white in light, gray-950 in dark.
     <div className="flex-1 bg-white text-gray-900 dark:bg-gray-950 dark:text-white flex flex-col md:flex-row overflow-hidden">
@@ -196,7 +181,6 @@ export default function ChatPage() {
         onSelectThread={setActiveThreadId}
         onNewThread={handleNewThread}
         onDeleteThread={handleDeleteThread}
-        footer={prefsControls}
       />
       <ChatContainer
         messages={messages}
@@ -216,7 +200,6 @@ export default function ChatPage() {
           onSelectThread={(id) => { setActiveThreadId(id); closeDrawer() }}
           onNewThread={async () => { await handleNewThread(); closeDrawer() }}
           onDeleteThread={handleDeleteThread}
-          footer={prefsControls}
         />
       </MobileDrawer>
     </div>
