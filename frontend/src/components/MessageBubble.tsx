@@ -24,14 +24,17 @@ function formatTokens(n: number): string {
 
 // Muted per-message cost caption (UI-SPEC § Copywriting — `${cost} · ${tokens} tok`).
 // The cost segment AND the `·` separator are omitted when usage.cost is null/absent (e.g. a
-// free model); renders nothing when there is no displayable figure at all. Locked muted token
-// `text-gray-600 dark:text-gray-400` (NOT gray-500 on white — Phase 13 contrast guardrail).
+// free model); renders nothing when there is no displayable figure at all.
+// IN-04: this caption sits inside the assistant bubble, which is `bg-gray-800` with NO light-mode
+// variant. `text-gray-600 dark:text-gray-400` left a low-contrast gray-600-on-gray-800 caption in
+// light mode. Since the bubble surface is dark in BOTH themes, use a single light token
+// (`text-gray-300`) that reads on gray-800 either way.
 function CostLine({ usage }: { usage: Usage }) {
   const costPart = usage.cost != null ? `$${usage.cost.toFixed(4)}` : null
   const tokensPart = usage.total_tokens != null ? `${formatTokens(usage.total_tokens)} tok` : null
   const text = [costPart, tokensPart].filter(Boolean).join(' · ')
   if (!text) return null
-  return <div className="text-xs text-gray-600 dark:text-gray-400 mt-1">{text}</div>
+  return <div className="text-xs text-gray-300 mt-1">{text}</div>
 }
 
 export default function MessageBubble({ role, content, toolsUsed, usage }: Props) {
