@@ -109,13 +109,20 @@ export default function SettingsPage() {
               <p className="text-xs text-gray-600 dark:text-gray-400 mt-2">
                 Balance unavailable right now.
               </p>
-            ) : balance === null ? null : balance.limit_remaining === null ? (
+            ) : balance === null ? null : !balance.connected ? (
+              // IN-01: a key deleted between the status fetch and the balance fetch returns
+              // {connected:false, limit_remaining:null}. Treat that as unavailable — NOT as
+              // "Pay-as-you-go — no limit set", which would mislabel a disconnected key.
+              <p className="text-xs text-gray-600 dark:text-gray-400 mt-2">
+                Balance unavailable right now.
+              </p>
+            ) : balance.limit_remaining === null ? (
               <p className="text-xs text-gray-600 dark:text-gray-400 mt-2">
                 Pay-as-you-go — no limit set
               </p>
             ) : (
               <p className="text-xs text-gray-600 dark:text-gray-400 mt-2">
-                Balance: ${balance.limit_remaining}
+                Balance: ${balance.limit_remaining.toFixed(2)}
               </p>
             )}
 
@@ -125,7 +132,7 @@ export default function SettingsPage() {
             {balance?.is_low && (
               <p className="flex items-center gap-1 text-xs text-amber-700 dark:text-amber-300 mt-2">
                 <AlertTriangle size={14} className="text-amber-500 shrink-0" aria-hidden="true" />
-                <span>Balance low: ${balance.limit_remaining} — add credits</span>
+                <span>Balance low: ${balance.limit_remaining?.toFixed(2)} — add credits</span>
               </p>
             )}
 
