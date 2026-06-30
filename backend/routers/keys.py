@@ -26,6 +26,7 @@ from datetime import datetime, timezone
 
 import httpx
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.concurrency import run_in_threadpool
 
 from auth import get_user_id
 from config import get_settings
@@ -125,7 +126,14 @@ async def balance(user_id: str = Depends(get_user_id)) -> BalanceResponse:
     # Decrypt in-memory for this request only — never stored, returned, or logged.
     key = decrypt_key(row.data["encrypted_key"])
     try:
-        resp = httpx.get(
+        # WR-01: balance() is async, but httpx.get is blocking. Hand the repo's
+        # established SYNC httpx.get to the threadpool so the await yields the loop —
+        # a slow/hanging OpenRouter connection can't freeze the worker (and every
+        # concurrent SSE chat stream on it) for up to the 15s timeout. We keep
+        # httpx.get (no AsyncClient invention) so the existing `patch("httpx.get", …)`
+        # test seam still holds.
+        resp = await run_in_threadpool(
+            httpx.get,
             "https://openrouter.ai/api/v1/key",
             headers={"Authorization": f"Bearer {key}"},
             timeout=15,
