@@ -107,6 +107,32 @@ def test_no_key_flag_off_refuses():
     assert model == "owner/default-model"  # still resolves a model for the error context
 
 
+def test_sec03_killswitch_no_owner_spend_when_flag_off():
+    """SEC-03 / D-05a (app-level kill switch): with demo_fallback_enabled=False and
+    NO connected user key, _resolve_key_and_model returns api_key=None — NO owner-key
+    completion is ever minted, so the owner account incurs ZERO spend on the keyless
+    path. This pins the in-our-control kill switch by requirement ID (greppable by
+    SEC-03); the provider-side $0.10 guardrail (D-05b) is the backstop proven by the
+    live burn in Plan 02. Re-asserts the contract of test_no_key_flag_off_refuses /
+    test_fail_closed_no_or_fallback under the SEC-03 name (does not replace them)."""
+    from routers import chat
+
+    db = _db_with_key_row(None)  # no user_api_keys row → keyless turn
+    settings = _fake_settings(demo_fallback_enabled=False)
+    body = MagicMock(spec=[])  # no .model attribute
+
+    with patch.object(chat, "get_settings", return_value=settings):
+        api_key, model, mode, is_user_key = chat._resolve_key_and_model(
+            db, "user-1", {"id": "t1"}, body
+        )
+
+    assert api_key is None
+    assert mode == "no_key"
+    assert is_user_key is False
+    # The owner key is NEVER returned when the flag is off and no user key exists.
+    assert api_key != settings.resolved_llm_api_key
+
+
 def test_demo_fallback_uses_free_model():
     """DEMO-03: keyless user + demo_fallback_enabled=True → owner key +
     settings.demo_fallback_model (:free slug), mode=='demo', is_user_key False."""
