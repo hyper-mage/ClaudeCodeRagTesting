@@ -1244,6 +1244,31 @@ async def send_message(
                     "The model provider refused this request. Try another model or "
                     "check your OpenRouter account.",
                 )
+            elif e.status_code == 404 or (
+                e.status_code == 400 and "no endpoints found" in str(e).lower()
+            ):
+                # model-unavailable family (FU-C). OpenRouter returns:
+                #   404 "No endpoints found for <model>"            — retired/stealth/parked
+                #                                                      model (e.g. owl-alpha)
+                #   400 "No endpoints found that support tool use"  — the agent loop ALWAYS
+                #                                                      sends tools; model has no
+                #                                                      tool-capable endpoint
+                #   400 "No endpoints found matching your data policy"
+                # The PINNED model has no live endpoint that can serve THIS request. This is NOT
+                # a key problem (no_api_key/402/403) and must NOT dead-end on the generic
+                # upstream_error Retry bubble — the user has to pick a DIFFERENT model. Distinct
+                # code so the FE renders model-specific copy + a plain Retry (no Reconnect).
+                # A static catalog filter can't fully prevent this: a model can 404 at call time
+                # even when the cached catalog looked valid. Detection is by status + OpenRouter
+                # message substring; the payload carries ONLY the fixed code/detail (scrubbed).
+                logger.warning(
+                    f"Chat model-unavailable: {scrub_secrets(str(e))}", exc_info=True
+                )
+                _mark_error_row(db, assistant_msg_id)
+                yield _sse_error(
+                    "model_unavailable",
+                    "That model isn't available right now. Pick a different model.",
+                )
             else:
                 logger.error(
                     f"Chat upstream error: {scrub_secrets(str(e))}", exc_info=True

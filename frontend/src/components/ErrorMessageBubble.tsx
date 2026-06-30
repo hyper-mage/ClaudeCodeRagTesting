@@ -4,9 +4,11 @@ import { startOpenRouterConnect } from '../lib/pkce'
 interface Props {
   onRetry: () => void
   isStreaming: boolean
-  /** Structured key-failure code (D-09). When set, the typed recovery variant renders the locked
-   *  UI-SPEC sentence + code-mapped action buttons instead of the generic Retry path. */
-  type?: 'no_api_key' | 'payment_required' | 'forbidden'
+  /** Structured typed-error code. When set, the typed variant renders the locked sentence + a
+   *  code-mapped action instead of the generic Retry path. Key-failure family (D-09:
+   *  no_api_key/payment_required/forbidden) gets recovery buttons; model_unavailable (FU-C) gets a
+   *  plain Retry (NOT a key problem — no Reconnect). */
+  type?: 'no_api_key' | 'payment_required' | 'forbidden' | 'model_unavailable'
   /** Whether demo fallback is eligible. Phase-14 prod default is false → `[Use demo]` is hidden on
    *  the 403 path; Phase 15 owns enabling demo. */
   demoEligible?: boolean
@@ -21,6 +23,7 @@ const RECOVERY_SENTENCE: Record<NonNullable<Props['type']>, string> = {
   no_api_key: 'Connect your OpenRouter account to keep chatting.',
   payment_required: 'Your key is out of credit (402).',
   forbidden: 'Your key was rejected (403).',
+  model_unavailable: "That model isn't available right now — pick a different model.",
 }
 
 // Recovery buttons reuse the existing Retry sizing (>=44px on touch, compact on desktop).
@@ -60,6 +63,37 @@ export default function ErrorMessageBubble({
             <p className="text-sm leading-[1.5]">
               The assistant ran into a problem. Try again, or rephrase your question.
             </p>
+          </div>
+          <div className="mt-2">
+            <button
+              type="button"
+              onClick={onRetry}
+              disabled={isStreaming}
+              className={`${BTN_BASE} ${BTN_PRIMARY} disabled:opacity-50 disabled:cursor-not-allowed`}
+            >
+              <RotateCw size={14} />
+              Retry
+            </button>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  if (type === 'model_unavailable') {
+    // Model-unavailable family (FU-C): the pinned model has no live endpoint for this turn (404
+    // "No endpoints found", or 400 no-tool-use / data-policy). NOT a key problem — so the typed
+    // (light+dark) bubble shows model-specific copy + a PLAIN Retry, never Reconnect/Add credits.
+    // The user switches model via the header selector, then Retry re-sends the last turn.
+    return (
+      <div className="flex justify-start mb-4">
+        <div
+          role="alert"
+          className="max-w-[85%] md:max-w-[70%] px-4 py-3 rounded-lg border bg-red-50 border-red-300 text-gray-900 dark:bg-red-950/40 dark:border-red-700 dark:text-gray-100"
+        >
+          <div className="flex items-start gap-2">
+            <AlertCircle size={16} className="text-red-600 dark:text-red-400 mt-0.5 shrink-0" />
+            <p className="text-sm leading-[1.5]">{RECOVERY_SENTENCE[type]}</p>
           </div>
           <div className="mt-2">
             <button

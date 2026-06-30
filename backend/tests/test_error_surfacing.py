@@ -187,6 +187,49 @@ def test_forbidden_code_on_403(monkeypatch):
     assert payload["error"] not in ("upstream_error", "[An error occurred]")
 
 
+def test_model_unavailable_code_on_404(monkeypatch):
+    """FU-C: a 404 "No endpoints found for <model>" (retired/stealth/parked model, e.g.
+    openrouter/owl-alpha) surfaces the distinct structured code `model_unavailable` — NOT the
+    generic upstream_error dead-end and NOT a key-failure code — so the FE renders model-specific
+    copy + a plain Retry (no Reconnect)."""
+    lines = _drive_with_raising_stream(
+        monkeypatch,
+        _status_error(404, "No endpoints found for openrouter/owl-alpha."),
+    )
+    payload = _sse_error_payload(lines)
+    assert payload["error"] == "model_unavailable"
+    assert payload["error"] not in (
+        "upstream_error",
+        "no_api_key",
+        "payment_required",
+        "forbidden",
+        "[An error occurred]",
+    )
+
+
+def test_model_unavailable_code_on_400_no_tool_endpoints(monkeypatch):
+    """FU-C: a 400 "No endpoints found that support tool use" (the agent loop ALWAYS sends a
+    tools array; the pinned model has no tool-capable endpoint) ALSO maps to `model_unavailable`
+    via the OpenRouter message marker — same family as the 404."""
+    lines = _drive_with_raising_stream(
+        monkeypatch,
+        _status_error(400, "No endpoints found that support tool use."),
+    )
+    payload = _sse_error_payload(lines)
+    assert payload["error"] == "model_unavailable"
+
+
+def test_generic_400_stays_upstream_error(monkeypatch):
+    """A plain 400 WITHOUT the OpenRouter "No endpoints found" marker must NOT be misclassified
+    as model_unavailable — it remains the generic upstream_error so we don't over-claim a
+    model-availability problem on unrelated bad requests."""
+    lines = _drive_with_raising_stream(
+        monkeypatch, _status_error(400, "invalid request: bad parameter")
+    )
+    payload = _sse_error_payload(lines)
+    assert payload["error"] == "upstream_error"
+
+
 def test_logging_filter_scrubs_exc_info():
     """SEC-01 (logs closure): the _ScrubFilter (plan 11-04 Task 2) scrubs the
     FORMATTED record including the exc_info traceback — not just getMessage().

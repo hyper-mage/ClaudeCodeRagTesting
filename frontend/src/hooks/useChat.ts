@@ -41,9 +41,11 @@ export interface Message {
   toolsUsed?: ToolEvent[]
   // Per-message cost/tokens (live done.usage + reloaded). Drives the cost caption (Wave 3 Plan 04).
   usage?: Usage
-  // Structured key-failure code (D-09). When set, the typed ErrorMessageBubble (Wave 3) supplies
-  // the locked recovery copy from the code — `content` stays empty and NO toast fired.
-  errorType?: 'no_api_key' | 'payment_required' | 'forbidden'
+  // Structured typed-error code. When set, the typed ErrorMessageBubble supplies the locked copy
+  // from the code — `content` stays empty and NO toast fires (single in-thread surface). Covers the
+  // key-failure family (D-09: no_api_key/payment_required/forbidden) AND the model-unavailable
+  // family (FU-C: a 404/400 "No endpoints found" — pinned model has no live endpoint for this turn).
+  errorType?: 'no_api_key' | 'payment_required' | 'forbidden' | 'model_unavailable'
 }
 
 export function useChat(threadId: string | null) {
@@ -291,21 +293,23 @@ export function useChat(threadId: string | null) {
       // (RESEARCH § Pitfall 4 / Standard Stack).
       Sentry.captureException(err)
 
-      // The error SSE branch throws the structured CODE as err.message. A typed key-failure code
-      // (D-09) drives the typed recovery bubble (Wave 3) and suppresses the toast; every other code
-      // (rate_limit, upstream_error) and any network error keeps the generic copy + toast.
-      const KEY_FAILURE_CODES: ReadonlyArray<NonNullable<Message['errorType']>> = [
+      // The error SSE branch throws the structured CODE as err.message. A typed code drives the
+      // typed ErrorMessageBubble and suppresses the toast (single in-thread surface): the key-failure
+      // family (D-09: no_api_key/payment_required/forbidden) AND model_unavailable (FU-C). Every
+      // other code (rate_limit, upstream_error) and any network error keeps the generic copy + toast.
+      const TYPED_ERROR_CODES: ReadonlyArray<NonNullable<Message['errorType']>> = [
         'no_api_key',
         'payment_required',
         'forbidden',
+        'model_unavailable',
       ]
       const code = err instanceof Error ? err.message : ''
-      const errorType = KEY_FAILURE_CODES.find(c => c === code)
+      const errorType = TYPED_ERROR_CODES.find(c => c === code)
 
       // Replace the empty assistant placeholder with an in-thread error bubble.
-      // Typed key-failure path: stamp errorType + empty content (the bubble renders locked copy from
-      // the code, never parsed.detail — Pitfall 3 / T-14-08). Generic path: locked copy per
-      // UI-SPEC § Surface 2 + § Copywriting Contract.
+      // Typed path (key-failure D-09 OR model_unavailable FU-C): stamp errorType + empty content
+      // (the bubble renders locked copy from the code, never parsed.detail — Pitfall 3 / T-14-08).
+      // Generic path: locked copy per UI-SPEC § Surface 2 + § Copywriting Contract.
       setMessages(prev =>
         prev.map(m => {
           if (m.id !== assistantId) return m
