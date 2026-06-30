@@ -25,7 +25,9 @@ findings:
   warning: 2
   info: 4
   total: 7
-status: issues_found
+status: resolved
+resolved: 2026-06-29
+resolution: all 6 findings fixed (CR-01, WR-01, WR-02, IN-01, IN-02, IN-03, IN-04)
 ---
 
 # Phase 14: Code Review Report
@@ -46,6 +48,8 @@ However, there is **one BLOCKER**: the balance handler parses the OpenRouter res
 ## Critical Issues
 
 ### CR-01: Balance proxy parses the provider response outside `try/except` — decrypted key can leak into a 500 traceback
+
+**Status:** Resolved — commit `6f339af`. Parsing + numeric validation moved inside the protected block; except broadened to `(httpx.HTTPError, ValueError, TypeError, AttributeError)`; `del key` in a `finally` drops the plaintext from the frame; added `test_balance_malformed_body` asserting a non-JSON 2xx body yields a generic 502 with no `sk-or-` in the response or logs.
 
 **File:** `backend/routers/keys.py:126-147`
 **Issue:**
@@ -104,6 +108,8 @@ Also consider wrapping `decrypt_key()` in the same protective mapping. (The exis
 
 ### WR-01: Synchronous `httpx.get` inside the async `balance` handler blocks the event loop
 
+**Status:** Resolved — commit `19d08cf`. The sync `httpx.get` now runs via `fastapi.concurrency.run_in_threadpool`, so the `await` yields the loop. Kept the established sync-httpx pattern (no AsyncClient) so the existing `patch("httpx.get", …)` test seam still holds.
+
 **File:** `backend/routers/keys.py:128-132`
 **Issue:** `balance()` is `async def`, but it calls the blocking, synchronous `httpx.get(..., timeout=15)`. A slow or hanging OpenRouter connection freezes the entire async worker for up to 15 seconds, stalling all concurrent requests on that worker — including in-flight SSE chat streams. This is an availability/robustness concern (distinct from throughput): one stuck provider call degrades unrelated users. The impact compounds with WR-02 (multiple simultaneous balance calls per page mount).
 **Fix:** Use an async client so the await yields the loop, e.g.:
@@ -121,6 +127,8 @@ async with httpx.AsyncClient(timeout=15) as client:
 
 ### WR-02: `useKeyStatus` fires duplicate `/api/keys/balance` calls from every mounted instance
 
+**Status:** Resolved — commit `9497fb1`. Status/balance hoisted into a module-level shared store with subscriber notification and in-flight promise dedup, so one `/status` and one `/balance` serve every mounted instance. On-demand semantics (no polling/Realtime), connected-gated balance fetch, and `notifyKeyStatusChanged` broadcast all preserved.
+
 **File:** `frontend/src/hooks/useKeyStatus.ts:39-95`
 **Issue:** `useKeyStatus` holds per-component state with no shared cache/context. `IconSidebar` (desktop rail, `md:flex`) and `MobileTopBar` (`md:hidden`) are **both** mounted in the DOM on every page regardless of viewport, and `SettingsPage` adds a third instance. Each instance independently fires `GET /api/keys/status` *and* `GET /api/keys/balance` on mount and on every `notifyKeyStatusChanged()` broadcast. Because `/balance` proxies to OpenRouter server-side, navigating to Settings triggers ~3 simultaneous authenticated OpenRouter round-trips for the same data — multiplying the user's OpenRouter API usage and risking their key's own rate limits, and amplifying WR-01's event-loop blocking. (This is not a polling violation — it is on-demand — but it is redundant.)
 **Fix:** Hoist the status/balance fetch into a shared context/provider (or a module-level cache with subscriber dedup) so the persistent dots and the Settings page read one fetched value, with a single `refresh`/`refreshBalance` per broadcast.
@@ -129,11 +137,15 @@ async with httpx.AsyncClient(timeout=15) as client:
 
 ### IN-01: `SettingsPage` balance line ignores `balance.connected`, mislabeling a disconnected balance as "Pay-as-you-go"
 
+**Status:** Resolved — commit `67de286`. Added a `!balance.connected` branch (rendering the unavailable copy) ahead of the pay-as-you-go check.
+
 **File:** `frontend/src/pages/SettingsPage.tsx:112-120`
 **Issue:** The cascade treats `balance.limit_remaining === null` as "Pay-as-you-go — no limit set" without checking `balance.connected`. If the key row is deleted between the status fetch and the balance fetch (a narrow race), `/balance` returns `{connected:false, limit_remaining:null}` while the connected block still renders (driven by `status?.connected`), so the user sees "Pay-as-you-go — no limit set" for a key that is actually disconnected.
 **Fix:** Gate the pay-as-you-go branch on `balance.connected === true && balance.limit_remaining === null`, and treat `connected === false` as the unavailable/disconnected case.
 
 ### IN-02: In-band SSE error with an empty `error` string is silently swallowed
+
+**Status:** Resolved — commit `f563f48`. An empty or non-string error code now defaults to `'upstream_error'` before throwing, so the thrown `Error` always has a truthy `message` and reaches the generic error path (bubble + toast) instead of being swallowed.
 
 **File:** `frontend/src/hooks/useChat.ts:260-272`
 **Issue:** The error branch does `throw new Error(parsed.error)`. The `catch (parseErr)` re-throws only when `parseErr.message` is truthy. If the backend ever yields `{"error": ""}` (e.g. the generic `Exception` path at `chat.py:1262` when `str(e)` is empty), the thrown `Error("")` has a falsy `message` and is swallowed as if it were an unparseable line. The assistant placeholder then stays empty with no error bubble and no toast.
@@ -141,11 +153,15 @@ async with httpx.AsyncClient(timeout=15) as client:
 
 ### IN-03: Balance amounts rendered as raw floats
 
+**Status:** Resolved — commit `67de286`. Both the balance and low-balance lines render the reported amount via `toFixed(2)` (display-only formatting, no client-side recompute).
+
 **File:** `frontend/src/pages/SettingsPage.tsx:118,128`
 **Issue:** `Balance: ${balance.limit_remaining}` and `Balance low: ${balance.limit_remaining}` interpolate the raw number. OpenRouter can report a long-precision float (e.g. `4.873291...`), producing an awkward caption. This is an intentional "render as reported, never recompute" choice, but display *formatting* (not cost recomputation) would read cleaner.
 **Fix:** Apply a display-only format, e.g. `${balance.limit_remaining.toFixed(2)}`, which does not violate the "no client recompute" rule (it is the same reported value, formatted).
 
 ### IN-04: New cost caption's light-mode color sits on a fixed-dark bubble surface
+
+**Status:** Resolved — commit `81f6c93`. `CostLine` now uses a single `text-gray-300` token that reads on the fixed `bg-gray-800` assistant bubble in both themes.
 
 **File:** `frontend/src/components/MessageBubble.tsx:34` (and `:44-48`)
 **Issue:** `CostLine` uses `text-gray-600 dark:text-gray-400`, chosen (per its comment) to avoid "gray-500 on white." But the assistant bubble it renders inside is `bg-gray-800` with no light-mode variant (line 44-48), so in light mode the caption is `text-gray-600` (#4b5563) on `bg-gray-800` (#1f2937) — low contrast. In the default dark theme this is fine; only the light-theme + assistant-bubble combination is affected. (The dark-only bubble surface itself is pre-existing.)
