@@ -266,5 +266,5 @@ Phases execute in numeric order: 9 → 10 → 11 → 12 → 13 → 14 → 15 (Ph
 | 11. Per-Request Key + Model Resolution | v1.2 | 4/4 | Complete   | 2026-06-23 |
 | 12. Model Cache + Catalog | v1.2 | 4/4 | Complete    | 2026-06-23 |
 | 13. Preferences + Per-Thread Model | v1.2 | 6/6 | Complete   | 2026-06-25 |
-| 14. Usage/Cost + Settings/Key-State UX | v1.2 | 5/5 | Complete   | 2026-06-30 |
+| 14. Usage/Cost + Settings/Key-State UX | v1.2 | 5/5 | Complete    | 2026-06-30 |
 | 15. Options UI Capstone + Demo Gating | v1.2 | 0/TBD | Not started | - |

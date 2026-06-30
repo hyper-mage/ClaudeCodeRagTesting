@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: User Options & BYOK
-status: executing
-stopped_at: Phase 14 Wave 1 interrupted by weekly quota cap — 14-01 Task 1 (Wave-0 RED tests) committed (c76ae8f), Tasks 2-3 (MessageResponse.usage + 401/403 branches; balance endpoint + config) PENDING; no SUMMARY yet
-last_updated: "2026-06-29T20:08:04.254Z"
+status: ready_to_plan
+stopped_at: Phase 14 complete (5/5) — ready to discuss Phase 999.1
+last_updated: 2026-06-30T16:25:13.723Z
 last_activity: 2026-06-26 -- Phase 14 execution started
 progress:
   total_phases: 9
   completed_phases: 6
   total_plans: 29
-  completed_plans: 24
+  completed_plans: 29
   percent: 67
 ---
 
@@ -21,15 +21,15 @@ progress:
 See: .planning/PROJECT.md (updated 2026-05-20 after v1.1 completion)
 
 **Core value:** The agent can intelligently search and reason across a structured board game knowledge base -- finding rules, comparing mechanics, and recommending games -- using the right tool for the job, transparently.
-**Current focus:** Phase 14 — Usage/Cost Display + Settings/Key-State UX
+**Current focus:** Phase 999.1 — chat empty state ux
 
 ## Current Position
 
-Phase: 14 (Usage/Cost Display + Settings/Key-State UX) — EXECUTING
-Plan: 1 of 5
-Status: Executing Phase 14
+Phase: 999.1
+Plan: Not started
+Status: Ready to plan
 Progress: [█████████░] 92%
-Last activity: 2026-06-26 -- Phase 14 execution started
+Last activity: 2026-06-30
 
 ## Performance Metrics
 

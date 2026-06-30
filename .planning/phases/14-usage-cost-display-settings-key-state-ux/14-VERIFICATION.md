@@ -1,7 +1,8 @@
 ---
 phase: 14-usage-cost-display-settings-key-state-ux
 verified: 2026-06-30T02:33:27Z
-status: human_needed
+status: verified
+human_verified: 2026-06-30  # all 6 UAT items approved by human; 4 follow-ups → 14-HUMAN-UAT.md Gaps
 score: 6/6 must-haves verified
 overrides_applied: 0
 re_verification:

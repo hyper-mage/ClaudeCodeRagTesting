@@ -28,10 +28,10 @@ Requirements for this milestone. Each maps to a roadmap phase (continues numberi
 
 ### Usage & Cost (COST)
 
-- [ ] **COST-01**: User sees the cost of each message (from OpenRouter `usage.cost`)
-- [ ] **COST-02**: User sees their OpenRouter account balance (via `GET /api/v1/key`)
-- [ ] **COST-03**: User is warned when their balance is low
-- [ ] **COST-04**: User sees a running cost total per chat thread
+- [x] **COST-01**: User sees the cost of each message (from OpenRouter `usage.cost`)
+- [x] **COST-02**: User sees their OpenRouter account balance (via `GET /api/v1/key`)
+- [x] **COST-03**: User is warned when their balance is low
+- [x] **COST-04**: User sees a running cost total per chat thread
 
 ### Demo Fallback (DEMO)
 
@@ -41,7 +41,7 @@ Requirements for this milestone. Each maps to a roadmap phase (continues numberi
 
 ### Preferences & UI (PREF)
 
-- [ ] **PREF-01**: User can access a settings/account page (key status, default model, theme, profile)
+- [x] **PREF-01**: User can access a settings/account page (key status, default model, theme, profile)
 - [x] **PREF-02**: User can toggle light/dark theme, persisted per user
 
 ### Security Hardening (SEC)
@@ -101,14 +101,14 @@ Each requirement maps to exactly one phase. Phases continue numbering from v1.1 
 | MODEL-06 | Phase 13 | Complete |
 | MODEL-07 | Phase 12 | Complete |
 | MODEL-08 | Phase 15 | Pending |
-| COST-01 | Phase 14 | Pending |
-| COST-02 | Phase 14 | Pending |
-| COST-03 | Phase 14 | Pending |
-| COST-04 | Phase 14 | Pending |
+| COST-01 | Phase 14 | Complete |
+| COST-02 | Phase 14 | Complete |
+| COST-03 | Phase 14 | Complete |
+| COST-04 | Phase 14 | Complete |
 | DEMO-01 | Phase 15 | Pending |
 | DEMO-02 | Phase 15 | Pending |
 | DEMO-03 | Phase 11 | Pending |
-| PREF-01 | Phase 14 | Pending |
+| PREF-01 | Phase 14 | Complete |
 | PREF-02 | Phase 13 | Complete |
 | SEC-01 | Phase 11 | Pending |
 | SEC-02 | Phase 9 | Complete |
