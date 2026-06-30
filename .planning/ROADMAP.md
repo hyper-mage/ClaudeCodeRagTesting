@@ -36,7 +36,7 @@ Full phase detail archived in `milestones/v1.1-ROADMAP.md`. Audit: passed, 23/23
 - [x] **Phase 12: Model Cache + Catalog** - Searchable, auto-refreshing model list with free/paid + popularity + price hints
  (completed 2026-06-23)
 - [x] **Phase 13: Preferences + Per-Thread Model** - Default model, per-thread model selection, persisted theme storage (completed 2026-06-25)
-- [ ] **Phase 14: Usage/Cost Display + Settings/Key-State UX** - Per-message cost, balance, low-balance warning, per-thread totals, settings page
+- [x] **Phase 14: Usage/Cost Display + Settings/Key-State UX** - Per-message cost, balance, low-balance warning, per-thread totals, settings page (completed 2026-06-30)
 - [ ] **Phase 15: Options UI Capstone + Demo-Fallback Gating** - Model picker, favorites, key-gated selection, demo banner, demo-fallback flag (gated on SEC-03)
 
 ## Phase Details
@@ -207,9 +207,9 @@ Plans:
 
 **Wave 3** *(blocked on Wave 2 — three parallel plans, disjoint files)*
 
-- [ ] 14-03-PLAN.md — chat render surfaces: per-message cost caption (MessageBubble) + typed recovery bubble (ErrorMessageBubble) + Σ thread total + usage/type passthrough (ChatContainer)
-- [ ] 14-04-PLAN.md — amber low-balance status dot (IconSidebar + MobileTopBar tri-state)
-- [ ] 14-05-PLAN.md — settings consolidation: SettingsPage grow to 3 theme-aware sections (tri-state copy + balance/warning lines + relocated Default model + Theme) + ChatPage prefsControls removal
+- [x] 14-03-PLAN.md — chat render surfaces: per-message cost caption (MessageBubble) + typed recovery bubble (ErrorMessageBubble) + Σ thread total + usage/type passthrough (ChatContainer)
+- [x] 14-04-PLAN.md — amber low-balance status dot (IconSidebar + MobileTopBar tri-state)
+- [x] 14-05-PLAN.md — settings consolidation: SettingsPage grow to 3 theme-aware sections (tri-state copy + balance/warning lines + relocated Default model + Theme) + ChatPage prefsControls removal
 
 ### Phase 15: Options UI Capstone + Demo-Fallback Gating
 
@@ -266,5 +266,5 @@ Phases execute in numeric order: 9 → 10 → 11 → 12 → 13 → 14 → 15 (Ph
 | 11. Per-Request Key + Model Resolution | v1.2 | 4/4 | Complete   | 2026-06-23 |
 | 12. Model Cache + Catalog | v1.2 | 4/4 | Complete    | 2026-06-23 |
 | 13. Preferences + Per-Thread Model | v1.2 | 6/6 | Complete   | 2026-06-25 |
-| 14. Usage/Cost + Settings/Key-State UX | v1.2 | 2/5 | In Progress|  |
+| 14. Usage/Cost + Settings/Key-State UX | v1.2 | 5/5 | Complete   | 2026-06-30 |
 | 15. Options UI Capstone + Demo Gating | v1.2 | 0/TBD | Not started | - |
