@@ -43,6 +43,7 @@ Last activity: 2026-07-02
 
 ### Roadmap Evolution
 
+- Phase 15 added 2026-07-02: Options UI Capstone + Demo Gating — recreated after v1.2 audit found it orphaned (ROADMAP.md remnant lost the Phases 9-15 list); carries KEY-05, MODEL-08, DEMO-01, DEMO-02, SEC-03 per REQUIREMENTS.md traceability + audit fold-ins B-1 (MODEL-03 popular-mark render) and W-1 (MODEL-01 picker search).
 - v1.2 roadmap created 2026-06-18: 7 phases (9-15), continuing numbering from v1.1 (which ended at Phase 8 + inserted 6.1). Standard granularity. Phase shape follows the research-recommended dependency-ordered build sequence: crypto/storage → OAuth → per-request resolution (critical-path 9-10-11), model cache parallelizable (12), prefs/thread-model (13), usage-cost/settings (14), options-UI capstone + demo-fallback gating last (15).
 - Phase 06.1 inserted after Phase 6 (v1.1): mobile-responsive-chat-layout — always-visible w-64 sidebar ate the mobile viewport; decimal phase kept numbering clean. Verified 2026-05-15.
 
