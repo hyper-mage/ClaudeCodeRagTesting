@@ -1,7 +1,8 @@
 ---
 phase: 15
 slug: options-ui-capstone-demo-gating
-status: draft
+status: approved
+reviewed_at: 2026-07-02
 shadcn_initialized: false
 preset: none
 created: 2026-07-02
