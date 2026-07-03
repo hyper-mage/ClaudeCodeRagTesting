@@ -14,11 +14,22 @@ Plans:
 **Plans:** 8 plans
 
 Plans:
+**Wave 1**
+
 - [ ] 15-01-PLAN.md — Migration 033 + schema fields + favorite_models roundtrip + demo_enabled in both status branches + [BLOCKING] dev db push (wave 1)
 - [ ] 15-02-PLAN.md — chat.py demo resolution: _demo_model_for free-guard + flag-gated use_demo override, SEC-03 killswitch tests pinned green (wave 1)
 - [ ] 15-03-PLAN.md — OAuthCallbackPage one-shot pending-selection resume + combined toasts + new page test file (wave 1)
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
 - [ ] 15-04-PLAN.md — Picker rebuild: hand-rolled fuzzy matcher, Favorites/Popular/All sections, Popular chip (B-1), search + combobox a11y migration (W-1) (wave 2)
 - [ ] 15-05-PLAN.md — useKeyGate shared gate + ConfirmDialog primary variant + both-surface wiring + stale-stash hygiene (KEY-05) (wave 2)
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
 - [ ] 15-06-PLAN.md — Favorite star + optimistic whole-array PUT persistence + Shift+Enter (MODEL-08) (wave 3)
 - [ ] 15-07-PLAN.md — Demo banner (locked copy, non-dismissible) + mode:"demo" signal read + [Use demo] 403 recovery wiring (wave 3)
+
+**Wave 4** *(blocked on Wave 3 completion)*
+
 - [ ] 15-08-PLAN.md — Human-gated prod deploy: migrations 029-033, LLM_API_KEY verify, DEMO_FALLBACK_ENABLED=true, live smoke (autonomous: false) (wave 4)
