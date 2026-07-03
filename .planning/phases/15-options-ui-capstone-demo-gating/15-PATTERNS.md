@@ -1,8 +1,8 @@
 # Phase 15: Options UI Capstone + Demo Gating - Pattern Map
 
 **Mapped:** 2026-07-02
-**Files analyzed:** 25 new/modified (6 new, 13 extended source, 6 extended tests) + 2 consumed-as-is references
-**Analogs found:** 25 / 25 (3 new files are composites with partial analogs — see No Analog Found)
+**Files analyzed:** 26 new/modified (6 new, 14 extended source, 6 extended tests) + 1 consumed-as-is reference
+**Analogs found:** 26 / 26 (3 new files are composites with partial analogs — see No Analog Found)
 
 All line numbers verified against live code this session. Extended files are their own analogs: the excerpts below are the exact current code the planner's actions modify or must preserve. RESEARCH.md Code Examples supply the *target* shapes; this document supplies the *source* shapes and insertion points.
 
@@ -30,6 +30,7 @@ All line numbers verified against live code this session. Extended files are the
 | `frontend/src/pages/OAuthCallbackPage.tsx` | page | request-response (OAuth exchange) | pending-selection resume (D-02) |
 | `frontend/src/pages/ChatPage.tsx` | page | CRUD + streaming | gate wraps handleThreadModelChange (D-04) |
 | `frontend/src/pages/SettingsPage.tsx` | page | CRUD | clear stale stash before plain connect (Pitfall 6) |
+| `frontend/src/components/ErrorMessageBubble.tsx` | component | presentation (typed error recovery) | [Reconnect] onClick clears stale `or_pending_selection` before launch (Pitfall 6, plan 15-05); the pre-existing `demoEligible`/`onUseDemo` props and [Use demo] button (lines 11-16, 152-156) are wired at the ChatContainer call site by plan 15-07 — no change to the button itself |
 | `frontend/src/hooks/useKeyStatus.ts` | hook | request-response (shared store) | `KeyStatus.demo_enabled?` (Pattern 5) |
 | `frontend/src/hooks/useChat.ts` | hook | streaming (SSE) | `lastTurnWasDemo` read + `use_demo` retry (D-10/11) |
 | `backend/routers/keys.py` | router (controller) | request-response | `demo_enabled` in BOTH status branches (Pitfall 3) |
@@ -48,7 +49,6 @@ All line numbers verified against live code this session. Extended files are the
 | File | Why it stays untouched |
 |------|------------------------|
 | `frontend/src/lib/pkce.ts` | `startOpenRouterConnect()` called as-is by the gate; the stash is written by `useKeyGate`, NOT here (keeps pkce pure — Pitfall 6 resolution) |
-| `frontend/src/components/ErrorMessageBubble.tsx` | `demoEligible`/`onUseDemo` props already exist (lines 11-16) and the [Use demo] button already renders at lines 152-156; only the *call site* in ChatContainer changes |
 
 ---
 

@@ -665,31 +665,38 @@ body: JSON.stringify({ content, ...(opts?.useDemo ? { use_demo: true } : {}) })
 
 **All other claims** in this research are `[VERIFIED]` against live repo code read this session, or `[CITED]` from the named planning documents (CONTEXT, UI-SPEC, SEC-03 finding, audit, STATE, REQUIREMENTS).
 
-## Open Questions
+## Open Questions (RESOLVED)
 
-1. **Does the `extraOption` clear row ("Use my default model") pass through the gate?**
+All five questions were resolved during planning; the adopted resolution is marked inline and encoded in the plan noted.
+
+1. **Does the `extraOption` clear row ("Use my default model") pass through the gate? (RESOLVED)**
    - What we know: the UI-SPEC decision table covers "select of model m"; the clear row passes `value: null` and carries no `is_free`. The user's *default* may itself be a paid model.
    - What's unclear: gating a *clear* action feels wrong (it selects nothing), but post-clear the thread resolves to a possibly-paid default for a keyless user — which the server fail-closed/demo branch already handles at send time.
    - Recommendation: clear bypasses the gate (apply immediately). Document in the plan so the checker doesn't flag it as a gap.
+   - **RESOLVED → plan 15-05** (Task 2 behavior: `modelId null` → onApply immediately, never gated — the clear row bypasses the gate; the server stays fail-closed at send time).
 
-2. **`lastTurnWasDemo` reset semantics.**
+2. **`lastTurnWasDemo` reset semantics. (RESOLVED)**
    - What we know: locked render condition `(!connected && demoEnabled) || lastTurnWasDemo`; the proactive branch continuously covers keyless users. `useChat` state resets naturally on thread switch today.
    - What's unclear: whether a connected user's [Use demo] turn should keep the banner up after switching threads.
    - Recommendation: keep it simple — per-hook state, reset on thread switch (the demo turn's banner accompanied the turn; the proactive branch owns the persistent case). Planner discretion.
+   - **RESOLVED → plan 15-07** (Task 1: `lastTurnWasDemo` resets to false on thread switch, per-hook state; the proactive `!connected && demo_enabled` branch owns the persistent case).
 
-3. **Validation bounds for `favorite_models`.**
+3. **Validation bounds for `favorite_models`. (RESOLVED)**
    - What we know: `PreferencesUpdate` currently has no size bounds on any field; the column is unbounded TEXT[].
    - What's unclear: locked decisions don't specify a cap.
    - Recommendation: add modest Pydantic bounds (e.g. `max_length≈200` items) as cheap abuse insurance; not a requirement, planner's call.
+   - **RESOLVED → plan 15-01** (Task 1: `PreferencesUpdate.favorite_models` declared with `Field(default=None, max_length=200)`).
 
-4. **Prod migration-history state at deploy.**
+4. **Prod migration-history state at deploy. (RESOLVED)**
    - What we know: prod applied through 028; 029–032 pending; the Phase-9 deploy needed `supabase migration repair --status applied` before `db push`.
    - What's unclear: whether prod's migration table needs another repair for the 025–028 range before pushing 029–033.
    - Recommendation: deploy plan includes a dry-run/`supabase migration list` check + the repair contingency as an explicit conditional step.
+   - **RESOLVED → plan 15-08** (Task 1: read-only `supabase migration list` drift check records whether the 025–028 range needs repair; Task 3 executes `supabase migration repair --status applied` as an explicit conditional step before the push).
 
-5. **Anon demo verification path is pre-broken.**
+5. **Anon demo verification path is pre-broken. (RESOLVED)**
    - What we know: `POST /api/demo/bootstrap` fails in dev (D-999.1-DEMO-A, pre-existing, different "demo" = anon sessions) — it may block live verification of the banner via an anon session.
    - Recommendation: verify demo-fallback UX with a signed-in keyless test account (e.g. fresh account, no OpenRouter connect) instead of the anon path; do not scope-creep into fixing bootstrap.
+   - **RESOLVED → plan 15-08** (Task 4: live smoke uses a SIGNED-IN keyless prod account, explicitly not the anon path; the bootstrap fix stays out of scope).
 
 ## Environment Availability
 
