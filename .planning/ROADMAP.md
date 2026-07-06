@@ -11,7 +11,7 @@ Plans:
 **Goal:** Close out v1.2: key-gated model selection (picking a model with no key triggers OAuth connect), favorite/pin models, demo-fallback flag decision + non-dismissible demo banner (gated on the 999.2 SEC-03 PASS finding), and the picker polish the audit flagged — render popular marking (B-1/MODEL-03) and add catalog search (W-1/MODEL-01).
 **Requirements**: KEY-05, MODEL-08, DEMO-01, DEMO-02, SEC-03 (+ audit fold-ins: MODEL-03 render seam, MODEL-01 search)
 **Depends on:** Phase 14, Phase 999.2 (SEC-03 finding: .planning/phases/999.2-cost-guardrail-burn-script/999.2-SEC-03-FINDING.md)
-**Plans:** 3/8 plans executed
+**Plans:** 5/8 plans executed
 
 Plans:
 **Wave 1**
@@ -22,8 +22,8 @@ Plans:
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 15-04-PLAN.md — Picker rebuild: hand-rolled fuzzy matcher, Favorites/Popular/All sections, Popular chip (B-1), search + combobox a11y migration (W-1) (wave 2)
-- [ ] 15-05-PLAN.md — useKeyGate shared gate + ConfirmDialog primary variant + both-surface wiring + stale-stash hygiene (KEY-05) (wave 2)
+- [x] 15-04-PLAN.md — Picker rebuild: hand-rolled fuzzy matcher, Favorites/Popular/All sections, Popular chip (B-1), search + combobox a11y migration (W-1) (wave 2)
+- [x] 15-05-PLAN.md — useKeyGate shared gate + ConfirmDialog primary variant + both-surface wiring + stale-stash hygiene (KEY-05) (wave 2)
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
