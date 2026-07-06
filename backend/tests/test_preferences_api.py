@@ -80,7 +80,8 @@ def test_get_defaults_for_new_user() -> None:
 
     assert resp.status_code == 200, f"GET failed: {resp.status_code} {resp.text}"
     body = resp.json()
-    assert body == {"default_model": None, "theme": "dark"}, body
+    # Phase 15 MODEL-08: favorite_models joined the wire shape (default []).
+    assert body == {"default_model": None, "theme": "dark", "favorite_models": []}, body
 
 
 def test_theme_persist_and_validate() -> None:
@@ -119,3 +120,166 @@ def test_theme_persist_and_validate() -> None:
     assert payload["theme"] == "light"
     # exclude_unset upsert must NOT carry default_model when the client sent only theme.
     assert "default_model" not in payload, f"theme-only PUT clobbered default_model: {payload}"
+
+
+# ----- Phase 15 MODEL-08 (D-05): favorite_models roundtrip + no-clobber -----
+#
+# favorite_models is a whole-array replace riding the existing partial-upsert
+# (exclude_unset) mechanics. The regression pins run BOTH clobber directions
+# (Pitfall 12): a favorites-only PUT must not carry theme/default_model, and a
+# theme-only PUT must not carry favorite_models.
+
+_FAVES = ["meta-llama/llama-3.3-70b-instruct:free", "anthropic/claude-3.5-sonnet"]
+
+
+def _upsert_payload(db) -> dict:
+    """The dict handed to user_preferences.upsert() in the PUT under test."""
+    upsert = db.table.return_value.upsert
+    upsert.assert_called()
+    payload = upsert.call_args.args[0]
+    if isinstance(payload, list):
+        payload = payload[0]
+    return payload
+
+
+def test_preferences_get_returns_favorites_default_empty() -> None:
+    """MODEL-08: a user with NO preferences row resolves favorite_models to []."""
+    from fastapi.testclient import TestClient
+
+    from auth import get_user_id
+    from main import app
+
+    db = _mock_db_with_pref_row(None)  # no row exists
+
+    app.dependency_overrides[get_user_id] = lambda: _USER
+    try:
+        with patch("routers.preferences.get_supabase", return_value=db):
+            resp = TestClient(app).get("/api/preferences")
+    finally:
+        app.dependency_overrides.clear()
+
+    assert resp.status_code == 200, f"GET failed: {resp.status_code} {resp.text}"
+    assert resp.json()["favorite_models"] == []
+
+
+def test_preferences_get_returns_stored_favorites() -> None:
+    """MODEL-08: a stored favorite_models array is echoed verbatim by GET."""
+    from fastapi.testclient import TestClient
+
+    from auth import get_user_id
+    from main import app
+
+    stored = {
+        "user_id": _USER,
+        "default_model": None,
+        "theme": "dark",
+        "favorite_models": _FAVES,
+    }
+    db = _mock_db_with_pref_row(stored)
+
+    app.dependency_overrides[get_user_id] = lambda: _USER
+    try:
+        with patch("routers.preferences.get_supabase", return_value=db):
+            resp = TestClient(app).get("/api/preferences")
+    finally:
+        app.dependency_overrides.clear()
+
+    assert resp.status_code == 200, f"GET failed: {resp.status_code} {resp.text}"
+    assert resp.json()["favorite_models"] == _FAVES
+
+
+def test_preferences_put_favorites_only_no_clobber() -> None:
+    """Pitfall 12 (favorites→theme direction): PUT {favorite_models} upserts a
+    payload carrying favorite_models + user_id + updated_at and NOTHING else —
+    no theme, no default_model (those would clobber the stored row)."""
+    from fastapi.testclient import TestClient
+
+    from auth import get_user_id
+    from main import app
+
+    stored = {
+        "user_id": _USER,
+        "default_model": None,
+        "theme": "dark",
+        "favorite_models": _FAVES,
+    }
+    db = _mock_db_with_pref_row(stored)
+
+    app.dependency_overrides[get_user_id] = lambda: _USER
+    try:
+        with patch("routers.preferences.get_supabase", return_value=db):
+            resp = TestClient(app).put(
+                "/api/preferences", json={"favorite_models": _FAVES}
+            )
+    finally:
+        app.dependency_overrides.clear()
+
+    assert resp.status_code == 200, f"PUT failed: {resp.status_code} {resp.text}"
+    payload = _upsert_payload(db)
+    assert payload["favorite_models"] == _FAVES
+    assert payload["user_id"] == _USER
+    assert "updated_at" in payload
+    assert "theme" not in payload, f"favorites-only PUT clobbered theme: {payload}"
+    assert "default_model" not in payload, (
+        f"favorites-only PUT clobbered default_model: {payload}"
+    )
+
+
+def test_preferences_put_theme_only_preserves_favorites() -> None:
+    """Pitfall 12 (theme→favorites direction): a theme-only PUT's upsert payload
+    must NOT carry favorite_models (exclude_unset keeps the stored array intact)."""
+    from fastapi.testclient import TestClient
+
+    from auth import get_user_id
+    from main import app
+
+    stored = {
+        "user_id": _USER,
+        "default_model": None,
+        "theme": "light",
+        "favorite_models": _FAVES,
+    }
+    db = _mock_db_with_pref_row(stored)
+
+    app.dependency_overrides[get_user_id] = lambda: _USER
+    try:
+        with patch("routers.preferences.get_supabase", return_value=db):
+            resp = TestClient(app).put("/api/preferences", json={"theme": "light"})
+    finally:
+        app.dependency_overrides.clear()
+
+    assert resp.status_code == 200, f"PUT failed: {resp.status_code} {resp.text}"
+    payload = _upsert_payload(db)
+    assert "favorite_models" not in payload, (
+        f"theme-only PUT clobbered favorite_models: {payload}"
+    )
+
+
+def test_preferences_put_echo_includes_favorites() -> None:
+    """MODEL-08: the PUT echo (read-back response) carries favorite_models."""
+    from fastapi.testclient import TestClient
+
+    from auth import get_user_id
+    from main import app
+
+    stored = {
+        "user_id": _USER,
+        "default_model": None,
+        "theme": "dark",
+        "favorite_models": _FAVES,
+    }
+    db = _mock_db_with_pref_row(stored)
+
+    app.dependency_overrides[get_user_id] = lambda: _USER
+    try:
+        with patch("routers.preferences.get_supabase", return_value=db):
+            resp = TestClient(app).put(
+                "/api/preferences", json={"favorite_models": _FAVES}
+            )
+    finally:
+        app.dependency_overrides.clear()
+
+    assert resp.status_code == 200, f"PUT failed: {resp.status_code} {resp.text}"
+    assert resp.json()["favorite_models"] == _FAVES, (
+        f"PUT echo dropped favorite_models: {resp.json()}"
+    )

@@ -73,3 +73,99 @@ def test_status_not_connected() -> None:
     # masked_label / connected_at default to None when not connected.
     assert body.get("masked_label") is None
     assert body.get("connected_at") is None
+
+
+# ----- Phase 15 DEMO-01: demo_enabled must ride BOTH status branches -----
+#
+# The keyless early return (routers/keys.py) is the trap branch (RESEARCH
+# Pitfall 3): keyless users are exactly the demo audience, so relying on the
+# Pydantic default would hide the flag from them. The flag is controlled by
+# patching routers.keys.get_settings (env-driven demo_fallback_enabled).
+
+def _status_db(row: dict | None) -> MagicMock:
+    """Fake supabase whose user_api_keys select chain returns `row` (or None)."""
+    db = MagicMock()
+    chain = (
+        db.table.return_value.select.return_value.eq.return_value.maybe_single.return_value
+    )
+    chain.execute.return_value = MagicMock(data=row)
+    return db
+
+
+def test_status_keyless_carries_demo_enabled_true() -> None:
+    """KEYLESS branch + flag ON → {"connected": false, "demo_enabled": true}.
+
+    Pins the keys.py early-return trap (Pitfall 3 / T-15-01): the keyless branch
+    must set demo_enabled EXPLICITLY, never via the Pydantic default."""
+    from fastapi.testclient import TestClient
+
+    from auth import get_user_id
+    from main import app
+
+    app.dependency_overrides[get_user_id] = lambda: "user-uuid"
+    try:
+        with patch("routers.keys.get_supabase", return_value=_status_db(None)), \
+             patch(
+                 "routers.keys.get_settings",
+                 return_value=MagicMock(demo_fallback_enabled=True),
+             ):
+            resp = TestClient(app).get("/api/keys/status")
+    finally:
+        app.dependency_overrides.clear()
+
+    assert resp.status_code == 200, f"expected 200, got {resp.status_code}: {resp.text}"
+    body = resp.json()
+    assert body["connected"] is False
+    assert body["demo_enabled"] is True, f"keyless branch dropped demo_enabled: {body}"
+
+
+def test_status_connected_carries_demo_enabled_true() -> None:
+    """CONNECTED branch + flag ON → connected true AND demo_enabled true."""
+    from fastapi.testclient import TestClient
+
+    from auth import get_user_id
+    from main import app
+
+    row = {"key_label": "sk-or-v1-…wXyZ", "connected_at": "2026-06-19T20:00:00+00:00"}
+
+    app.dependency_overrides[get_user_id] = lambda: "user-uuid"
+    try:
+        with patch("routers.keys.get_supabase", return_value=_status_db(row)), \
+             patch(
+                 "routers.keys.get_settings",
+                 return_value=MagicMock(demo_fallback_enabled=True),
+             ):
+            resp = TestClient(app).get("/api/keys/status")
+    finally:
+        app.dependency_overrides.clear()
+
+    assert resp.status_code == 200, f"expected 200, got {resp.status_code}: {resp.text}"
+    body = resp.json()
+    assert body["connected"] is True
+    assert body["demo_enabled"] is True, f"connected branch dropped demo_enabled: {body}"
+
+
+def test_status_demo_enabled_false_by_default() -> None:
+    """Flag OFF (the config.py default) → demo_enabled false in BOTH branches."""
+    from fastapi.testclient import TestClient
+
+    from auth import get_user_id
+    from main import app
+
+    settings_off = MagicMock(demo_fallback_enabled=False)
+    row = {"key_label": "sk-or-v1-…wXyZ", "connected_at": "2026-06-19T20:00:00+00:00"}
+
+    app.dependency_overrides[get_user_id] = lambda: "user-uuid"
+    try:
+        with patch("routers.keys.get_supabase", return_value=_status_db(None)), \
+             patch("routers.keys.get_settings", return_value=settings_off):
+            keyless = TestClient(app).get("/api/keys/status")
+        with patch("routers.keys.get_supabase", return_value=_status_db(row)), \
+             patch("routers.keys.get_settings", return_value=settings_off):
+            connected = TestClient(app).get("/api/keys/status")
+    finally:
+        app.dependency_overrides.clear()
+
+    assert keyless.status_code == 200 and connected.status_code == 200
+    assert keyless.json()["demo_enabled"] is False
+    assert connected.json()["demo_enabled"] is False
