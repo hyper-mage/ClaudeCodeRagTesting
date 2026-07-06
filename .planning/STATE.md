@@ -4,8 +4,8 @@ milestone: v1.2
 milestone_name: User Options & BYOK
 status: executing
 stopped_at: Phase 15 UI-SPEC approved
-last_updated: "2026-07-03T16:56:56.036Z"
-last_activity: 2026-07-03 -- Phase 15 planning complete
+last_updated: "2026-07-06T01:19:20.314Z"
+last_activity: 2026-07-06 -- Phase 15 execution started
 progress:
   total_phases: 1
   completed_phases: 0
@@ -21,15 +21,15 @@ progress:
 See: .planning/PROJECT.md (updated 2026-05-20 after v1.1 completion)
 
 **Core value:** The agent can intelligently search and reason across a structured board game knowledge base -- finding rules, comparing mechanics, and recommending games -- using the right tool for the job, transparently.
-**Current focus:** Milestone complete
+**Current focus:** Phase 15 — options-ui-capstone-demo-gating
 
 ## Current Position
 
-Phase: 999.2
-Plan: Not started
-Status: Ready to execute
+Phase: 15 (options-ui-capstone-demo-gating) — EXECUTING
+Plan: 1 of 8
+Status: Executing Phase 15
 Progress: [█████████░] 92%
-Last activity: 2026-07-03 -- Phase 15 planning complete
+Last activity: 2026-07-06 -- Phase 15 execution started
 
 ## Performance Metrics
 
