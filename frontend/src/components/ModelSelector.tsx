@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useId, useRef, useState } from 'react'
-import { Check, ChevronDown } from 'lucide-react'
+import { Check, ChevronDown, Search } from 'lucide-react'
 import { apiFetch } from '../lib/api'
+import { matchModel } from '../lib/fuzzy'
 
 /**
  * ModelResponse — mirrors the Phase-12 GET /api/models row (render-ready). The frontend NEVER
@@ -45,7 +46,12 @@ const COPY = {
   favorites: 'Favorites',
   popular: 'Popular',
   allModels: 'All models',
+  searchPlaceholder: 'Search models…',
+  noMatch: 'No models match your search.',
 } as const
+
+/** The applied search query trails the input value by this much (LOCKED). */
+const SEARCH_DEBOUNCE_MS = 150
 
 /** A selectable row — the flat NAVIGABLE array indexes these (headers are never navigable). */
 interface NavOption {
@@ -80,7 +86,7 @@ function contextHint(contextLength: number | null): string | null {
 }
 
 /**
- * ModelSelector — hand-rolled accessible listbox dropdown over the GET /api/models catalog
+ * ModelSelector — hand-rolled accessible searchable combobox over the GET /api/models catalog
  * (no shadcn — `Tool: none` per the approved Phase-15 UI-SPEC). Presentation + a11y only: the
  * caller supplies onSelect. Theme-aware via the core-surface tokens so it reads correctly in
  * both light and dark. The trigger is NEUTRAL surface, not the blue-600 accent.
@@ -90,10 +96,18 @@ function contextHint(contextLength: number | null): string | null {
  * preserves popularity_rank order; All models is the complete catalog alphabetical by label.
  * Duplication across sections is deliberate — keys and option DOM ids are section-scoped.
  *
- * LOCKED a11y contract (UI-SPEC § Components): aria-haspopup="listbox" + aria-expanded on the
- * trigger; role="listbox"/"option" on the list; Enter/Space opens; arrow-nav skips headers;
- * Enter selects; Esc closes and returns focus to the trigger; outside-click closes; focus trap
- * while open; ≥44px rows; selected row carries a blue-600 check in EVERY duplicate instance.
+ * Search (D-08, MODEL-01): a pinned input atop the open panel filters the catalog fuzzily
+ * (lib/fuzzy matchModel over id AND name, 150ms debounce). While the applied query is non-empty
+ * the sections collapse into ONE flat score-ranked list — no headers, extraOption hidden,
+ * non-matches removed.
+ *
+ * LOCKED a11y contract (UI-SPEC § Interaction Contract — combobox-with-list-popup, supersedes
+ * the listbox-focus model): trigger keeps aria-haspopup="listbox"/aria-expanded/aria-controls
+ * and Enter/Space/ArrowDown opens; on open, focus moves to the SEARCH INPUT which carries
+ * aria-autocomplete="list", aria-controls={listboxId} and aria-activedescendant of the active
+ * navigable row; ArrowUp/Down skip headers structurally; Enter selects; Esc closes back to the
+ * trigger; Tab stays trapped; Home/End keep native caret behavior; outside-click closes;
+ * ≥44px rows; selected row carries a blue-600 check in EVERY duplicate instance.
  */
 export default function ModelSelector({ value, onSelect, placeholder, extraOption, models }: Props) {
   // An empty array prop ([]) means "no catalog yet" — NOT an authoritative empty list — so the
@@ -105,6 +119,9 @@ export default function ModelSelector({ value, onSelect, placeholder, extraOptio
   const [fetched, setFetched] = useState<ModelResponse[] | null>(suppliedModels ?? null)
   const [state, setState] = useState<LoadState>(suppliedModels ? 'loaded' : 'idle')
   const [activeIndex, setActiveIndex] = useState(0)
+  // Search: the input value is live; the APPLIED query trails it by 150ms (LOCKED debounce).
+  const [query, setQuery] = useState('')
+  const [debouncedQuery, setDebouncedQuery] = useState('')
   // Favorites are read-only this plan (render the section): the star toggle + PUT land in
   // plan 15-06. Seeded once at mount from GET /api/preferences (favorite_models ?? []).
   const [favorites, setFavorites] = useState<string[]>([])
@@ -114,21 +131,19 @@ export default function ModelSelector({ value, onSelect, placeholder, extraOptio
 
   const rootRef = useRef<HTMLDivElement>(null)
   const triggerRef = useRef<HTMLButtonElement>(null)
-  const listRef = useRef<HTMLUListElement>(null)
+  const inputRef = useRef<HTMLInputElement>(null)
   const listboxId = useId()
 
   const rows: ModelResponse[] = suppliedModels ?? fetched ?? []
+  const searching = debouncedQuery !== ''
 
-  // Build the two derived structures (D-06): a flat NAVIGABLE array of selectable options only
+  // Build the two derived structures: a flat NAVIGABLE array of selectable options only
   // (activeIndex indexes this — headers are never navigable) and a RENDER row list interleaving
-  // header rows and option rows. The extraOption row renders first, outside all sections.
+  // header rows and option rows. Sections mode (D-06): extraOption first (outside sections),
+  // then Favorites → Popular → All models. Search mode (D-08): ONE flat score-ranked list —
+  // no headers, extraOption hidden, non-matches removed.
   const sortByLabel = (a: ModelResponse, b: ModelResponse) =>
     (a.name ?? a.id).localeCompare(b.name ?? b.id)
-  const favoriteRows = rows.filter(m => favorites.includes(m.id)).sort(sortByLabel)
-  const popularRows = rows
-    .filter(m => m.popularity_rank != null)
-    .sort((a, b) => (a.popularity_rank ?? 0) - (b.popularity_rank ?? 0))
-  const allRows = [...rows].sort(sortByLabel)
 
   const navigable: NavOption[] = []
   const renderRows: RenderRow[] = []
@@ -156,10 +171,26 @@ export default function ModelSelector({ value, onSelect, placeholder, extraOptio
     renderRows.push({ kind: 'header', key: `header:${section}`, label })
     sectionRows.forEach((m, i) => pushOption(section, i, m.id, m.name ?? m.id, m))
   }
-  if (extraOption) pushOption('extra', 0, extraOption.value, extraOption.label, null)
-  pushSection('fav', COPY.favorites, favoriteRows)
-  pushSection('pop', COPY.popular, popularRows)
-  pushSection('all', COPY.allModels, allRows)
+
+  if (searching) {
+    const scored = rows
+      .map(m => ({ m, score: matchModel(debouncedQuery, m.id, m.name) }))
+      .filter((x): x is { m: ModelResponse; score: number } => x.score !== null)
+      // Score desc; ties alphabetical by label (the scorer bakes in no tie-breaking).
+      .sort((a, b) => b.score - a.score || sortByLabel(a.m, b.m))
+    scored.forEach((x, i) => pushOption('search', i, x.m.id, x.m.name ?? x.m.id, x.m))
+  } else {
+    const favoriteRows = rows.filter(m => favorites.includes(m.id)).sort(sortByLabel)
+    const popularRows = rows
+      .filter(m => m.popularity_rank != null)
+      .sort((a, b) => (a.popularity_rank ?? 0) - (b.popularity_rank ?? 0))
+    const allRows = [...rows].sort(sortByLabel)
+
+    if (extraOption) pushOption('extra', 0, extraOption.value, extraOption.label, null)
+    pushSection('fav', COPY.favorites, favoriteRows)
+    pushSection('pop', COPY.popular, popularRows)
+    pushSection('all', COPY.allModels, allRows)
+  }
 
   const loadModels = useCallback(async () => {
     if (suppliedModels) return // caller-supplied non-empty list — never fetch
@@ -175,6 +206,10 @@ export default function ModelSelector({ value, onSelect, placeholder, extraOptio
   }, [suppliedModels])
 
   const openMenu = useCallback(() => {
+    // Each open starts with a fresh query (cmdk convention) — both the live value and the
+    // applied query, so a stale filter can never flash while the debounce catches up.
+    setQuery('')
+    setDebouncedQuery('')
     setOpen(true)
     if (state === 'idle') void loadModels()
   }, [state, loadModels])
@@ -214,16 +249,27 @@ export default function ModelSelector({ value, onSelect, placeholder, extraOptio
     if (!open) return
     const rect = triggerRef.current?.getBoundingClientRect()
     if (!rect) return
-    const PANEL_MAX = 320 // ~ max-h-72 list + chrome
+    const PANEL_MAX = 370 // ~ max-h-72 list + h-11 search row + chrome
     const spaceBelow = window.innerHeight - rect.bottom
     const spaceAbove = rect.top
     setDropUp(spaceBelow < PANEL_MAX && spaceAbove > spaceBelow)
   }, [open])
 
+  // Apply the query 150ms behind the input (LOCKED debounce). The same tick resets the
+  // active row to the first navigable option — and implicitly clamps when the filtered
+  // list shrinks (Pitfall 2).
+  useEffect(() => {
+    const t = setTimeout(() => {
+      setDebouncedQuery(query)
+      setActiveIndex(0)
+    }, SEARCH_DEBOUNCE_MS)
+    return () => clearTimeout(t)
+  }, [query])
+
   // Seed the active row to the selected option's NAVIGABLE index (else 0) on OPEN only —
   // plus once more when the lazy fetch lands (state flips to 'loaded' while open).
   // Deliberately NOT keyed on option count: live filtering must never re-seed per
-  // keystroke (Pitfall 2 groundwork — search lands next task).
+  // keystroke (Pitfall 2).
   useEffect(() => {
     if (!open) return
     const idx = navigable.findIndex(o => o.value === value)
@@ -243,12 +289,11 @@ export default function ModelSelector({ value, onSelect, placeholder, extraOptio
     return () => document.removeEventListener('mousedown', onMouseDown)
   }, [open, closeMenu])
 
-  // Move focus into the list when it opens with options, so arrow-nav + focus-trap work.
+  // LOCKED focus model (combobox-with-list-popup): on open, focus moves to the search
+  // input — not the list. Arrow-nav/Enter/Esc are handled on the input's keydown.
   useEffect(() => {
-    if (open && navigable.length > 0) {
-      listRef.current?.focus()
-    }
-  }, [open, navigable.length])
+    if (open) inputRef.current?.focus()
+  }, [open])
 
   function selectOption(idx: number) {
     const opt = navigable[idx]
@@ -264,7 +309,12 @@ export default function ModelSelector({ value, onSelect, placeholder, extraOptio
     }
   }
 
-  function onListKeyDown(e: React.KeyboardEvent<HTMLUListElement>) {
+  // Keyboard machinery lives on the search input (LOCKED contract): ArrowUp/Down move over
+  // the NAVIGABLE array (headers skipped structurally, wrapping not required); Enter selects;
+  // Esc closes back to the trigger; Tab stays trapped; printable keys fall through to the
+  // input natively; Home/End keep the native caret behavior (no list jump).
+  // Shift+Enter is deliberately NOT implemented here — it needs the favorite toggle (plan 15-06).
+  function onInputKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
     switch (e.key) {
       case 'Escape':
         e.preventDefault()
@@ -278,21 +328,12 @@ export default function ModelSelector({ value, onSelect, placeholder, extraOptio
         e.preventDefault()
         setActiveIndex(i => Math.max(i - 1, 0))
         break
-      case 'Home':
-        e.preventDefault()
-        setActiveIndex(0)
-        break
-      case 'End':
-        e.preventDefault()
-        setActiveIndex(navigable.length - 1)
-        break
       case 'Enter':
-      case ' ':
         e.preventDefault()
-        selectOption(activeIndex)
+        if (!e.shiftKey) selectOption(activeIndex)
         break
       case 'Tab':
-        // Focus trap: keep focus in the list while open.
+        // Focus trap: keep focus inside the open panel.
         e.preventDefault()
         break
       default:
@@ -303,6 +344,9 @@ export default function ModelSelector({ value, onSelect, placeholder, extraOptio
   // Trigger label: the selected model's display name, else the placeholder.
   const selectedModel = rows.find(m => m.id === value) ?? null
   const triggerLabel = selectedModel ? (selectedModel.name ?? selectedModel.id) : (placeholder ?? 'Select a model')
+
+  // The section-scoped DOM id of the active navigable row (aria-activedescendant wiring).
+  const activeOptionId = navigable[activeIndex]?.id
 
   return (
     <div ref={rootRef} className="relative w-full">
@@ -322,6 +366,24 @@ export default function ModelSelector({ value, onSelect, placeholder, extraOptio
 
       {open && (
         <div className={`absolute left-0 z-50 w-full overflow-hidden rounded border border-gray-300 bg-gray-50 shadow-lg dark:border-gray-700 dark:bg-gray-900 ${dropUp ? 'bottom-full mb-1' : 'top-full mt-1'}`}>
+          {/* Pinned search row — first element inside the open panel, above everything.
+              No focus ring inside the panel (cmdk convention): the panel border frames it. */}
+          <div className="flex h-11 w-full items-center border-b border-gray-300 bg-gray-50 dark:border-gray-700 dark:bg-gray-900">
+            <Search size={14} className="ml-3 shrink-0 text-gray-500 dark:text-gray-400" aria-hidden="true" />
+            <input
+              ref={inputRef}
+              type="text"
+              value={query}
+              onChange={e => setQuery(e.target.value)}
+              onKeyDown={onInputKeyDown}
+              placeholder={COPY.searchPlaceholder}
+              aria-autocomplete="list"
+              aria-controls={listboxId}
+              aria-activedescendant={activeOptionId}
+              className="h-full w-full bg-transparent px-3 text-sm text-gray-900 placeholder-gray-500 focus:outline-none dark:text-white dark:placeholder-gray-400"
+            />
+          </div>
+
           {state === 'loading' && (
             <p className="px-3 py-2 text-sm text-gray-600 dark:text-gray-400">{COPY.loading}</p>
           )}
@@ -337,18 +399,19 @@ export default function ModelSelector({ value, onSelect, placeholder, extraOptio
           )}
 
           {state === 'loaded' && navigable.length === 0 && (
-            <p className="px-3 py-2 text-sm text-gray-600 dark:text-gray-400">No models available.</p>
+            searching ? (
+              <p className="px-3 py-2 text-xs text-gray-600 dark:text-gray-400">{COPY.noMatch}</p>
+            ) : (
+              <p className="px-3 py-2 text-sm text-gray-600 dark:text-gray-400">No models available.</p>
+            )
           )}
 
           {state === 'loaded' && navigable.length > 0 && (
             <ul
-              ref={listRef}
               id={listboxId}
               role="listbox"
-              tabIndex={-1}
               aria-label="Models"
-              onKeyDown={onListKeyDown}
-              className="max-h-72 overflow-y-auto focus:outline-none"
+              className="max-h-72 overflow-y-auto"
             >
               {renderRows.map(row => {
                 if (row.kind === 'header') {

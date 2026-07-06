@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { screen, waitFor, within } from '@testing-library/react'
+import { screen, waitFor, within, act, fireEvent } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { renderWithProviders, makeApiMock } from '../test/utils'
 import { apiFetch } from '../lib/api'
@@ -11,12 +11,13 @@ vi.mock('../lib/api', () => makeApiMock())
 
 const mockApiFetch = apiFetch as ReturnType<typeof vi.fn>
 
-// Three rows mirroring the Phase-12 ModelResponse shape: one free+popular, one paid+popular,
+// Three rows mirroring the Phase-12 ModelResponse shape: one free+popular (with '3.3' in the
+// id/name so the locked 'lama33' typo-tolerance case has a real target), one paid+popular,
 // one paid unranked (popularity_rank null → no Popular section membership, no chip).
 const MODELS = [
   {
-    id: 'meta/llama-free',
-    name: 'Llama Free',
+    id: 'meta/llama-3.3-free',
+    name: 'Llama 3.3 Free',
     context_length: 128000,
     is_free: true,
     price_per_mtok_prompt: null,
@@ -191,6 +192,7 @@ describe('ModelSelector (a11y contract — UI-SPEC LOCKED)', () => {
     await user.click(trigger)
     await screen.findByRole('listbox')
 
+    // The combobox focus model puts focus on the search input — Esc lands there.
     await user.keyboard('{Escape}')
     await waitFor(() => expect(screen.queryByRole('listbox')).not.toBeInTheDocument())
     expect(trigger).toHaveFocus()
@@ -292,7 +294,7 @@ describe('ModelSelector sections + Popular chip (D-06 / D-07)', () => {
 
     const popInstances = Array.from(listbox.querySelectorAll('[id*="-opt-pop-"]'))
     expect(popInstances).toHaveLength(2)
-    expect(popInstances[0].textContent).toContain('Llama Free') // rank 1
+    expect(popInstances[0].textContent).toContain('Llama 3.3 Free') // rank 1
     expect(popInstances[1].textContent).toContain('Claude Paid') // rank 2
     // Unranked mistral never joins Popular.
     expect(popInstances.some(el => el.textContent!.includes('Mistral'))).toBe(false)
@@ -309,13 +311,13 @@ describe('ModelSelector sections + Popular chip (D-06 / D-07)', () => {
     const allInstances = Array.from(listbox.querySelectorAll('[id*="-opt-all-"]'))
     expect(allInstances).toHaveLength(MODELS.length)
     expect(allInstances[0].textContent).toContain('Claude Paid')
-    expect(allInstances[1].textContent).toContain('Llama Free')
+    expect(allInstances[1].textContent).toContain('Llama 3.3 Free')
     expect(allInstances[2].textContent).toContain('Mistral 7B')
   })
 
   it('shows the Popular chip on ranked rows in EVERY section instance, never on unranked rows', async () => {
     const user = userEvent.setup()
-    mockCatalog({ favorites: ['meta/llama-free'] })
+    mockCatalog({ favorites: ['meta/llama-3.3-free'] })
     renderWithProviders(<ModelSelector value={null} onSelect={vi.fn()} placeholder="Pick a model" />)
 
     await user.click(screen.getByRole('button', { name: /pick a model/i }))
@@ -330,7 +332,7 @@ describe('ModelSelector sections + Popular chip (D-06 / D-07)', () => {
     expect(popInstances.every(hasPopularChip)).toBe(true)
 
     const allInstances = Array.from(listbox.querySelectorAll('[id*="-opt-all-"]'))
-    const llamaAll = allInstances.find(el => el.textContent!.includes('Llama Free'))!
+    const llamaAll = allInstances.find(el => el.textContent!.includes('Llama 3.3 Free'))!
     const claudeAll = allInstances.find(el => el.textContent!.includes('Claude Paid'))!
     const mistralAll = allInstances.find(el => el.textContent!.includes('Mistral 7B'))!
     expect(hasPopularChip(llamaAll)).toBe(true)
@@ -343,7 +345,7 @@ describe('ModelSelector sections + Popular chip (D-06 / D-07)', () => {
     try {
       const user = userEvent.setup()
       // llama favorited + ranked → appears in all 3 sections; keys must be section-scoped.
-      mockCatalog({ favorites: ['meta/llama-free'] })
+      mockCatalog({ favorites: ['meta/llama-3.3-free'] })
       renderWithProviders(<ModelSelector value={null} onSelect={vi.fn()} placeholder="Pick a model" />)
 
       await user.click(screen.getByRole('button', { name: /pick a model/i }))
@@ -354,5 +356,156 @@ describe('ModelSelector sections + Popular chip (D-06 / D-07)', () => {
     } finally {
       errorSpy.mockRestore()
     }
+  })
+})
+
+describe('ModelSelector search (MODEL-01 — LOCKED combobox contract)', () => {
+  beforeEach(() => {
+    mockApiFetch.mockReset()
+  })
+
+  it('moves focus to the search input on open (combobox focus model, supersedes UL focus)', async () => {
+    const user = userEvent.setup()
+    mockCatalog()
+    renderWithProviders(<ModelSelector value={null} onSelect={vi.fn()} placeholder="Pick a model" />)
+
+    await user.click(screen.getByRole('button', { name: /pick a model/i }))
+    const input = screen.getByPlaceholderText('Search models…')
+    await waitFor(() => expect(input).toHaveFocus())
+    expect(input).toHaveAttribute('aria-autocomplete', 'list')
+    const listbox = await screen.findByRole('listbox')
+    expect(input.getAttribute('aria-controls')).toBe(listbox.id)
+  })
+
+  // NOTE on the debounce tests: RTL 16's async event wrapper drains via setTimeout(0) and only
+  // auto-advances when it detects JEST fake timers (`typeof jest !== 'undefined'`), so every
+  // `await user.*` call hangs forever under VITEST fake timers. The plan-sanctioned
+  // vi.useFakeTimers + advanceTimersByTime(150) flow therefore drives the input with the SYNC
+  // fireEvent API (controlled-input change) instead of userEvent.
+
+  it("typing 'lama33' filters into ONE flat score-ranked list after the 150ms debounce (typo-tolerant)", async () => {
+    vi.useFakeTimers()
+    try {
+      mockCatalog()
+      renderWithProviders(
+        <ModelSelector
+          value={null}
+          onSelect={vi.fn()}
+          placeholder="Pick a model"
+          models={MODELS}
+          extraOption={{ label: 'Use my default model', value: null }}
+        />
+      )
+      // Drain the mount-time preferences microtask inside act (no timers involved).
+      await act(async () => {})
+
+      fireEvent.click(screen.getByRole('button', { name: /pick a model/i }))
+      const listbox = screen.getByRole('listbox')
+      expect(listbox.querySelectorAll('li[role="presentation"]').length).toBeGreaterThan(0)
+
+      fireEvent.change(screen.getByPlaceholderText('Search models…'), {
+        target: { value: 'lama33' },
+      })
+      // Debounce respected: the sections survive until 150ms elapse.
+      expect(listbox.querySelectorAll('li[role="presentation"]').length).toBeGreaterThan(0)
+      act(() => {
+        vi.advanceTimersByTime(150)
+      })
+
+      const options = within(screen.getByRole('listbox')).getAllByRole('option')
+      expect(options).toHaveLength(1)
+      expect(options[0].textContent).toContain('Llama 3.3 Free')
+      // Flat search mode: no headers, extraOption hidden, non-matches removed.
+      expect(screen.getByRole('listbox').querySelectorAll('li[role="presentation"]')).toHaveLength(0)
+      expect(screen.queryByRole('option', { name: 'Use my default model' })).not.toBeInTheDocument()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('renders the LOCKED no-match caption when nothing matches', async () => {
+    vi.useFakeTimers()
+    try {
+      mockCatalog()
+      renderWithProviders(
+        <ModelSelector value={null} onSelect={vi.fn()} placeholder="Pick a model" models={MODELS} />
+      )
+      await act(async () => {})
+
+      fireEvent.click(screen.getByRole('button', { name: /pick a model/i }))
+      fireEvent.change(screen.getByPlaceholderText('Search models…'), {
+        target: { value: 'zzzqqq' },
+      })
+      act(() => {
+        vi.advanceTimersByTime(150)
+      })
+
+      expect(screen.getByText('No models match your search.')).toBeInTheDocument()
+      expect(screen.queryByRole('listbox')).not.toBeInTheDocument()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('clearing the query restores the sections and the extraOption row', async () => {
+    vi.useFakeTimers()
+    try {
+      mockCatalog()
+      renderWithProviders(
+        <ModelSelector
+          value={null}
+          onSelect={vi.fn()}
+          placeholder="Pick a model"
+          models={MODELS}
+          extraOption={{ label: 'Use my default model', value: null }}
+        />
+      )
+      await act(async () => {})
+
+      fireEvent.click(screen.getByRole('button', { name: /pick a model/i }))
+      const input = screen.getByPlaceholderText('Search models…')
+      fireEvent.change(input, { target: { value: 'lama33' } })
+      act(() => {
+        vi.advanceTimersByTime(150)
+      })
+      expect(screen.getByRole('listbox').querySelectorAll('li[role="presentation"]')).toHaveLength(0)
+
+      fireEvent.change(input, { target: { value: '' } })
+      act(() => {
+        vi.advanceTimersByTime(150)
+      })
+
+      const headers = Array.from(
+        screen.getByRole('listbox').querySelectorAll('li[role="presentation"]')
+      )
+      expect(headers.map(h => h.textContent)).toEqual(['Popular', 'All models'])
+      expect(screen.getByRole('option', { name: 'Use my default model' })).toBeInTheDocument()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('ArrowDown moves the active row over options only (headers skipped) and Enter selects it', async () => {
+    const user = userEvent.setup()
+    const onSelect = vi.fn()
+    mockCatalog({ favorites: ['anthropic/claude'] })
+    renderWithProviders(<ModelSelector value={null} onSelect={onSelect} placeholder="Pick a model" />)
+
+    await user.click(screen.getByRole('button', { name: /pick a model/i }))
+    const listbox = await screen.findByRole('listbox')
+    const input = screen.getByPlaceholderText('Search models…')
+    const optionIds = within(listbox).getAllByRole('option').map(o => o.id)
+
+    // Active starts on the first navigable option; headers are never activedescendant targets.
+    await waitFor(() => expect(input).toHaveAttribute('aria-activedescendant', optionIds[0]))
+    await user.keyboard('{ArrowDown}')
+    expect(input).toHaveAttribute('aria-activedescendant', optionIds[1])
+    const active = document.getElementById(input.getAttribute('aria-activedescendant')!)
+    expect(active).toHaveAttribute('role', 'option')
+
+    // Enter selects the active row (Favorites: claude → Popular: llama rank 1).
+    await user.keyboard('{Enter}')
+    expect(onSelect).toHaveBeenCalledWith('meta/llama-3.3-free')
+    await waitFor(() => expect(screen.queryByRole('listbox')).not.toBeInTheDocument())
   })
 })
