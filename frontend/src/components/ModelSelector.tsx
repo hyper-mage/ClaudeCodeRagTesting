@@ -42,7 +42,26 @@ const COPY = {
   loading: 'Loading models…',
   error: "Couldn't load models. Tap to retry.",
   free: 'Free',
+  favorites: 'Favorites',
+  popular: 'Popular',
+  allModels: 'All models',
 } as const
+
+/** A selectable row — the flat NAVIGABLE array indexes these (headers are never navigable). */
+interface NavOption {
+  /** React key, section-scoped: a model may appear in up to 3 sections (Pitfall 1). */
+  key: string
+  /** Stable DOM id, section-scoped: `${listboxId}-opt-${section}-${index}`. */
+  id: string
+  value: string | null
+  label: string
+  model: ModelResponse | null
+}
+
+/** The RENDER list interleaves non-interactive section headers with option rows. */
+type RenderRow =
+  | { kind: 'header'; key: string; label: string }
+  | { kind: 'option'; navIndex: number; opt: NavOption }
 
 /** Format the paid price hint: "In ${p} · Out ${c}/M tokens" when both present, else the single figure. */
 function priceHint(prompt: number | null, completion: number | null): string | null {
@@ -62,14 +81,19 @@ function contextHint(contextLength: number | null): string | null {
 
 /**
  * ModelSelector — hand-rolled accessible listbox dropdown over the GET /api/models catalog
- * (no shadcn — shadcn is gated to Phase 15 per STATE.md). Presentation + a11y only: the caller
- * supplies onSelect (Plan 06 wires the PATCH/PUT). Theme-aware via the core-surface tokens so it
- * reads correctly in both light and dark. The trigger is NEUTRAL surface, not the blue-600 accent.
+ * (no shadcn — `Tool: none` per the approved Phase-15 UI-SPEC). Presentation + a11y only: the
+ * caller supplies onSelect. Theme-aware via the core-surface tokens so it reads correctly in
+ * both light and dark. The trigger is NEUTRAL surface, not the blue-600 accent.
+ *
+ * Sections (D-06): Favorites → Popular → All models, with non-interactive role="presentation"
+ * headers. Favorites is hidden entirely when empty (LOCKED — no empty-state hint). Popular
+ * preserves popularity_rank order; All models is the complete catalog alphabetical by label.
+ * Duplication across sections is deliberate — keys and option DOM ids are section-scoped.
  *
  * LOCKED a11y contract (UI-SPEC § Components): aria-haspopup="listbox" + aria-expanded on the
- * trigger; role="listbox"/"option" on the list; Enter/Space opens; arrow-nav; Enter selects; Esc
- * closes and returns focus to the trigger; outside-click closes; focus trap while open; ≥44px rows;
- * selected row carries a blue-600 check/left-border.
+ * trigger; role="listbox"/"option" on the list; Enter/Space opens; arrow-nav skips headers;
+ * Enter selects; Esc closes and returns focus to the trigger; outside-click closes; focus trap
+ * while open; ≥44px rows; selected row carries a blue-600 check in EVERY duplicate instance.
  */
 export default function ModelSelector({ value, onSelect, placeholder, extraOption, models }: Props) {
   // An empty array prop ([]) means "no catalog yet" — NOT an authoritative empty list — so the
@@ -81,6 +105,9 @@ export default function ModelSelector({ value, onSelect, placeholder, extraOptio
   const [fetched, setFetched] = useState<ModelResponse[] | null>(suppliedModels ?? null)
   const [state, setState] = useState<LoadState>(suppliedModels ? 'loaded' : 'idle')
   const [activeIndex, setActiveIndex] = useState(0)
+  // Favorites are read-only this plan (render the section): the star toggle + PUT land in
+  // plan 15-06. Seeded once at mount from GET /api/preferences (favorite_models ?? []).
+  const [favorites, setFavorites] = useState<string[]>([])
   // Open upward when the trigger sits too low for the panel to fit below (e.g. the
   // default-model control in the sidebar footer) — otherwise the list spills off-screen.
   const [dropUp, setDropUp] = useState(false)
@@ -92,12 +119,47 @@ export default function ModelSelector({ value, onSelect, placeholder, extraOptio
 
   const rows: ModelResponse[] = suppliedModels ?? fetched ?? []
 
-  // Build the flat option list: optional extraOption first (value null), then the catalog rows.
-  const options: { key: string; value: string | null; label: string; model: ModelResponse | null }[] =
-    [
-      ...(extraOption ? [{ key: '__extra__', value: extraOption.value, label: extraOption.label, model: null }] : []),
-      ...rows.map(m => ({ key: m.id, value: m.id, label: m.name ?? m.id, model: m })),
-    ]
+  // Build the two derived structures (D-06): a flat NAVIGABLE array of selectable options only
+  // (activeIndex indexes this — headers are never navigable) and a RENDER row list interleaving
+  // header rows and option rows. The extraOption row renders first, outside all sections.
+  const sortByLabel = (a: ModelResponse, b: ModelResponse) =>
+    (a.name ?? a.id).localeCompare(b.name ?? b.id)
+  const favoriteRows = rows.filter(m => favorites.includes(m.id)).sort(sortByLabel)
+  const popularRows = rows
+    .filter(m => m.popularity_rank != null)
+    .sort((a, b) => (a.popularity_rank ?? 0) - (b.popularity_rank ?? 0))
+  const allRows = [...rows].sort(sortByLabel)
+
+  const navigable: NavOption[] = []
+  const renderRows: RenderRow[] = []
+  const pushOption = (
+    section: string,
+    index: number,
+    value_: string | null,
+    label: string,
+    model: ModelResponse | null
+  ) => {
+    const opt: NavOption = {
+      key: `${section}:${model ? model.id : '__extra__'}`,
+      id: `${listboxId}-opt-${section}-${index}`,
+      value: value_,
+      label,
+      model,
+    }
+    renderRows.push({ kind: 'option', navIndex: navigable.length, opt })
+    navigable.push(opt)
+  }
+  const pushSection = (section: string, label: string, sectionRows: ModelResponse[]) => {
+    // A section with no rows renders nothing — Favorites hidden-when-empty is LOCKED
+    // (no empty-state hint), and a rowless header would be meaningless for the others.
+    if (sectionRows.length === 0) return
+    renderRows.push({ kind: 'header', key: `header:${section}`, label })
+    sectionRows.forEach((m, i) => pushOption(section, i, m.id, m.name ?? m.id, m))
+  }
+  if (extraOption) pushOption('extra', 0, extraOption.value, extraOption.label, null)
+  pushSection('fav', COPY.favorites, favoriteRows)
+  pushSection('pop', COPY.popular, popularRows)
+  pushSection('all', COPY.allModels, allRows)
 
   const loadModels = useCallback(async () => {
     if (suppliedModels) return // caller-supplied non-empty list — never fetch
@@ -122,6 +184,22 @@ export default function ModelSelector({ value, onSelect, placeholder, extraOptio
     if (returnFocus) triggerRef.current?.focus()
   }, [])
 
+  // Favorites read once at mount (MODEL-08 read side). Silent array-guarded fetch — a
+  // malformed/unexpected payload must never poison the section build (house pattern,
+  // ChatPage catalog fetch).
+  useEffect(() => {
+    let cancelled = false
+    apiFetch('/api/preferences')
+      .then((data: unknown) => {
+        const fav = (data as { favorite_models?: unknown } | null)?.favorite_models
+        if (!cancelled && Array.isArray(fav)) setFavorites(fav as string[])
+      })
+      .catch(() => {})
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
   // A preselected value needs its display name resolved for the (closed) trigger,
   // so fetch the catalog on mount when a value is set and no list was supplied.
   // When value is null we stay lazy (fetch on open) so the trigger just shows the placeholder.
@@ -142,14 +220,16 @@ export default function ModelSelector({ value, onSelect, placeholder, extraOptio
     setDropUp(spaceBelow < PANEL_MAX && spaceAbove > spaceBelow)
   }, [open])
 
-  // Seed the active row to the selected one (or 0) each time the menu opens with rows present.
+  // Seed the active row to the selected option's NAVIGABLE index (else 0) on OPEN only —
+  // plus once more when the lazy fetch lands (state flips to 'loaded' while open).
+  // Deliberately NOT keyed on option count: live filtering must never re-seed per
+  // keystroke (Pitfall 2 groundwork — search lands next task).
   useEffect(() => {
     if (!open) return
-    const idx = options.findIndex(o => o.value === value)
+    const idx = navigable.findIndex(o => o.value === value)
     setActiveIndex(idx >= 0 ? idx : 0)
-    // Only re-seed on open / option count changes, not on every keystroke.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, options.length])
+  }, [open, state])
 
   // Outside-click closes (mousedown so it fires before a focus shift).
   useEffect(() => {
@@ -165,14 +245,13 @@ export default function ModelSelector({ value, onSelect, placeholder, extraOptio
 
   // Move focus into the list when it opens with options, so arrow-nav + focus-trap work.
   useEffect(() => {
-    if (open && options.length > 0) {
+    if (open && navigable.length > 0) {
       listRef.current?.focus()
     }
-     
-  }, [open, options.length])
+  }, [open, navigable.length])
 
   function selectOption(idx: number) {
-    const opt = options[idx]
+    const opt = navigable[idx]
     if (!opt) return
     onSelect(opt.value)
     closeMenu()
@@ -193,7 +272,7 @@ export default function ModelSelector({ value, onSelect, placeholder, extraOptio
         break
       case 'ArrowDown':
         e.preventDefault()
-        setActiveIndex(i => Math.min(i + 1, options.length - 1))
+        setActiveIndex(i => Math.min(i + 1, navigable.length - 1))
         break
       case 'ArrowUp':
         e.preventDefault()
@@ -205,7 +284,7 @@ export default function ModelSelector({ value, onSelect, placeholder, extraOptio
         break
       case 'End':
         e.preventDefault()
-        setActiveIndex(options.length - 1)
+        setActiveIndex(navigable.length - 1)
         break
       case 'Enter':
       case ' ':
@@ -257,11 +336,11 @@ export default function ModelSelector({ value, onSelect, placeholder, extraOptio
             </button>
           )}
 
-          {state === 'loaded' && options.length === 0 && (
+          {state === 'loaded' && navigable.length === 0 && (
             <p className="px-3 py-2 text-sm text-gray-600 dark:text-gray-400">No models available.</p>
           )}
 
-          {state === 'loaded' && options.length > 0 && (
+          {state === 'loaded' && navigable.length > 0 && (
             <ul
               ref={listRef}
               id={listboxId}
@@ -271,17 +350,29 @@ export default function ModelSelector({ value, onSelect, placeholder, extraOptio
               onKeyDown={onListKeyDown}
               className="max-h-72 overflow-y-auto focus:outline-none"
             >
-              {options.map((opt, idx) => {
+              {renderRows.map(row => {
+                if (row.kind === 'header') {
+                  return (
+                    <li
+                      key={row.key}
+                      role="presentation"
+                      className="px-3 pt-2 pb-1 text-xs font-semibold text-gray-600 dark:text-gray-400"
+                    >
+                      {row.label}
+                    </li>
+                  )
+                }
+                const { opt, navIndex } = row
                 const isSelected = opt.value === value
-                const isActive = idx === activeIndex
-                const hint = opt.model ? null : undefined // placeholder for extraOption (no hint)
+                const isActive = navIndex === activeIndex
                 return (
                   <li
                     key={opt.key}
+                    id={opt.id}
                     role="option"
                     aria-selected={isSelected}
-                    onMouseEnter={() => setActiveIndex(idx)}
-                    onClick={() => selectOption(idx)}
+                    onMouseEnter={() => setActiveIndex(navIndex)}
+                    onClick={() => selectOption(navIndex)}
                     className={`relative flex min-h-11 cursor-pointer flex-col justify-center gap-0.5 py-2 pl-6 pr-3 text-sm ${
                       isActive
                         ? 'bg-gray-100 dark:bg-gray-800'
@@ -296,10 +387,7 @@ export default function ModelSelector({ value, onSelect, placeholder, extraOptio
                       />
                     )}
                     <span className="font-normal text-gray-900 dark:text-white">{opt.label}</span>
-                    {opt.model && (
-                      <ModelHint model={opt.model} />
-                    )}
-                    {hint === null && null}
+                    {opt.model && <ModelHint model={opt.model} />}
                   </li>
                 )
               })}
@@ -311,7 +399,11 @@ export default function ModelSelector({ value, onSelect, placeholder, extraOptio
   )
 }
 
-/** Caption sub-line: the Free tag OR the price hint, plus the context line when present. */
+/**
+ * Caption sub-line: the Free tag OR the price hint, then the Popular chip (D-07 — renders in
+ * EVERY section instance whenever popularity_rank is non-null, closing audit B-1 / MODEL-03),
+ * then the context line when present. Order: [Free|price] [Popular] [context].
+ */
 function ModelHint({ model }: { model: ModelResponse }) {
   const price = priceHint(model.price_per_mtok_prompt, model.price_per_mtok_completion)
   const context = contextHint(model.context_length)
@@ -323,6 +415,11 @@ function ModelHint({ model }: { model: ModelResponse }) {
         </span>
       ) : (
         price && <span>{price}</span>
+      )}
+      {model.popularity_rank != null && (
+        <span className="rounded bg-gray-200 px-1 text-gray-700 dark:bg-gray-700 dark:text-gray-200">
+          {COPY.popular}
+        </span>
       )}
       {context && <span>{context}</span>}
     </span>
