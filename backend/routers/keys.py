@@ -81,7 +81,14 @@ async def exchange(body: ExchangeRequest, user_id: str = Depends(get_user_id)) -
 
 @router.get("/status", response_model=KeyStatusResponse)
 async def status(user_id: str = Depends(get_user_id)):
-    """Masked-only connection state (KEY-03). Never selects/returns encrypted_key."""
+    """Masked-only connection state (KEY-03). Never selects/returns encrypted_key.
+
+    Phase 15 DEMO-01: also carries the read-only demo_fallback_enabled flag.
+    demo_enabled is set EXPLICITLY in BOTH return branches (T-15-01 / RESEARCH
+    Pitfall 3) — keyless users are exactly the demo audience, so the keyless
+    early return must never fall back to the Pydantic default.
+    """
+    demo_enabled = get_settings().demo_fallback_enabled
     row = (
         get_supabase()
         .table("user_api_keys")
@@ -91,11 +98,12 @@ async def status(user_id: str = Depends(get_user_id)):
         .execute()
     )
     if not row or not row.data:
-        return {"connected": False}
+        return {"connected": False, "demo_enabled": demo_enabled}
     return {
         "connected": True,
         "masked_label": row.data["key_label"],
         "connected_at": row.data["connected_at"],
+        "demo_enabled": demo_enabled,
     }
 
 

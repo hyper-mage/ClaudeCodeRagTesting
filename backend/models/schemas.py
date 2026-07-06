@@ -48,6 +48,9 @@ class PreferencesResponse(BaseModel):
     """
     default_model: str | None = None
     theme: str = "dark"
+    # Phase 15 MODEL-08 (D-05) — the user's starred model ids. Always present on
+    # the wire (default []); default_factory avoids a shared mutable default.
+    favorite_models: list[str] = Field(default_factory=list)
 
 
 class PreferencesUpdate(BaseModel):
@@ -61,6 +64,10 @@ class PreferencesUpdate(BaseModel):
     """
     default_model: str | None = None
     theme: Literal["light", "dark"] | None = None
+    # Phase 15 MODEL-08 (D-05) — whole-array replace of the user's favorites.
+    # None default keeps exclude_unset partial-upsert semantics (a theme-only PUT
+    # must NOT carry favorite_models); max_length=200 bounds abuse (Open Q3).
+    favorite_models: list[str] | None = Field(default=None, max_length=200)
 
 
 class ThreadModelUpdate(BaseModel):
@@ -76,6 +83,9 @@ class ThreadModelUpdate(BaseModel):
 
 class MessageCreate(BaseModel):
     content: str
+    # Phase 15 D-11 (DEMO-02) — [Use demo] retry override; the server honors it
+    # ONLY when demo_fallback_enabled (fail-closed preserved when the flag is OFF).
+    use_demo: bool = False
 
 
 class MessageResponse(BaseModel):
@@ -129,6 +139,10 @@ class KeyStatusResponse(BaseModel):
     connected: bool
     masked_label: str | None = None
     connected_at: str | None = None
+    # Phase 15 DEMO-01 — env-driven demo-fallback flag surfaced read-only (never
+    # settable via API); MUST be set explicitly in BOTH status() branches so
+    # keyless users (the demo audience) see it too (RESEARCH Pitfall 3).
+    demo_enabled: bool = False
 
 
 class BalanceResponse(BaseModel):

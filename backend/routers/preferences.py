@@ -3,11 +3,14 @@
 Two handlers under /api/preferences, both bound to the calling user via
 Depends(get_user_id) (the JWT sub — never a value from the request body):
 
-  GET ""  — the user's resolved default_model + theme; a brand-new user with
-            no row resolves to {"default_model": null, "theme": "dark"}.
+  GET ""  — the user's resolved default_model + theme + favorite_models; a
+            brand-new user with no row resolves to
+            {"default_model": null, "theme": "dark", "favorite_models": []}.
   PUT ""  — a PARTIAL upsert (RESEARCH Pattern 2): only the fields the client
             actually sent are written, keyed on user_id (PK). A theme-only PUT
-            must NOT clobber default_model and vice-versa.
+            must NOT clobber default_model or favorite_models and vice-versa
+            (favorite_models is a whole-array replace when sent — Phase 15
+            MODEL-08 / D-05).
 
 SECURITY (T-13-02 / T-13-08):
 - user_id is ALWAYS bound from Depends(get_user_id) (the JWT sub) and written
@@ -42,16 +45,18 @@ async def get_preferences(user_id: str = Depends(get_user_id)):
     row = (
         get_supabase()
         .table("user_preferences")
-        .select("default_model, theme")
+        .select("default_model, theme, favorite_models")
         .eq("user_id", user_id)
         .maybe_single()
         .execute()
     )
     if not row or not row.data:
-        return {"default_model": None, "theme": "dark"}
+        return {"default_model": None, "theme": "dark", "favorite_models": []}
     return {
         "default_model": row.data.get("default_model"),
         "theme": row.data.get("theme") or "dark",
+        # Phase 15 MODEL-08: null-tolerant fallback mirrors the theme guard.
+        "favorite_models": row.data.get("favorite_models") or [],
     }
 
 
@@ -76,14 +81,16 @@ async def update_preferences(
 
     row = (
         db.table("user_preferences")
-        .select("default_model, theme")
+        .select("default_model, theme, favorite_models")
         .eq("user_id", user_id)
         .maybe_single()
         .execute()
     )
     if not row or not row.data:
-        return {"default_model": None, "theme": "dark"}
+        return {"default_model": None, "theme": "dark", "favorite_models": []}
     return {
         "default_model": row.data.get("default_model"),
         "theme": row.data.get("theme") or "dark",
+        # Phase 15 MODEL-08: null-tolerant fallback mirrors the theme guard.
+        "favorite_models": row.data.get("favorite_models") or [],
     }
