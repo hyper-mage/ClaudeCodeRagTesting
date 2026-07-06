@@ -218,7 +218,7 @@ describe('ChatContainer per-thread model header (MODEL-06 / D-05)', () => {
 
     await user.click(screen.getByRole('button', { name: 'Default model' }))
     const listbox = await screen.findByRole('listbox')
-    await user.click(within(listbox).getByRole('option', { name: /claude paid/i }))
+    await user.click(within(listbox).getAllByRole('option', { name: /claude paid/i })[0])
 
     expect(onThreadModelChange).toHaveBeenCalledWith('anthropic/claude')
   })

@@ -69,7 +69,7 @@ describe('DefaultModelSelector (D-04 — PUT /api/preferences {default_model})',
     // Open the selector (heading is separate; the trigger is the model-selector button).
     await user.click(screen.getByRole('button', { name: /select a model|default model/i }))
     await screen.findByRole('listbox')
-    await user.click(screen.getByRole('option', { name: /claude paid/i }))
+    await user.click(screen.getAllByRole('option', { name: /claude paid/i })[0])
 
     const putCall = mockApiFetch.mock.calls.find(
       ([path, opts]) => path === '/api/preferences' && opts?.method === 'PUT'
@@ -87,7 +87,7 @@ describe('DefaultModelSelector (D-04 — PUT /api/preferences {default_model})',
 
     await user.click(screen.getByRole('button', { name: /select a model|default model/i }))
     await screen.findByRole('listbox')
-    await user.click(screen.getByRole('option', { name: /llama free/i }))
+    await user.click(screen.getAllByRole('option', { name: /llama free/i })[0])
 
     expect(onChange).toHaveBeenCalledWith('meta/llama-free')
   })
@@ -102,7 +102,7 @@ describe('DefaultModelSelector (D-04 — PUT /api/preferences {default_model})',
 
     await user.click(screen.getByRole('button', { name: /select a model|default model/i }))
     await screen.findByRole('listbox')
-    await user.click(screen.getByRole('option', { name: /claude paid/i }))
+    await user.click(screen.getAllByRole('option', { name: /claude paid/i })[0])
 
     // The gate modal opened instead of applying (demo OFF gates ANY pick — D-03).
     expect(screen.getByText('Connect OpenRouter?')).toBeInTheDocument()
