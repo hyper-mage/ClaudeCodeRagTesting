@@ -6,6 +6,10 @@ export interface KeyStatus {
   connected: boolean
   masked_label?: string
   connected_at?: string
+  // Demo-fallback flag (Phase 15 D-03/D-11), carried on GET /api/keys/status — the smallest seam
+  // (UI-SPEC resolved). Optional: while status is null/loading it is undefined, which downstream
+  // render conditions treat as false (no flash-gate, no flash-banner).
+  demo_enabled?: boolean
 }
 
 // GET /api/keys/balance shape (Plan 01 BalanceResponse). Secret-free by construction — the backend

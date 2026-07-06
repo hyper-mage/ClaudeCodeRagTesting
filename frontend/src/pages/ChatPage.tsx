@@ -8,6 +8,7 @@ import type { ModelResponse } from '../components/ModelSelector'
 import { apiFetch } from '../lib/api'
 import { applyStoredTheme } from '../lib/themeBootstrap'
 import { useChat } from '../hooks/useChat'
+import { useKeyGate } from '../hooks/useKeyGate'
 import * as Sentry from '@sentry/react'
 import { useToast } from '../contexts/ToastContext'
 
@@ -108,6 +109,16 @@ export default function ChatPage() {
     [activeThreadId, showToast]
   )
 
+  // Shared key gate (KEY-05, D-04): every thread-header pick routes through the gate BEFORE the
+  // PATCH path above. Connected users (and the null clear row) flow straight through; keyless
+  // picks may open the gate modal instead — see useKeyGate's locked decision table.
+  const { guardedSelect, gateModal } = useKeyGate({
+    kind: 'thread',
+    threadId: activeThreadId,
+    models: models ?? [],
+    onApply: handleThreadModelChange,
+  })
+
   const handleNewThread = async () => {
     const thread = await apiFetch('/api/threads', {
       method: 'POST',
@@ -189,7 +200,7 @@ export default function ChatPage() {
         onRetry={retryLastUserMessage}
         activeThreadId={activeThreadId}
         threadModel={activeThread?.model ?? null}
-        onThreadModelChange={handleThreadModelChange}
+        onThreadModelChange={guardedSelect}
         models={models}
       />
       <MobileDrawer isOpen={isDrawerOpen} onClose={closeDrawer} triggerRef={hamburgerRef}>
@@ -202,6 +213,7 @@ export default function ChatPage() {
           onDeleteThread={handleDeleteThread}
         />
       </MobileDrawer>
+      {gateModal}
     </div>
   )
 }

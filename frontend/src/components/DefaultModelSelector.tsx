@@ -1,5 +1,6 @@
 import ModelSelector, { type ModelResponse } from './ModelSelector'
 import { apiFetch } from '../lib/api'
+import { useKeyGate } from '../hooks/useKeyGate'
 
 // LOCKED copy (UI-SPEC § Copywriting Contract). Do not paraphrase.
 const COPY = {
@@ -27,17 +28,24 @@ interface Props {
  * action (the default is always a concrete model id once set), so no extraOption is wired here.
  */
 export default function DefaultModelSelector({ value, onChange, models }: Props) {
-  function handleSelect(modelId: string | null) {
-    // The default-model control never offers a clear row, so modelId is always a concrete id here;
-    // guard defensively so a null can never PUT {default_model: null}.
-    if (modelId == null) return
-    onChange?.(modelId)
-    // Best-effort server persist; never block the UI and never revert on failure (house style).
-    void apiFetch('/api/preferences', {
-      method: 'PUT',
-      body: JSON.stringify({ default_model: modelId }),
-    }).catch(() => {})
-  }
+  // Shared key gate (KEY-05, D-04): the gate decision runs BEFORE onChange/PUT (Pitfall 7) — a
+  // keyless gated pick leaves the trigger on the prior model and fires NO PUT. The former
+  // handleSelect body is now the gate's onApply, reachable ONLY when the gate applies.
+  const { guardedSelect, gateModal } = useKeyGate({
+    kind: 'default',
+    models: models ?? [],
+    onApply: (modelId: string | null) => {
+      // The default-model control never offers a clear row, so modelId is always a concrete id
+      // here; guard defensively so a null can never PUT {default_model: null}.
+      if (modelId == null) return
+      onChange?.(modelId)
+      // Best-effort server persist; never block the UI and never revert on failure (house style).
+      void apiFetch('/api/preferences', {
+        method: 'PUT',
+        body: JSON.stringify({ default_model: modelId }),
+      }).catch(() => {})
+    },
+  })
 
   return (
     <div className="flex flex-col gap-1.5">
@@ -45,7 +53,8 @@ export default function DefaultModelSelector({ value, onChange, models }: Props)
         <h3 className="text-base font-semibold text-gray-900 dark:text-white">{COPY.heading}</h3>
         <p className="text-xs text-gray-600 dark:text-gray-400">{COPY.helper}</p>
       </div>
-      <ModelSelector value={value} onSelect={handleSelect} placeholder="Select a model" models={models} />
+      <ModelSelector value={value} onSelect={guardedSelect} placeholder="Select a model" models={models} />
+      {gateModal}
     </div>
   )
 }
