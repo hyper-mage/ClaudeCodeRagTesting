@@ -43,12 +43,16 @@ def _fake_settings(**overrides):
 
 
 def _db_with_key_row(encrypted_key: str | None, pref_model: str | None = None,
-                     pref_raises: bool = False):
+                     pref_raises: bool = False, cache_is_free: bool | None = None,
+                     cache_raises: bool = False):
     """Build a fake supabase client for _resolve_key_and_model.
 
     - user_api_keys read returns a row (or none) carrying `encrypted_key`.
     - user_preferences read returns `pref_model` (or none), or raises when
       `pref_raises` is set (simulating the absent P13 table → Postgres 42P01).
+    - model_cache read (Plan 15-02 D-03 free-guard) returns {"is_free": <bool>}
+      when `cache_is_free` is True/False, `.data is None` when left at None
+      (unknown model ≠ free), or raises when `cache_raises` is set.
 
     Each read is chained .table().select().eq().maybe_single().execute() → `.data`.
     """
@@ -72,6 +76,18 @@ def _db_with_key_row(encrypted_key: str | None, pref_model: str | None = None,
             else:
                 exec_result.data = (
                     {"default_model": pref_model} if pref_model else None
+                )
+                tbl.select.return_value.eq.return_value.maybe_single.return_value.execute.return_value = (
+                    exec_result
+                )
+        elif name == "model_cache":
+            if cache_raises:
+                tbl.select.return_value.eq.return_value.maybe_single.return_value.execute.side_effect = (
+                    RuntimeError("model_cache read failed (simulated cold/mid-refresh cache)")
+                )
+            else:
+                exec_result.data = (
+                    {"is_free": cache_is_free} if cache_is_free is not None else None
                 )
                 tbl.select.return_value.eq.return_value.maybe_single.return_value.execute.return_value = (
                     exec_result
@@ -366,3 +382,160 @@ def test_thread_model_wins_when_set():
     assert api_key == "sk-or-v1-PLAIN"
     assert mode == "user"
     assert is_user_key is True
+
+
+# ---------------------------------------------------------------------------
+# Plan 15-02: D-03 server-side free-guard + D-11 `use_demo` retry override.
+# The guard trusts model_cache.is_free ONLY (never the FE, never the :free
+# suffix); ANY non-`is_free is True` outcome falls back to the pinned
+# settings.demo_fallback_model. The override is gated on demo_fallback_enabled
+# in the SAME condition, BEFORE the user-key branch (SEC-03 kill switch intact).
+# ---------------------------------------------------------------------------
+
+
+def test_demo_runs_picked_free_model():
+    """D-03: keyless + flag ON + model_cache marks the picked model is_free=True
+    → the PICKED model runs on the owner key (mode 'demo'), not the pinned fallback."""
+    from routers import chat
+
+    db = _db_with_key_row(None, cache_is_free=True)
+    settings = _fake_settings(demo_fallback_enabled=True)
+    body = MagicMock(spec=["model"], model="picked/free-model")
+
+    with patch.object(chat, "get_settings", return_value=settings):
+        api_key, model, mode, is_user_key = chat._resolve_key_and_model(
+            db, "user-1", {"id": "t1"}, body
+        )
+
+    assert api_key == settings.resolved_llm_api_key
+    assert model == "picked/free-model"
+    assert mode == "demo"
+    assert is_user_key is False
+
+
+def test_demo_paid_model_falls_back_to_pinned():
+    """D-03: keyless + flag ON + model_cache says is_free=False → the paid pick
+    is refused server-side; the turn runs the pinned demo_fallback_model."""
+    from routers import chat
+
+    db = _db_with_key_row(None, cache_is_free=False)
+    settings = _fake_settings(demo_fallback_enabled=True)
+    body = MagicMock(spec=["model"], model="picked/paid-model")
+
+    with patch.object(chat, "get_settings", return_value=settings):
+        api_key, model, mode, is_user_key = chat._resolve_key_and_model(
+            db, "user-1", {"id": "t1"}, body
+        )
+
+    assert api_key == settings.resolved_llm_api_key
+    assert model == settings.demo_fallback_model
+    assert model != "picked/paid-model"
+    assert mode == "demo"
+    assert is_user_key is False
+
+
+def test_demo_unknown_model_falls_back():
+    """D-03 / Pitfall 5: a model ABSENT from model_cache (maybe_single .data is
+    None) is NOT free — unknown ≠ free; the turn runs the pinned fallback."""
+    from routers import chat
+
+    db = _db_with_key_row(None)  # cache_is_free=None → .data is None (no row)
+    settings = _fake_settings(demo_fallback_enabled=True)
+    body = MagicMock(spec=["model"], model="picked/unknown-model")
+
+    with patch.object(chat, "get_settings", return_value=settings):
+        api_key, model, mode, is_user_key = chat._resolve_key_and_model(
+            db, "user-1", {"id": "t1"}, body
+        )
+
+    assert api_key == settings.resolved_llm_api_key
+    assert model == settings.demo_fallback_model
+    assert model != "picked/unknown-model"
+    assert mode == "demo"
+    assert is_user_key is False
+
+
+def test_demo_cache_error_falls_back():
+    """D-03 / Pitfall 5 (T-15-07): a model_cache read failure never crashes the
+    turn — the exception is swallowed and the pinned fallback runs."""
+    from routers import chat
+
+    db = _db_with_key_row(None, cache_raises=True)
+    settings = _fake_settings(demo_fallback_enabled=True)
+    body = MagicMock(spec=["model"], model="picked/free-model")
+
+    with patch.object(chat, "get_settings", return_value=settings):
+        # Must NOT raise — any escape here is the T-15-07 DoS defect.
+        api_key, model, mode, is_user_key = chat._resolve_key_and_model(
+            db, "user-1", {"id": "t1"}, body
+        )
+
+    assert api_key == settings.resolved_llm_api_key
+    assert model == settings.demo_fallback_model
+    assert mode == "demo"
+    assert is_user_key is False
+
+
+def test_use_demo_override_beats_user_key_when_flag_on():
+    """D-11: body.use_demo=True + flag ON short-circuits BEFORE the user-key
+    branch — the turn runs mode 'demo' on the OWNER key even though a connected
+    user key exists, and the model is still free-guarded via model_cache."""
+    from routers import chat
+
+    db = _db_with_key_row("sk-or-v1-CIPHER", cache_is_free=True)
+    settings = _fake_settings(demo_fallback_enabled=True)
+    body = MagicMock(spec=["use_demo", "model"], use_demo=True, model="picked/free-model")
+
+    with patch.object(chat, "get_settings", return_value=settings), \
+         patch.object(chat, "decrypt_key", side_effect=lambda c: "sk-or-v1-PLAIN"):
+        api_key, model, mode, is_user_key = chat._resolve_key_and_model(
+            db, "user-1", {"id": "t1"}, body
+        )
+
+    assert mode == "demo"
+    assert api_key == settings.resolved_llm_api_key  # owner key mints the demo turn
+    assert api_key != "sk-or-v1-PLAIN"               # NOT the decrypted user key
+    assert model == "picked/free-model"              # free-guarded, cache says free
+    assert is_user_key is False
+
+
+def test_use_demo_inert_when_flag_off_with_key():
+    """T-15-05: use_demo=True with the flag OFF is completely inert — a
+    connected user resolves 'user' as if the override were never sent."""
+    from routers import chat
+
+    db = _db_with_key_row("sk-or-v1-CIPHER")
+    settings = _fake_settings(demo_fallback_enabled=False)
+    body = MagicMock(spec=["use_demo"], use_demo=True)
+
+    with patch.object(chat, "get_settings", return_value=settings), \
+         patch.object(chat, "decrypt_key", side_effect=lambda c: "sk-or-v1-PLAIN"):
+        api_key, model, mode, is_user_key = chat._resolve_key_and_model(
+            db, "user-1", {"id": "t1"}, body
+        )
+
+    assert mode == "user"                            # normal resolution, override ignored
+    assert api_key == "sk-or-v1-PLAIN"
+    assert api_key != settings.resolved_llm_api_key  # owner key never minted
+    assert is_user_key is True
+
+
+def test_use_demo_inert_when_flag_off_keyless():
+    """T-15-05 / SEC-03: use_demo=True + flag OFF + no key row still refuses —
+    api_key None, mode 'no_key'; the kill switch cannot be bypassed by a
+    crafted request body."""
+    from routers import chat
+
+    db = _db_with_key_row(None)
+    settings = _fake_settings(demo_fallback_enabled=False)
+    body = MagicMock(spec=["use_demo"], use_demo=True)
+
+    with patch.object(chat, "get_settings", return_value=settings):
+        api_key, model, mode, is_user_key = chat._resolve_key_and_model(
+            db, "user-1", {"id": "t1"}, body
+        )
+
+    assert api_key is None
+    assert api_key != settings.resolved_llm_api_key
+    assert mode == "no_key"
+    assert is_user_key is False

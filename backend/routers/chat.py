@@ -149,6 +149,33 @@ def _safe_user_default_model(db, user_id: str) -> str | None:
         return None
 
 
+def _demo_model_for(db, model: str, settings) -> str:
+    """D-03 server-side free-guard: run the picked model ONLY when model_cache
+    says it is free; non-free, unknown, or any read failure → the pinned
+    settings.demo_fallback_model. Never trusts the frontend; unknown is NOT free.
+
+    is_free is precomputed by model_catalog_service._to_cache_row — never
+    recompute freeness from pricing or the `:free` suffix here.
+    """
+    try:
+        row = (
+            db.table("model_cache")
+            .select("is_free")
+            .eq("model_id", model)
+            .maybe_single()
+            .execute()
+        )
+        # Defensive maybe_single shape (mirrors the user_api_keys guard below):
+        # only a dict row explicitly carrying is_free=True passes the guard.
+        if row and isinstance(row.data, dict) and row.data.get("is_free") is True:
+            return model
+    except Exception as e:  # T-15-07: a cache-read error must never crash the turn
+        logger.warning(
+            f"demo free-check failed; using pinned fallback: {scrub_secrets(str(e))}"
+        )
+    return settings.demo_fallback_model
+
+
 def _resolve_key_and_model(
     db, user_id: str, thread_row: dict | None, body
 ) -> tuple[str | None, str, str, bool]:
@@ -161,9 +188,12 @@ def _resolve_key_and_model(
         body.model? → thread_row.model? → user_preferences.default_model?
                     → settings.llm_model (owner default — always present)
 
-    KEY — fail-closed three-branch (NEVER a fail-open one-liner):
-        if a user_api_keys row exists → decrypt in-memory → ("user", is_user_key=True)
-        elif settings.demo_fallback_enabled → owner key + free demo model → ("demo", False)
+    KEY — fail-closed four-branch (NEVER a fail-open one-liner):
+        if body.use_demo AND settings.demo_fallback_enabled → owner key +
+            free-guarded demo model → ("demo", False)  [D-11; flag OFF → inert]
+        elif a user_api_keys row exists → decrypt in-memory → ("user", is_user_key=True)
+        elif settings.demo_fallback_enabled → owner key + free-guarded demo model
+            → ("demo", False)
         else → (None, model, "no_key", False) ; caller refuses with a structured error.
     """
     settings = get_settings()
@@ -176,7 +206,18 @@ def _resolve_key_and_model(
         or settings.llm_model                     # owner default — always present
     )
 
-    # KEY tier — fail-closed three-branch. Read the user's stored key via the
+    # D-11 [Use demo] override — honored ONLY when the flag is ON, checked in the
+    # SAME condition BEFORE the user-key branch (T-15-05: flag OFF → completely
+    # inert, SEC-03 kill switch intact). Model still free-guarded (D-03).
+    if getattr(body, "use_demo", False) and settings.demo_fallback_enabled:
+        return (
+            settings.resolved_llm_api_key,
+            _demo_model_for(db, model, settings),
+            "demo",
+            False,
+        )
+
+    # KEY tier — fail-closed. Read the user's stored key via the
     # service-role client using the empty-row guard from keys.py:79-88.
     row = (
         db.table("user_api_keys")
@@ -194,11 +235,13 @@ def _resolve_key_and_model(
         return api_key, model, "user", True
 
     if settings.demo_fallback_enabled:
-        # Owner-key fallback is PINNED to a free model (D-06): the cost bound comes
-        # from the MODEL, not from who's eligible (D-05).
+        # Keyless demo turn runs the user's PICKED model when the D-03 server-side
+        # free-guard confirms model_cache.is_free is True; otherwise the pinned
+        # demo_fallback_model. The cost bound still comes from the MODEL, not from
+        # who's eligible (D-05) — the guard keeps that bound structural.
         return (
             settings.resolved_llm_api_key,
-            settings.demo_fallback_model or model,
+            _demo_model_for(db, model, settings),
             "demo",
             False,
         )
