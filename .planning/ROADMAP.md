@@ -11,14 +11,14 @@ Plans:
 **Goal:** Close out v1.2: key-gated model selection (picking a model with no key triggers OAuth connect), favorite/pin models, demo-fallback flag decision + non-dismissible demo banner (gated on the 999.2 SEC-03 PASS finding), and the picker polish the audit flagged — render popular marking (B-1/MODEL-03) and add catalog search (W-1/MODEL-01).
 **Requirements**: KEY-05, MODEL-08, DEMO-01, DEMO-02, SEC-03 (+ audit fold-ins: MODEL-03 render seam, MODEL-01 search)
 **Depends on:** Phase 14, Phase 999.2 (SEC-03 finding: .planning/phases/999.2-cost-guardrail-burn-script/999.2-SEC-03-FINDING.md)
-**Plans:** 8 plans
+**Plans:** 3/8 plans executed
 
 Plans:
 **Wave 1**
 
-- [ ] 15-01-PLAN.md — Migration 033 + schema fields + favorite_models roundtrip + demo_enabled in both status branches + [BLOCKING] dev db push (wave 1)
-- [ ] 15-02-PLAN.md — chat.py demo resolution: _demo_model_for free-guard + flag-gated use_demo override, SEC-03 killswitch tests pinned green (wave 1)
-- [ ] 15-03-PLAN.md — OAuthCallbackPage one-shot pending-selection resume + combined toasts + new page test file (wave 1)
+- [x] 15-01-PLAN.md — Migration 033 + schema fields + favorite_models roundtrip + demo_enabled in both status branches + [BLOCKING] dev db push (wave 1)
+- [x] 15-02-PLAN.md — chat.py demo resolution: _demo_model_for free-guard + flag-gated use_demo override, SEC-03 killswitch tests pinned green (wave 1)
+- [x] 15-03-PLAN.md — OAuthCallbackPage one-shot pending-selection resume + combined toasts + new page test file (wave 1)
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
