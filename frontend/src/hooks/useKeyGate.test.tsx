@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { render, screen, act } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { useEffect } from 'react'
 import { useKeyGate } from './useKeyGate'
 import { startOpenRouterConnect } from '../lib/pkce'
 import type { ModelResponse } from '../components/ModelSelector'
@@ -50,15 +51,19 @@ type GateOptions = Parameters<typeof useKeyGate>[0]
 type GateApi = ReturnType<typeof useKeyGate>
 
 // Host component: renders gateModal and exposes the hook surface for imperative driving.
-function Host({ opts, api }: { opts: GateOptions; api: { current: GateApi | null } }) {
+// The ref assignment lives in an effect (not render) per react-hooks/refs; act() in select()
+// flushes effects, so the ref is always populated before tests drive guardedSelect.
+function Host({ opts, apiRef }: { opts: GateOptions; apiRef: { current: GateApi | null } }) {
   const gate = useKeyGate(opts)
-  api.current = gate
+  useEffect(() => {
+    apiRef.current = gate
+  })
   return <>{gate.gateModal}</>
 }
 
 function renderGate(over: Partial<GateOptions> = {}) {
   const onApply = vi.fn()
-  const api = { current: null as GateApi | null }
+  const apiRef = { current: null as GateApi | null }
   const opts: GateOptions = {
     kind: 'thread',
     threadId: 't-1',
@@ -66,13 +71,13 @@ function renderGate(over: Partial<GateOptions> = {}) {
     onApply,
     ...over,
   }
-  render(<Host opts={opts} api={api} />)
-  return { onApply, api }
+  render(<Host opts={opts} apiRef={apiRef} />)
+  return { onApply, apiRef }
 }
 
-function select(api: { current: GateApi | null }, modelId: string | null) {
+function select(apiRef: { current: GateApi | null }, modelId: string | null) {
   act(() => {
-    api.current!.guardedSelect(modelId)
+    apiRef.current!.guardedSelect(modelId)
   })
 }
 
@@ -88,32 +93,32 @@ describe('useKeyGate — locked decision table (KEY-05 / D-01 / D-03 / D-04)', (
 
   it('row 1: connected → onApply immediately, no modal', () => {
     keyStatusState.status = { connected: true }
-    const { onApply, api } = renderGate()
-    select(api, PAID_MODEL.id)
+    const { onApply, apiRef } = renderGate()
+    select(apiRef, PAID_MODEL.id)
     expect(onApply).toHaveBeenCalledWith(PAID_MODEL.id)
     expect(modalHeading()).not.toBeInTheDocument()
   })
 
   it('row 2: status null (unresolved) → onApply immediately (A3 — no flash-gate; server stays fail-closed)', () => {
     keyStatusState.status = null
-    const { onApply, api } = renderGate()
-    select(api, PAID_MODEL.id)
+    const { onApply, apiRef } = renderGate()
+    select(apiRef, PAID_MODEL.id)
     expect(onApply).toHaveBeenCalledWith(PAID_MODEL.id)
     expect(modalHeading()).not.toBeInTheDocument()
   })
 
   it('row 3: keyless + demo ON + is_free === true → onApply immediately (D-03 free fast-path)', () => {
     keyStatusState.status = { connected: false, demo_enabled: true }
-    const { onApply, api } = renderGate()
-    select(api, FREE_MODEL.id)
+    const { onApply, apiRef } = renderGate()
+    select(apiRef, FREE_MODEL.id)
     expect(onApply).toHaveBeenCalledWith(FREE_MODEL.id)
     expect(modalHeading()).not.toBeInTheDocument()
   })
 
   it('row 4: keyless + demo ON + paid model → modal with the paid body; onApply NOT called', () => {
     keyStatusState.status = { connected: false, demo_enabled: true }
-    const { onApply, api } = renderGate()
-    select(api, PAID_MODEL.id)
+    const { onApply, apiRef } = renderGate()
+    select(apiRef, PAID_MODEL.id)
     expect(onApply).not.toHaveBeenCalled()
     expect(modalHeading()).toBeInTheDocument()
     expect(
@@ -125,8 +130,8 @@ describe('useKeyGate — locked decision table (KEY-05 / D-01 / D-03 / D-04)', (
 
   it('row 5: keyless + demo ON + modelId not found in catalog → treated as paid (modal), display name = id', () => {
     keyStatusState.status = { connected: false, demo_enabled: true }
-    const { onApply, api } = renderGate()
-    select(api, 'ghost/unknown-model')
+    const { onApply, apiRef } = renderGate()
+    select(apiRef, 'ghost/unknown-model')
     expect(onApply).not.toHaveBeenCalled()
     expect(modalHeading()).toBeInTheDocument()
     expect(
@@ -138,8 +143,8 @@ describe('useKeyGate — locked decision table (KEY-05 / D-01 / D-03 / D-04)', (
 
   it('row 6: keyless + demo OFF + ANY model (even free) → modal with the demo-OFF body', () => {
     keyStatusState.status = { connected: false, demo_enabled: false }
-    const { onApply, api } = renderGate()
-    select(api, FREE_MODEL.id)
+    const { onApply, apiRef } = renderGate()
+    select(apiRef, FREE_MODEL.id)
     expect(onApply).not.toHaveBeenCalled()
     expect(modalHeading()).toBeInTheDocument()
     expect(
@@ -151,8 +156,8 @@ describe('useKeyGate — locked decision table (KEY-05 / D-01 / D-03 / D-04)', (
 
   it('row 7: modelId null (extraOption clear row) → onApply immediately, NEVER gated (Open Q1)', () => {
     keyStatusState.status = { connected: false, demo_enabled: false }
-    const { onApply, api } = renderGate()
-    select(api, null)
+    const { onApply, apiRef } = renderGate()
+    select(apiRef, null)
     expect(onApply).toHaveBeenCalledWith(null)
     expect(modalHeading()).not.toBeInTheDocument()
   })
@@ -165,8 +170,8 @@ describe('useKeyGate — locked decision table (KEY-05 / D-01 / D-03 / D-04)', (
     mockedStart.mockImplementation(async () => {
       stashAtLaunch = sessionStorage.getItem('or_pending_selection')
     })
-    const { onApply, api } = renderGate({ kind: 'thread', threadId: 't-42' })
-    select(api, PAID_MODEL.id)
+    const { onApply, apiRef } = renderGate({ kind: 'thread', threadId: 't-42' })
+    select(apiRef, PAID_MODEL.id)
 
     await user.click(screen.getByRole('button', { name: 'Connect' }))
 
@@ -185,8 +190,8 @@ describe('useKeyGate — locked decision table (KEY-05 / D-01 / D-03 / D-04)', (
   it('row 8b: [Connect] on a default pick → stash omits threadId, returnTo /settings', async () => {
     const user = userEvent.setup()
     keyStatusState.status = { connected: false, demo_enabled: false }
-    const { api } = renderGate({ kind: 'default', threadId: undefined })
-    select(api, PAID_MODEL.id)
+    const { apiRef } = renderGate({ kind: 'default', threadId: undefined })
+    select(apiRef, PAID_MODEL.id)
 
     await user.click(screen.getByRole('button', { name: 'Connect' }))
 
@@ -203,8 +208,8 @@ describe('useKeyGate — locked decision table (KEY-05 / D-01 / D-03 / D-04)', (
   it('row 9: [Cancel] → modal closes, onApply never called, no stash written, no PKCE launch', async () => {
     const user = userEvent.setup()
     keyStatusState.status = { connected: false, demo_enabled: true }
-    const { onApply, api } = renderGate()
-    select(api, PAID_MODEL.id)
+    const { onApply, apiRef } = renderGate()
+    select(apiRef, PAID_MODEL.id)
     expect(modalHeading()).toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: 'Cancel' }))
