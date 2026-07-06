@@ -9,6 +9,17 @@ import DefaultModelSelector from './DefaultModelSelector'
 // mock the api boundary.
 vi.mock('../lib/api', () => makeApiMock())
 
+// The shared key gate (15-05) reads connected/demo_enabled via useKeyStatus (→ useAuth →
+// supabase env) — mock the store boundary so the suite stays network/env-free and each test can
+// drive the gate branch. Default: connected, so the pre-gate selection tests flow straight
+// through to onChange/PUT unchanged.
+const keyStatusState = vi.hoisted(() => ({
+  status: { connected: true } as { connected: boolean; demo_enabled?: boolean } | null,
+}))
+vi.mock('../hooks/useKeyStatus', () => ({
+  useKeyStatus: () => ({ status: keyStatusState.status, loading: false }),
+}))
+
 const mockApiFetch = apiFetch as ReturnType<typeof vi.fn>
 
 const MODELS = [
@@ -38,6 +49,7 @@ describe('DefaultModelSelector (D-04 — PUT /api/preferences {default_model})',
   beforeEach(() => {
     mockApiFetch.mockReset()
     mockApiFetch.mockResolvedValue(MODELS)
+    keyStatusState.status = { connected: true }
   })
 
   it('renders the LOCKED heading and helper copy', () => {
@@ -78,5 +90,33 @@ describe('DefaultModelSelector (D-04 — PUT /api/preferences {default_model})',
     await user.click(screen.getByRole('option', { name: /llama free/i }))
 
     expect(onChange).toHaveBeenCalledWith('meta/llama-free')
+  })
+
+  it('keyless pick is gated BEFORE onChange/PUT — modal opens, nothing half-applies (Pitfall 7)', async () => {
+    keyStatusState.status = { connected: false, demo_enabled: false }
+    const user = userEvent.setup()
+    const onChange = vi.fn()
+    renderWithProviders(
+      <DefaultModelSelector value={null} models={MODELS} onChange={onChange} />
+    )
+
+    await user.click(screen.getByRole('button', { name: /select a model|default model/i }))
+    await screen.findByRole('listbox')
+    await user.click(screen.getByRole('option', { name: /claude paid/i }))
+
+    // The gate modal opened instead of applying (demo OFF gates ANY pick — D-03).
+    expect(screen.getByText('Connect OpenRouter?')).toBeInTheDocument()
+    // The apply path never ran: no optimistic onChange, no PUT (Pitfall 7).
+    expect(onChange).not.toHaveBeenCalled()
+    const putCall = mockApiFetch.mock.calls.find(
+      ([path, opts]) => path === '/api/preferences' && opts?.method === 'PUT'
+    )
+    expect(putCall).toBeUndefined()
+
+    // Cancel closes with the selection unchanged — still no onChange/PUT, no stash written.
+    await user.click(screen.getByRole('button', { name: 'Cancel' }))
+    expect(screen.queryByText('Connect OpenRouter?')).not.toBeInTheDocument()
+    expect(onChange).not.toHaveBeenCalled()
+    expect(sessionStorage.getItem('or_pending_selection')).toBeNull()
   })
 })

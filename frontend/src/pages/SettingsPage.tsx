@@ -57,6 +57,9 @@ export default function SettingsPage() {
   }, [])
 
   const handleConnect = () => {
+    // Stale-stash hygiene (Pitfall 6 / T-15-18): useKeyGate is the stash's ONLY writer. A plain
+    // Settings connect must never auto-apply a leftover pick from an earlier abandoned gate flow.
+    sessionStorage.removeItem('or_pending_selection')
     startOpenRouterConnect()
   }
 

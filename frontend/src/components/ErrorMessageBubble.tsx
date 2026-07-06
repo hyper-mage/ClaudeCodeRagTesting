@@ -117,6 +117,10 @@ export default function ErrorMessageBubble({
     <button
       type="button"
       onClick={() => {
+        // Stale-stash hygiene (Pitfall 6 / T-15-18): a plain Reconnect must never auto-apply a
+        // leftover pending selection from an earlier abandoned gate flow (useKeyGate is the
+        // stash's only writer; the callback Retry PRESERVES it — locked per-call-site table).
+        sessionStorage.removeItem('or_pending_selection')
         void startOpenRouterConnect()
       }}
       className={`${BTN_BASE} ${type === 'payment_required' ? BTN_SECONDARY : BTN_PRIMARY}`}
