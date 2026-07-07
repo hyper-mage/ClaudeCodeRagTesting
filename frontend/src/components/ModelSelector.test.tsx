@@ -68,6 +68,13 @@ function hasPopularChip(el: Element): boolean {
   )
 }
 
+/** All PUT /api/preferences call bodies, JSON-parsed (MODEL-08 whole-array replace assertions). */
+function preferencesPutBodies(): unknown[] {
+  return mockApiFetch.mock.calls
+    .filter(c => c[0] === '/api/preferences' && c[1]?.method === 'PUT')
+    .map(c => JSON.parse(c[1].body as string))
+}
+
 describe('ModelSelector (a11y contract — UI-SPEC LOCKED)', () => {
   beforeEach(() => {
     mockApiFetch.mockReset()
@@ -507,5 +514,183 @@ describe('ModelSelector search (MODEL-01 — LOCKED combobox contract)', () => {
     await user.keyboard('{Enter}')
     expect(onSelect).toHaveBeenCalledWith('meta/llama-3.3-free')
     await waitFor(() => expect(screen.queryByRole('listbox')).not.toBeInTheDocument())
+  })
+})
+
+describe('ModelSelector favorite star (MODEL-08 / D-05)', () => {
+  beforeEach(() => {
+    mockApiFetch.mockReset()
+  })
+
+  it('star click toggles: whole-array PUT, dropdown stays OPEN, onSelect NOT called', async () => {
+    const user = userEvent.setup()
+    const onSelect = vi.fn()
+    mockCatalog()
+    renderWithProviders(<ModelSelector value={null} onSelect={onSelect} placeholder="Pick a model" />)
+
+    await user.click(screen.getByRole('button', { name: /pick a model/i }))
+    await screen.findByRole('listbox')
+
+    // Sectioned picker: a model renders in multiple sections — take the FIRST star instance.
+    const star = screen.getAllByRole('button', { name: 'Add Claude Paid to favorites' })[0]
+    await user.click(star)
+
+    // Whole-array replace, favorite_models the ONLY key in the body (D-05 partial upsert).
+    expect(preferencesPutBodies()).toEqual([{ favorite_models: ['anthropic/claude'] }])
+    // stopPropagation: no selection, no close — users can star several in one open.
+    expect(onSelect).not.toHaveBeenCalled()
+    expect(screen.getByRole('listbox')).toBeInTheDocument()
+  })
+
+  it('Shift+Enter toggles favorite on the active row while plain Enter still selects', async () => {
+    const user = userEvent.setup()
+    const onSelect = vi.fn()
+    mockCatalog()
+    renderWithProviders(<ModelSelector value={null} onSelect={onSelect} placeholder="Pick a model" />)
+
+    await user.click(screen.getByRole('button', { name: /pick a model/i }))
+    await screen.findByRole('listbox')
+
+    // Active row starts on the first navigable option (Popular: llama, rank 1).
+    await user.keyboard('{Shift>}{Enter}{/Shift}')
+    expect(preferencesPutBodies()).toEqual([{ favorite_models: ['meta/llama-3.3-free'] }])
+    expect(onSelect).not.toHaveBeenCalled()
+    expect(screen.getByRole('listbox')).toBeInTheDocument()
+
+    // Plain Enter still selects the active row (now Favorites: llama) and closes.
+    await user.keyboard('{Enter}')
+    expect(onSelect).toHaveBeenCalledTimes(1)
+    expect(onSelect).toHaveBeenCalledWith('meta/llama-3.3-free')
+    await waitFor(() => expect(screen.queryByRole('listbox')).not.toBeInTheDocument())
+  })
+
+  it('renders a star on every catalog row but never on the extraOption row', async () => {
+    const user = userEvent.setup()
+    mockCatalog()
+    renderWithProviders(
+      <ModelSelector
+        value={null}
+        onSelect={vi.fn()}
+        placeholder="Pick a model"
+        extraOption={{ label: 'Use my default model', value: null }}
+      />
+    )
+
+    await user.click(screen.getByRole('button', { name: /pick a model/i }))
+    const listbox = await screen.findByRole('listbox')
+
+    const extra = within(listbox).getByRole('option', { name: 'Use my default model' })
+    expect(within(extra).queryByRole('button')).not.toBeInTheDocument()
+
+    // Every catalog instance (Popular 2 + All 3) carries exactly one always-visible star.
+    const stars = within(listbox).getAllByRole('button', { name: /favorites$/ })
+    expect(stars).toHaveLength(SECTIONED_COUNT)
+  })
+
+  it('starring a model adds it to the Favorites section in the same open session', async () => {
+    const user = userEvent.setup()
+    mockCatalog()
+    renderWithProviders(<ModelSelector value={null} onSelect={vi.fn()} placeholder="Pick a model" />)
+
+    await user.click(screen.getByRole('button', { name: /pick a model/i }))
+    const listbox = await screen.findByRole('listbox')
+    expect(listbox.querySelectorAll('[id*="-opt-fav-"]')).toHaveLength(0)
+
+    await user.click(screen.getAllByRole('button', { name: 'Add Claude Paid to favorites' })[0])
+
+    // The Favorites header appears and the starred row sits under it — no reopen needed.
+    const headers = Array.from(
+      screen.getByRole('listbox').querySelectorAll('li[role="presentation"]')
+    )
+    expect(headers.map(h => h.textContent)).toEqual(['Favorites', 'Popular', 'All models'])
+    const favRows = Array.from(screen.getByRole('listbox').querySelectorAll('[id*="-opt-fav-"]'))
+    expect(favRows).toHaveLength(1)
+    expect(favRows[0].textContent).toContain('Claude Paid')
+  })
+
+  it('un-starring the only favorite hides the Favorites section entirely', async () => {
+    const user = userEvent.setup()
+    mockCatalog({ favorites: ['anthropic/claude'] })
+    renderWithProviders(<ModelSelector value={null} onSelect={vi.fn()} placeholder="Pick a model" />)
+
+    await user.click(screen.getByRole('button', { name: /pick a model/i }))
+    const listbox = await screen.findByRole('listbox')
+    expect(
+      Array.from(listbox.querySelectorAll('li[role="presentation"]')).map(h => h.textContent)
+    ).toEqual(['Favorites', 'Popular', 'All models'])
+
+    await user.click(
+      screen.getAllByRole('button', { name: 'Remove Claude Paid from favorites' })[0]
+    )
+
+    expect(preferencesPutBodies()).toEqual([{ favorite_models: [] }])
+    expect(
+      Array.from(
+        screen.getByRole('listbox').querySelectorAll('li[role="presentation"]')
+      ).map(h => h.textContent)
+    ).toEqual(['Popular', 'All models'])
+  })
+
+  it('PUT rejection does not revert the optimistic toggle and shows no toast', async () => {
+    const user = userEvent.setup()
+    mockApiFetch.mockImplementation((url: string, init?: { method?: string }) => {
+      if (url === '/api/models') return Promise.resolve(MODELS)
+      if (url === '/api/preferences' && init?.method === 'PUT') {
+        return Promise.reject(new Error('boom'))
+      }
+      if (url === '/api/preferences') {
+        return Promise.resolve({ default_model: null, theme: 'dark', favorite_models: [] })
+      }
+      return Promise.resolve({})
+    })
+    renderWithProviders(<ModelSelector value={null} onSelect={vi.fn()} placeholder="Pick a model" />)
+
+    await user.click(screen.getByRole('button', { name: /pick a model/i }))
+    await screen.findByRole('listbox')
+    await user.click(screen.getAllByRole('button', { name: 'Add Claude Paid to favorites' })[0])
+
+    // The PUT fired and rejected — the star stays favorited (silent, no revert)…
+    await waitFor(() => expect(preferencesPutBodies()).toHaveLength(1))
+    expect(
+      screen.getAllByRole('button', { name: 'Remove Claude Paid from favorites' }).length
+    ).toBeGreaterThan(0)
+    expect(
+      Array.from(
+        screen.getByRole('listbox').querySelectorAll('li[role="presentation"]')
+      ).map(h => h.textContent)
+    ).toEqual(['Favorites', 'Popular', 'All models'])
+    // …and no toast appears (ToastProvider renders role="status" items).
+    expect(screen.queryAllByRole('status')).toHaveLength(0)
+  })
+
+  it('flips the star aria-label between the two locked strings (blue fill tracks it)', async () => {
+    const user = userEvent.setup()
+    mockCatalog()
+    renderWithProviders(<ModelSelector value={null} onSelect={vi.fn()} placeholder="Pick a model" />)
+
+    await user.click(screen.getByRole('button', { name: /pick a model/i }))
+    await screen.findByRole('listbox')
+
+    const star = screen.getAllByRole('button', { name: 'Add Llama 3.3 Free to favorites' })[0]
+    expect(star.querySelector('svg')?.getAttribute('class')).toContain('text-gray-400')
+    await user.click(star)
+
+    // Favorited: llama is ranked → Favorites + Popular + All = 3 identical instances.
+    const removeStars = screen.getAllByRole('button', {
+      name: 'Remove Llama 3.3 Free from favorites',
+    })
+    expect(removeStars).toHaveLength(3)
+    for (const s of removeStars) {
+      expect(s.querySelector('svg')?.getAttribute('class')).toContain('fill-blue-600')
+    }
+
+    // Toggle back: label returns to Add on the surviving 2 instances (Favorites collapses).
+    await user.click(removeStars[0])
+    expect(
+      screen.getAllByRole('button', { name: 'Add Llama 3.3 Free to favorites' })
+    ).toHaveLength(2)
+    expect(
+      screen.queryAllByRole('button', { name: 'Remove Llama 3.3 Free from favorites' })
+    ).toHaveLength(0)
   })
 })

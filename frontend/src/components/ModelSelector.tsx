@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useId, useRef, useState } from 'react'
-import { Check, ChevronDown, Search } from 'lucide-react'
+import { Check, ChevronDown, Search, Star } from 'lucide-react'
 import { apiFetch } from '../lib/api'
 import { matchModel } from '../lib/fuzzy'
 
@@ -101,6 +101,12 @@ function contextHint(contextLength: number | null): string | null {
  * the sections collapse into ONE flat score-ranked list — no headers, extraOption hidden,
  * non-matches removed.
  *
+ * Favorite star (D-05, MODEL-08): every catalog row (sections AND flat search results, never the
+ * extraOption row) carries an always-visible star at its right edge. Click toggles the favorite
+ * WITHOUT selecting or closing; Shift+Enter toggles on the active row. Toggles are optimistic:
+ * local state first, then a fire-and-forget PUT /api/preferences {favorite_models} whole-array
+ * replace — silent, no revert on failure, no toast (house style).
+ *
  * LOCKED a11y contract (UI-SPEC § Interaction Contract — combobox-with-list-popup, supersedes
  * the listbox-focus model): trigger keeps aria-haspopup="listbox"/aria-expanded/aria-controls
  * and Enter/Space/ArrowDown opens; on open, focus moves to the SEARCH INPUT which carries
@@ -122,8 +128,8 @@ export default function ModelSelector({ value, onSelect, placeholder, extraOptio
   // Search: the input value is live; the APPLIED query trails it by 150ms (LOCKED debounce).
   const [query, setQuery] = useState('')
   const [debouncedQuery, setDebouncedQuery] = useState('')
-  // Favorites are read-only this plan (render the section): the star toggle + PUT land in
-  // plan 15-06. Seeded once at mount from GET /api/preferences (favorite_models ?? []).
+  // Favorites (MODEL-08): seeded once at mount from GET /api/preferences (favorite_models ?? []),
+  // written by toggleFavorite (optimistic local set + fire-and-forget PUT — D-05).
   const [favorites, setFavorites] = useState<string[]>([])
   // Open upward when the trigger sits too low for the panel to fit below (e.g. the
   // default-model control in the sidebar footer) — otherwise the list spills off-screen.
@@ -302,6 +308,19 @@ export default function ModelSelector({ value, onSelect, placeholder, extraOptio
     closeMenu()
   }
 
+  // MODEL-08 (D-05): optimistic favorite toggle. Local state updates immediately; the PUT is
+  // fire-and-forget with the COMPLETE new array (whole-array replace — the partial upsert keeps
+  // theme/default_model intact because favorite_models is the ONLY key sent). House style per
+  // DefaultModelSelector: never block the UI, never revert on failure, NO toast.
+  function toggleFavorite(id: string) {
+    const next = favorites.includes(id) ? favorites.filter(f => f !== id) : [...favorites, id]
+    setFavorites(next)
+    void apiFetch('/api/preferences', {
+      method: 'PUT',
+      body: JSON.stringify({ favorite_models: next }),
+    }).catch(() => {})
+  }
+
   function onTriggerKeyDown(e: React.KeyboardEvent<HTMLButtonElement>) {
     if (e.key === 'Enter' || e.key === ' ' || e.key === 'ArrowDown') {
       e.preventDefault()
@@ -311,9 +330,9 @@ export default function ModelSelector({ value, onSelect, placeholder, extraOptio
 
   // Keyboard machinery lives on the search input (LOCKED contract): ArrowUp/Down move over
   // the NAVIGABLE array (headers skipped structurally, wrapping not required); Enter selects;
-  // Esc closes back to the trigger; Tab stays trapped; printable keys fall through to the
-  // input natively; Home/End keep the native caret behavior (no list jump).
-  // Shift+Enter is deliberately NOT implemented here — it needs the favorite toggle (plan 15-06).
+  // Shift+Enter toggles favorite on the ACTIVE row (MODEL-08); Esc closes back to the trigger;
+  // Tab stays trapped; printable keys fall through to the input natively; Home/End keep the
+  // native caret behavior (no list jump).
   function onInputKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
     switch (e.key) {
       case 'Escape':
@@ -328,10 +347,18 @@ export default function ModelSelector({ value, onSelect, placeholder, extraOptio
         e.preventDefault()
         setActiveIndex(i => Math.max(i - 1, 0))
         break
-      case 'Enter':
+      case 'Enter': {
         e.preventDefault()
-        if (!e.shiftKey) selectOption(activeIndex)
+        if (e.shiftKey) {
+          // Shift+Enter branch runs BEFORE plain-Enter select: toggle favorite on the active
+          // row, skipping the extraOption row (model is null there — never favoritable).
+          const active = navigable[activeIndex]
+          if (active?.model) toggleFavorite(active.model.id)
+        } else {
+          selectOption(activeIndex)
+        }
         break
+      }
       case 'Tab':
         // Focus trap: keep focus inside the open panel.
         e.preventDefault()
@@ -426,8 +453,10 @@ export default function ModelSelector({ value, onSelect, placeholder, extraOptio
                   )
                 }
                 const { opt, navIndex } = row
+                const model = opt.model
                 const isSelected = opt.value === value
                 const isActive = navIndex === activeIndex
+                const isFavorited = model != null && favorites.includes(model.id)
                 return (
                   <li
                     key={opt.key}
@@ -436,7 +465,7 @@ export default function ModelSelector({ value, onSelect, placeholder, extraOptio
                     aria-selected={isSelected}
                     onMouseEnter={() => setActiveIndex(navIndex)}
                     onClick={() => selectOption(navIndex)}
-                    className={`relative flex min-h-11 cursor-pointer flex-col justify-center gap-0.5 py-2 pl-6 pr-3 text-sm ${
+                    className={`relative flex min-h-11 cursor-pointer flex-col justify-center gap-0.5 py-2 pl-6 ${model ? 'pr-12' : 'pr-3'} text-sm ${
                       isActive
                         ? 'bg-gray-100 dark:bg-gray-800'
                         : 'hover:bg-gray-100 dark:hover:bg-gray-800'
@@ -450,7 +479,40 @@ export default function ModelSelector({ value, onSelect, placeholder, extraOptio
                       />
                     )}
                     <span className="font-normal text-gray-900 dark:text-white">{opt.label}</span>
-                    {opt.model && <ModelHint model={opt.model} />}
+                    {model && <ModelHint model={model} />}
+                    {/* Favorite star (MODEL-08) — every catalog row, NEVER the extraOption row.
+                        Always visible (no hover-gating — touch parity); 44px hit area around a
+                        16px icon; tabIndex={-1} so it is never a tab stop inside the trap
+                        (mouse/touch + Shift+Enter reach it). Derived from the favorites array
+                        per model id, so every duplicate section instance renders identically. */}
+                    {model && (
+                      <button
+                        type="button"
+                        tabIndex={-1}
+                        aria-label={
+                          isFavorited
+                            ? `Remove ${opt.label} from favorites`
+                            : `Add ${opt.label} to favorites`
+                        }
+                        onClick={e => {
+                          // Toggle only: never select the row, never close the dropdown
+                          // (users can star several models in one open).
+                          e.stopPropagation()
+                          toggleFavorite(model.id)
+                        }}
+                        className="absolute right-0 inset-y-0 w-11 flex items-center justify-center focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+                      >
+                        <Star
+                          size={16}
+                          className={
+                            isFavorited
+                              ? 'text-blue-600 fill-blue-600'
+                              : 'text-gray-400 dark:text-gray-500'
+                          }
+                          aria-hidden="true"
+                        />
+                      </button>
+                    )}
                   </li>
                 )
               })}
