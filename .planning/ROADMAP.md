@@ -11,7 +11,7 @@ Plans:
 **Goal:** Close out v1.2: key-gated model selection (picking a model with no key triggers OAuth connect), favorite/pin models, demo-fallback flag decision + non-dismissible demo banner (gated on the 999.2 SEC-03 PASS finding), and the picker polish the audit flagged — render popular marking (B-1/MODEL-03) and add catalog search (W-1/MODEL-01).
 **Requirements**: KEY-05, MODEL-08, DEMO-01, DEMO-02, SEC-03 (+ audit fold-ins: MODEL-03 render seam, MODEL-01 search)
 **Depends on:** Phase 14, Phase 999.2 (SEC-03 finding: .planning/phases/999.2-cost-guardrail-burn-script/999.2-SEC-03-FINDING.md)
-**Plans:** 5/8 plans executed
+**Plans:** 7/8 plans executed
 
 Plans:
 **Wave 1**
@@ -27,8 +27,8 @@ Plans:
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
-- [ ] 15-06-PLAN.md — Favorite star + optimistic whole-array PUT persistence + Shift+Enter (MODEL-08) (wave 3)
-- [ ] 15-07-PLAN.md — Demo banner (locked copy, non-dismissible) + mode:"demo" signal read + [Use demo] 403 recovery wiring (wave 3)
+- [x] 15-06-PLAN.md — Favorite star + optimistic whole-array PUT persistence + Shift+Enter (MODEL-08) (wave 3)
+- [x] 15-07-PLAN.md — Demo banner (locked copy, non-dismissible) + mode:"demo" signal read + [Use demo] 403 recovery wiring (wave 3)
 
 **Wave 4** *(blocked on Wave 3 completion)*
 
