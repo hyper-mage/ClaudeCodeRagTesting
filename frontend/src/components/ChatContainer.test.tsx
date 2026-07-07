@@ -1,8 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import type { ComponentProps } from 'react'
 import { renderWithProviders, makeAuthMock, makeApiMock, resetMockAuth } from '../test/utils'
 import { apiFetch } from '../lib/api'
+import type { Message } from '../hooks/useChat'
 import ChatContainer from './ChatContainer'
 
 // ChatContainer calls useAuth() for isAnon — mock the module so renderWithProviders'
@@ -13,6 +15,29 @@ vi.mock('../contexts/AuthContext', () => makeAuthMock())
 // fires. The MODEL-06 cases below pass a pre-fetched `models` prop so names resolve synchronously.
 vi.mock('../lib/api', () => makeApiMock())
 const mockApiFetch = apiFetch as ReturnType<typeof vi.fn>
+
+// ChatContainer reads connected + demo_enabled from the shared useKeyStatus store (D-10/D-11) —
+// mock the module with a mutable state object so each test controls the status shape directly.
+const keyStatusMock = vi.hoisted(() => ({
+  state: { status: null as null | { connected: boolean; demo_enabled?: boolean } },
+}))
+vi.mock('../hooks/useKeyStatus', () => ({
+  useKeyStatus: () => ({
+    status: keyStatusMock.state.status,
+    loading: keyStatusMock.state.status === null,
+    refresh: async () => {},
+    balance: null,
+    isLow: false,
+    balanceLoading: false,
+    balanceError: false,
+    refreshBalance: async () => {},
+  }),
+}))
+
+// Default every test to the loading (null) status so pre-existing cases are unaffected.
+beforeEach(() => {
+  keyStatusMock.state.status = null
+})
 
 // Two catalog rows for the per-thread selector cases (Phase-12 ModelResponse shape).
 const MODELS = [
@@ -270,5 +295,123 @@ describe('ChatContainer per-thread model header (MODEL-06 / D-05)', () => {
     expect(noticeLine.querySelector('[class*="bg-blue-600"]')).toBeNull()
     // It is not a MessageBubble user/assistant bubble — no whitespace-pre-wrap user bubble markup.
     expect(noticeLine.querySelector('[class*="max-w-[70%]"]')).toBeNull()
+  })
+})
+
+// LOCKED banner sentence (UI-SPEC § Copywriting, verbatim from Phase 11 D-08) — asserted exactly.
+const DEMO_BANNER_SENTENCE =
+  'Demo mode — a free model is in use; it may be slower, less accurate, or temporarily rate-limited (no usage left).'
+
+// Shared render helper for the demo cases: sensible defaults, overridable per test.
+function renderContainer(props: Partial<ComponentProps<typeof ChatContainer>> = {}) {
+  return renderWithProviders(
+    <ChatContainer
+      messages={[]}
+      onSend={vi.fn()}
+      isStreaming={false}
+      onRetry={vi.fn()}
+      activeThreadId={null}
+      threadModel={null}
+      onThreadModelChange={vi.fn()}
+      {...props}
+    />
+  )
+}
+
+describe('ChatContainer demo banner (DEMO-02 / D-10)', () => {
+  beforeEach(() => {
+    resetMockAuth()
+    mockApiFetch.mockReset()
+    mockApiFetch.mockResolvedValue(MODELS)
+  })
+
+  it('matrix (a): keyless + demo_enabled → banner present with the locked copy verbatim', () => {
+    keyStatusMock.state.status = { connected: false, demo_enabled: true }
+    renderContainer()
+
+    expect(screen.getByText(DEMO_BANNER_SENTENCE)).toBeInTheDocument()
+  })
+
+  it('matrix (b): connected + no demo turn → banner absent', () => {
+    keyStatusMock.state.status = { connected: true, demo_enabled: true }
+    renderContainer()
+
+    expect(screen.queryByText(DEMO_BANNER_SENTENCE)).not.toBeInTheDocument()
+  })
+
+  it('matrix (c): connected + lastTurnWasDemo → banner present (mode:"demo" latch)', () => {
+    keyStatusMock.state.status = { connected: true, demo_enabled: true }
+    renderContainer({ lastTurnWasDemo: true })
+
+    expect(screen.getByText(DEMO_BANNER_SENTENCE)).toBeInTheDocument()
+  })
+
+  it('matrix (d): status null (still loading) → banner absent — no flash', () => {
+    keyStatusMock.state.status = null
+    renderContainer()
+
+    expect(screen.queryByText(DEMO_BANNER_SENTENCE)).not.toBeInTheDocument()
+  })
+
+  it('banner is role="status", non-dismissible (no interactive children), and sits ABOVE the thread header', () => {
+    keyStatusMock.state.status = { connected: false, demo_enabled: true }
+    renderContainer({
+      messages: [{ id: 'a1', role: 'assistant', content: 'hi' }],
+      activeThreadId: 't1',
+      models: MODELS,
+    })
+
+    const banner = screen
+      .getByText(DEMO_BANNER_SENTENCE)
+      .closest('[role="status"]') as HTMLElement
+    expect(banner).not.toBeNull()
+    // shrink-0 sibling — preserves the flex-1 scroll layout (Pitfall 11 / T-15-27).
+    expect(banner.className).toContain('shrink-0')
+    // DEMO-02 non-dismissible: no close button, no interactive children of any kind.
+    expect(banner.querySelector('button')).toBeNull()
+    expect(banner.querySelector('a')).toBeNull()
+    expect(banner.querySelector('input')).toBeNull()
+    // First shrink-0 child: the banner precedes the per-thread header row in DOM order.
+    const headerLabel = screen.getByText('Model for this chat')
+    expect(
+      banner.compareDocumentPosition(headerLabel) & Node.DOCUMENT_POSITION_FOLLOWING
+    ).toBeTruthy()
+  })
+})
+
+describe('ChatContainer [Use demo] wiring (D-11)', () => {
+  beforeEach(() => {
+    resetMockAuth()
+    mockApiFetch.mockReset()
+    mockApiFetch.mockResolvedValue(MODELS)
+  })
+
+  // A failed 403 turn: the typed forbidden error bubble.
+  const forbiddenError: Message[] = [
+    { id: 'e1', role: 'error', content: '', errorType: 'forbidden' },
+  ]
+
+  it('forbidden bubble + demo_enabled → [Use demo] visible; clicking calls onUseDemo', async () => {
+    const user = userEvent.setup()
+    keyStatusMock.state.status = { connected: true, demo_enabled: true }
+    const onUseDemo = vi.fn()
+    renderContainer({ messages: forbiddenError, activeThreadId: 't1', models: MODELS, onUseDemo })
+
+    const btn = screen.getByRole('button', { name: 'Use demo' })
+    await user.click(btn)
+
+    expect(onUseDemo).toHaveBeenCalledTimes(1)
+  })
+
+  it('forbidden bubble + demo_enabled false → [Use demo] absent', () => {
+    keyStatusMock.state.status = { connected: true, demo_enabled: false }
+    renderContainer({
+      messages: forbiddenError,
+      activeThreadId: 't1',
+      models: MODELS,
+      onUseDemo: vi.fn(),
+    })
+
+    expect(screen.queryByRole('button', { name: 'Use demo' })).not.toBeInTheDocument()
   })
 })
