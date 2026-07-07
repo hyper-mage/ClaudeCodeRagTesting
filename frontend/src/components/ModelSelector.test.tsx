@@ -68,6 +68,13 @@ function hasPopularChip(el: Element): boolean {
   )
 }
 
+/** All PUT /api/preferences call bodies, JSON-parsed (MODEL-08 whole-array replace assertions). */
+function preferencesPutBodies(): unknown[] {
+  return mockApiFetch.mock.calls
+    .filter(c => c[0] === '/api/preferences' && c[1]?.method === 'PUT')
+    .map(c => JSON.parse(c[1].body as string))
+}
+
 describe('ModelSelector (a11y contract — UI-SPEC LOCKED)', () => {
   beforeEach(() => {
     mockApiFetch.mockReset()
@@ -507,5 +514,76 @@ describe('ModelSelector search (MODEL-01 — LOCKED combobox contract)', () => {
     await user.keyboard('{Enter}')
     expect(onSelect).toHaveBeenCalledWith('meta/llama-3.3-free')
     await waitFor(() => expect(screen.queryByRole('listbox')).not.toBeInTheDocument())
+  })
+})
+
+describe('ModelSelector favorite star (MODEL-08 / D-05)', () => {
+  beforeEach(() => {
+    mockApiFetch.mockReset()
+  })
+
+  it('star click toggles: whole-array PUT, dropdown stays OPEN, onSelect NOT called', async () => {
+    const user = userEvent.setup()
+    const onSelect = vi.fn()
+    mockCatalog()
+    renderWithProviders(<ModelSelector value={null} onSelect={onSelect} placeholder="Pick a model" />)
+
+    await user.click(screen.getByRole('button', { name: /pick a model/i }))
+    await screen.findByRole('listbox')
+
+    // Sectioned picker: a model renders in multiple sections — take the FIRST star instance.
+    const star = screen.getAllByRole('button', { name: 'Add Claude Paid to favorites' })[0]
+    await user.click(star)
+
+    // Whole-array replace, favorite_models the ONLY key in the body (D-05 partial upsert).
+    expect(preferencesPutBodies()).toEqual([{ favorite_models: ['anthropic/claude'] }])
+    // stopPropagation: no selection, no close — users can star several in one open.
+    expect(onSelect).not.toHaveBeenCalled()
+    expect(screen.getByRole('listbox')).toBeInTheDocument()
+  })
+
+  it('Shift+Enter toggles favorite on the active row while plain Enter still selects', async () => {
+    const user = userEvent.setup()
+    const onSelect = vi.fn()
+    mockCatalog()
+    renderWithProviders(<ModelSelector value={null} onSelect={onSelect} placeholder="Pick a model" />)
+
+    await user.click(screen.getByRole('button', { name: /pick a model/i }))
+    await screen.findByRole('listbox')
+
+    // Active row starts on the first navigable option (Popular: llama, rank 1).
+    await user.keyboard('{Shift>}{Enter}{/Shift}')
+    expect(preferencesPutBodies()).toEqual([{ favorite_models: ['meta/llama-3.3-free'] }])
+    expect(onSelect).not.toHaveBeenCalled()
+    expect(screen.getByRole('listbox')).toBeInTheDocument()
+
+    // Plain Enter still selects the active row (now Favorites: llama) and closes.
+    await user.keyboard('{Enter}')
+    expect(onSelect).toHaveBeenCalledTimes(1)
+    expect(onSelect).toHaveBeenCalledWith('meta/llama-3.3-free')
+    await waitFor(() => expect(screen.queryByRole('listbox')).not.toBeInTheDocument())
+  })
+
+  it('renders a star on every catalog row but never on the extraOption row', async () => {
+    const user = userEvent.setup()
+    mockCatalog()
+    renderWithProviders(
+      <ModelSelector
+        value={null}
+        onSelect={vi.fn()}
+        placeholder="Pick a model"
+        extraOption={{ label: 'Use my default model', value: null }}
+      />
+    )
+
+    await user.click(screen.getByRole('button', { name: /pick a model/i }))
+    const listbox = await screen.findByRole('listbox')
+
+    const extra = within(listbox).getByRole('option', { name: 'Use my default model' })
+    expect(within(extra).queryByRole('button')).not.toBeInTheDocument()
+
+    // Every catalog instance (Popular 2 + All 3) carries exactly one always-visible star.
+    const stars = within(listbox).getAllByRole('button', { name: /favorites$/ })
+    expect(stars).toHaveLength(SECTIONED_COUNT)
   })
 })
