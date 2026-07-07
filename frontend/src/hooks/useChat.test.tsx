@@ -218,3 +218,166 @@ describe('useChat.loadMessages — unconditional fetch contract (CR-01)', () => 
     })
   })
 })
+
+describe('useChat demo signal + demo retry (15-07 D-10/D-11)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mockedApiFetch.mockResolvedValue({ messages: [] })
+    mockedApiStream.mockResolvedValue(streamReply())
+  })
+
+  // A demo turn: the done event carries the Phase-11 mode:"demo" signal.
+  function demoStreamReply() {
+    return mockSSEResponse(['data: {"text":"hi"}', 'data: {"message_id":"m1","mode":"demo"}'])
+  }
+
+  it('Demo 1: a done event with mode:"demo" sets lastTurnWasDemo to true', async () => {
+    mockedApiStream.mockResolvedValue(demoStreamReply())
+    const { result } = renderHook(() => useChat('t-1'), { wrapper: ProvidersWrapper })
+
+    expect(result.current.lastTurnWasDemo).toBe(false)
+
+    await act(async () => {
+      await result.current.sendMessage('hi')
+    })
+
+    expect(result.current.lastTurnWasDemo).toBe(true)
+  })
+
+  it('Demo 2: a done event WITHOUT mode leaves lastTurnWasDemo false', async () => {
+    const { result } = renderHook(() => useChat('t-1'), { wrapper: ProvidersWrapper })
+
+    await act(async () => {
+      await result.current.sendMessage('hi')
+    })
+
+    expect(mockedApiStream).toHaveBeenCalledTimes(1)
+    expect(result.current.lastTurnWasDemo).toBe(false)
+  })
+
+  it('Demo 3: lastTurnWasDemo resets to false on thread switch (Open Q2 resolution)', async () => {
+    mockedApiStream.mockResolvedValue(demoStreamReply())
+    const { result, rerender } = renderHook(({ id }) => useChat(id), {
+      wrapper: ProvidersWrapper,
+      initialProps: { id: 't-a' as string | null },
+    })
+
+    await act(async () => {
+      await result.current.sendMessage('hi')
+    })
+    expect(result.current.lastTurnWasDemo).toBe(true)
+
+    // Genuine thread switch — per-hook demo state follows the thread-scoped reset semantics.
+    rerender({ id: 't-b' })
+
+    await waitFor(() => expect(result.current.lastTurnWasDemo).toBe(false))
+  })
+
+  it('Demo 4: a normal send body is {"content": ...} with NO use_demo key', async () => {
+    const { result } = renderHook(() => useChat('t-1'), { wrapper: ProvidersWrapper })
+
+    await act(async () => {
+      await result.current.sendMessage('hi')
+    })
+
+    expect(mockedApiStream).toHaveBeenCalledTimes(1)
+    const init = mockedApiStream.mock.calls[0][1] as RequestInit
+    const body = JSON.parse(init.body as string)
+    expect(body).toEqual({ content: 'hi' })
+    expect(body).not.toHaveProperty('use_demo')
+  })
+
+  it('Demo 5: sendMessage(content, {useDemo: true}) body contains "use_demo": true', async () => {
+    const { result } = renderHook(() => useChat('t-1'), { wrapper: ProvidersWrapper })
+
+    await act(async () => {
+      await result.current.sendMessage('hi', { useDemo: true })
+    })
+
+    expect(mockedApiStream).toHaveBeenCalledTimes(1)
+    const init = mockedApiStream.mock.calls[0][1] as RequestInit
+    const body = JSON.parse(init.body as string)
+    expect(body).toEqual({ content: 'hi', use_demo: true })
+  })
+
+  it('Demo 6: retryWithDemo strips error bubbles and re-sends the last user turn with retry + use_demo', async () => {
+    const { result } = renderHook(() => useChat('t-1'), { wrapper: ProvidersWrapper })
+
+    // Seed a failed 403 turn: the user message + its typed error bubble.
+    act(() => {
+      result.current.setMessages([
+        { id: 'u1', role: 'user', content: 'question' },
+        { id: 'e1', role: 'error', content: '', errorType: 'forbidden' },
+      ])
+    })
+
+    await act(async () => {
+      result.current.retryWithDemo()
+      await Promise.resolve()
+    })
+
+    // The retry re-sent the LAST user message against the retry endpoint with the demo override.
+    await waitFor(() => expect(mockedApiStream).toHaveBeenCalledTimes(1))
+    const [url, init] = mockedApiStream.mock.calls[0]
+    expect(url).toContain('/api/threads/t-1/messages?retry=true')
+    const body = JSON.parse((init as RequestInit).body as string)
+    expect(body).toMatchObject({ content: 'question', use_demo: true })
+
+    // The error bubble was stripped the moment the retry started.
+    await waitFor(() =>
+      expect(result.current.messages.some(m => m.role === 'error')).toBe(false)
+    )
+  })
+
+  it('Demo 7: retryWithDemo is a no-op when no prior user message exists', async () => {
+    const { result } = renderHook(() => useChat('t-1'), { wrapper: ProvidersWrapper })
+
+    await act(async () => {
+      result.current.retryWithDemo()
+      await Promise.resolve()
+    })
+
+    expect(mockedApiStream).not.toHaveBeenCalled()
+  })
+
+  it('Demo 8: retryWithDemo is a no-op while a stream is in flight', async () => {
+    // A never-resolving stream keeps isStreaming true across the retry attempt.
+    let releaseReader: (() => void) | null = null
+    const pendingReader: ReadableStreamDefaultReader<Uint8Array> = {
+      read: () =>
+        new Promise(resolve => {
+          releaseReader = () => resolve({ done: true, value: undefined })
+        }),
+      releaseLock: () => {},
+      cancel: async () => {},
+      closed: Promise.resolve(undefined),
+    }
+    mockedApiStream.mockResolvedValue({
+      ok: true,
+      status: 200,
+      body: { getReader: () => pendingReader },
+    } as unknown as Response)
+
+    const { result } = renderHook(() => useChat('t-1'), { wrapper: ProvidersWrapper })
+
+    let sendPromise!: Promise<void>
+    await act(async () => {
+      sendPromise = result.current.sendMessage('hi')
+      await Promise.resolve()
+    })
+    await waitFor(() => expect(result.current.isStreaming).toBe(true))
+
+    await act(async () => {
+      result.current.retryWithDemo()
+      await Promise.resolve()
+    })
+
+    // Only the original send hit the wire — the mid-stream retry was refused.
+    expect(mockedApiStream).toHaveBeenCalledTimes(1)
+
+    await act(async () => {
+      releaseReader?.()
+      await sendPromise
+    })
+  })
+})
