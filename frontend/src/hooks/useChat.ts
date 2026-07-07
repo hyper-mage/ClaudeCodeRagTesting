@@ -51,6 +51,11 @@ export interface Message {
 export function useChat(threadId: string | null) {
   const [messages, setMessages] = useState<Message[]>([])
   const [isStreaming, setIsStreaming] = useState(false)
+  // Phase-11 mode:"demo" done-event signal, read here since Phase 15 (D-10). Latches true when a
+  // turn ran on the owner-key demo branch so ChatContainer can guarantee the demo banner after
+  // any observed demo turn. Per-hook state: resets on genuine thread switch (Open Q2 resolution) —
+  // the proactive (!connected && demo_enabled) banner branch owns the persistent keyless case.
+  const [lastTurnWasDemo, setLastTurnWasDemo] = useState(false)
   // Ref mirror of isStreaming, used by the re-entrancy guard in sendMessage (WR-01) and the
   // abort-on-switch effect below. Kept in a ref (not a dep) so toggling isStreaming does NOT
   // re-create loadMessages; the thread-load effect must fire ONLY on threadId change, never on
@@ -100,6 +105,9 @@ export function useChat(threadId: string | null) {
     abortRef.current = null
     isStreamingRef.current = false
     setIsStreaming(false)
+    // Demo latch follows the thread-scoped reset semantics (Open Q2): the banner accompanied the
+    // demo turn in the PREVIOUS thread; the new thread starts clean.
+    setLastTurnWasDemo(false)
     void loadMessages()
   }, [threadId, loadMessages])
 
@@ -109,7 +117,7 @@ export function useChat(threadId: string | null) {
     skipNextLoadRef.current = true
   }, [])
 
-  const sendMessage = useCallback(async (content: string, opts?: { retry?: boolean; threadId?: string }) => {
+  const sendMessage = useCallback(async (content: string, opts?: { retry?: boolean; threadId?: string; useDemo?: boolean }) => {
     // Pitfall 1 (stale closure): an explicit threadId from the caller must win over the
     // closured one so a message sent against a null-thread state (a freshly-created thread
     // id passed in by Plan 03) actually fires instead of silently no-opping.
@@ -150,7 +158,10 @@ export function useChat(threadId: string | null) {
         : `/api/threads/${effectiveThreadId}/messages`
       const res = await apiStream(url, {
         method: 'POST',
-        body: JSON.stringify({ content }),
+        // use_demo is ABSENT on normal sends (D-11): only the explicit [Use demo] retry adds it.
+        // The server honors the override only when demo_fallback_enabled is ON (plan 15-02) and
+        // free-guards the model regardless — the FE flag grants nothing by itself (T-15-24).
+        body: JSON.stringify({ content, ...(opts?.useDemo ? { use_demo: true } : {}) }),
         signal: controller.signal,
       })
 
@@ -252,6 +263,9 @@ export function useChat(threadId: string | null) {
                 // done event - update with final message ID and capture the live turn's summed
                 // usage (cost + tokens). Falls back to any usage already on the message so we never
                 // clobber an existing value with an absent one.
+                // Phase-11 demo signal (D-10): a demo turn's done event carries mode:"demo" —
+                // latch it so the banner is guaranteed after any observed demo turn.
+                if (parsed.mode === 'demo') setLastTurnWasDemo(true)
                 setMessages(prev =>
                   prev.map(m =>
                     m.id === assistantId
@@ -361,6 +375,17 @@ export function useChat(threadId: string | null) {
     void sendMessage(lastUser.content, { retry: true, threadId: threadId ?? undefined })
   }, [messages, isStreaming, sendMessage, threadId])
 
+  // [Use demo] recovery (D-11): mirrors retryLastUserMessage exactly, plus the use_demo override —
+  // strips the error bubble and re-sends the last user turn on the server's demo branch. The
+  // override is honored server-side only when demo_fallback_enabled is ON (inert when OFF).
+  const retryWithDemo = useCallback(() => {
+    if (isStreaming) return
+    const lastUser = [...messages].reverse().find(m => m.role === 'user')
+    if (!lastUser) return
+    setMessages(prev => prev.filter(m => m.role !== 'error'))
+    void sendMessage(lastUser.content, { retry: true, useDemo: true, threadId: threadId ?? undefined })
+  }, [messages, isStreaming, sendMessage, threadId])
+
   return {
     messages,
     setMessages,
@@ -370,5 +395,7 @@ export function useChat(threadId: string | null) {
     skipNextLoad,
     cancel,
     retryLastUserMessage,
+    lastTurnWasDemo,
+    retryWithDemo,
   }
 }

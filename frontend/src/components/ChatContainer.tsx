@@ -1,9 +1,11 @@
+import { Info } from 'lucide-react'
 import MessageBubble from './MessageBubble'
 import ChatInput from './ChatInput'
 import ErrorMessageBubble from './ErrorMessageBubble'
 import DeprecationNotice from './DeprecationNotice'
 import ModelSelector, { type ModelResponse } from './ModelSelector'
 import { useAuth } from '../contexts/AuthContext'
+import { useKeyStatus } from '../hooks/useKeyStatus'
 // Single source of truth for the message shape (incl. usage + errorType) — Plan 02 hook contract.
 import type { Message } from '../hooks/useChat'
 
@@ -20,6 +22,10 @@ interface Props {
   onThreadModelChange: (modelId: string | null) => void
   /** Optional pre-fetched catalog forwarded to the per-thread ModelSelector (avoids a duplicate fetch). */
   models?: ModelResponse[]
+  /** True after a mode:"demo" done event was observed on this thread (useChat latch, D-10). */
+  lastTurnWasDemo?: boolean
+  /** [Use demo] recovery on the 403 bubble (D-11): retries the last user turn with use_demo:true. */
+  onUseDemo?: () => void
 }
 
 // LOCKED copy (UI-SPEC § Copywriting Contract) for the per-thread selector.
@@ -38,6 +44,10 @@ const EXAMPLE_PROMPTS = [
   'Recommend a 2-player game',
 ]
 
+// LOCKED copy (UI-SPEC § Copywriting Contract, verbatim from Phase 11 D-08). Do not paraphrase.
+const DEMO_BANNER_COPY =
+  'Demo mode — a free model is in use; it may be slower, less accurate, or temporarily rate-limited (no usage left).'
+
 export default function ChatContainer({
   messages,
   onSend,
@@ -47,8 +57,17 @@ export default function ChatContainer({
   threadModel,
   onThreadModelChange,
   models,
+  lastTurnWasDemo = false,
+  onUseDemo,
 }: Props) {
   const { isAnon } = useAuth()
+  // Shared no-poll key-status store (zero extra fetches — the same instance serves the sidebar
+  // dots and the gate hook). Carries connected + demo_enabled for the banner and [Use demo].
+  const { status } = useKeyStatus()
+  // Locked render condition (D-10): proactive for keyless users under the flag, and guaranteed
+  // after any observed mode:"demo" turn. While status is still null (loading), demo_enabled is
+  // undefined → both terms false → no banner flash.
+  const showDemoBanner = (!status?.connected && Boolean(status?.demo_enabled)) || lastTurnWasDemo
   // Per-thread running total (D-02, COST-04): sum the persisted per-message usage.cost. The
   // persisted sum is the source of truth, so the total is correct on reload. Free/empty threads
   // sum to 0 and the Σ caption below is omitted entirely (no `Σ $0.0000` clutter).
@@ -56,6 +75,19 @@ export default function ChatContainer({
   return (
     // Core-surface light token (D-01): white in light, gray-950 in dark — no orphan dark panel.
     <div className="flex-1 flex flex-col h-full bg-white text-gray-900 dark:bg-gray-950 dark:text-white">
+      {/* Demo banner (DEMO-02, D-10) — FIRST shrink-0 child, above the thread-header row,
+          full-bleed, present with or without an active thread. Non-dismissible: no close button,
+          no interactive children, not a pill. Locked classes + copy (UI-SPEC § Components).
+          NOT the same concept as DemoPill (anon-session badge) — both may legitimately show. */}
+      {showDemoBanner && (
+        <div
+          role="status"
+          className="shrink-0 flex items-center gap-2 px-4 py-2 text-xs border-b bg-amber-500/10 border-amber-500/30 text-amber-700 dark:text-amber-300"
+        >
+          <Info size={14} className="text-amber-500 shrink-0" aria-hidden="true" />
+          <span>{DEMO_BANNER_COPY}</span>
+        </div>
+      )}
       {/* Per-thread model selector row (D-05). shrink-0 sibling above the scroll area so the
           existing flex-1 flex flex-col h-full layout is preserved (UI-SPEC Consistency req).
           Only renders when a thread is active — hidden on the cold-start empty state. */}
@@ -113,13 +145,15 @@ export default function ChatContainer({
         {messages.map(msg =>
           msg.role === 'error' ? (
             // errorType set → typed recovery variant (D-09); undefined → generic Retry path.
-            // demoEligible is false this phase (Phase 15 owns enabling demo fallback).
+            // demoEligible rides the live flag (D-11): [Use demo] renders on the forbidden (403)
+            // bubble when demo fallback is ON; clicking retries the turn with use_demo:true.
             <ErrorMessageBubble
               key={msg.id}
               onRetry={onRetry}
               isStreaming={isStreaming}
               type={msg.errorType}
-              demoEligible={false}
+              demoEligible={Boolean(status?.demo_enabled)}
+              onUseDemo={onUseDemo}
             />
           ) : msg.role === 'notice' ? (
             <DeprecationNotice key={msg.id} content={msg.content} />

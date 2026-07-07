@@ -33,8 +33,18 @@ export default function ChatPage() {
   const openDrawer = () => setIsDrawerOpen(true)
   // useChat owns thread loading + abort-on-switch (CR-01). skipNextLoad requests a one-shot
   // skip of the next [threadId] load for a freshly auto-created thread (see handleSend).
-  const { messages, isStreaming, sendMessage, skipNextLoad, cancel, retryLastUserMessage } =
-    useChat(activeThreadId)
+  // lastTurnWasDemo + retryWithDemo surface the Phase-11 demo signal (D-10) and the [Use demo]
+  // 403 recovery (D-11) — both consumed by ChatContainer.
+  const {
+    messages,
+    isStreaming,
+    sendMessage,
+    skipNextLoad,
+    cancel,
+    retryLastUserMessage,
+    lastTurnWasDemo,
+    retryWithDemo,
+  } = useChat(activeThreadId)
   const { showToast } = useToast()
 
   useEffect(() => {
@@ -202,6 +212,8 @@ export default function ChatPage() {
         threadModel={activeThread?.model ?? null}
         onThreadModelChange={guardedSelect}
         models={models}
+        lastTurnWasDemo={lastTurnWasDemo}
+        onUseDemo={retryWithDemo}
       />
       <MobileDrawer isOpen={isDrawerOpen} onClose={closeDrawer} triggerRef={hamburgerRef}>
         <IconNavRow onNavigate={closeDrawer} />
