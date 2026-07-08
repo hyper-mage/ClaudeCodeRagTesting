@@ -11,7 +11,7 @@ Plans:
 **Goal:** Close out v1.2: key-gated model selection (picking a model with no key triggers OAuth connect), favorite/pin models, demo-fallback flag decision + non-dismissible demo banner (gated on the 999.2 SEC-03 PASS finding), and the picker polish the audit flagged — render popular marking (B-1/MODEL-03) and add catalog search (W-1/MODEL-01).
 **Requirements**: KEY-05, MODEL-08, DEMO-01, DEMO-02, SEC-03 (+ audit fold-ins: MODEL-03 render seam, MODEL-01 search)
 **Depends on:** Phase 14, Phase 999.2 (SEC-03 finding: .planning/phases/999.2-cost-guardrail-burn-script/999.2-SEC-03-FINDING.md)
-**Plans:** 8/8 plans complete
+**Plans:** 8 complete + 2 gap-closure (verification 29/32 → closing CR-01, CR-02)
 
 Plans:
 **Wave 1**
@@ -33,3 +33,8 @@ Plans:
 **Wave 4** *(blocked on Wave 3 completion)*
 
 - [x] 15-08-PLAN.md — Human-gated prod deploy: migrations 029-033, LLM_API_KEY verify, DEMO_FALLBACK_ENABLED=true, live smoke (autonomous: false) (wave 4)
+
+**Gap Closure** *(from 15-VERIFICATION.md — CR-01, CR-02)*
+
+- [ ] 15-09-PLAN.md — CR-01 fix: free-guard the deprecated-pin override in demo mode (_deprecated_pin_default_model) + regression test + [BLOCKING] prod backend redeploy (SEC-03, DEMO-01; autonomous: false)
+- [ ] 15-10-PLAN.md — CR-02 fix: ModelSelector effectiveState derivation so a late catalog prop unlocks the settings panel + late-arrival test (KEY-05, MODEL-08, MODEL-01, MODEL-03)
