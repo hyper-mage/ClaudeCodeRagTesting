@@ -176,6 +176,29 @@ def _demo_model_for(db, model: str, settings) -> str:
     return settings.demo_fallback_model
 
 
+def _deprecated_pin_default_model(db, user_id: str, mode: str, settings) -> str:
+    """Compute the deprecated-pin fallback model, free-guarded on the demo path (CR-01).
+
+    When a thread is pinned to a model that has fallen out of the Phase 12
+    model_cache, the caller degrades gracefully by overriding the turn's model to a
+    default. That default is user-influenceable (user_preferences.default_model is
+    written unvalidated), so on a keyless DEMO turn an un-guarded default would mint
+    a PAID completion on the owner key — the exact SEC-03/D-03 $0 bound the resolver
+    already enforces via `_demo_model_for`. Re-apply that free-guard HERE, at the
+    override seam, so the deprecated-pin path can never bypass it.
+
+    base = user_preferences.default_model (tolerant read) or settings.llm_model.
+    In demo mode return `_demo_model_for(db, base, settings)` — a paid/unknown base
+    falls back to settings.demo_fallback_model. Off the demo path (mode != "demo")
+    return `base` unchanged: a connected user pays with their OWN key as before, so
+    the guard is deliberately demo-only.
+    """
+    base = _safe_user_default_model(db, user_id) or settings.llm_model
+    if mode == "demo":
+        return _demo_model_for(db, base, settings)
+    return base
+
+
 def _resolve_key_and_model(
     db, user_id: str, thread_row: dict | None, body
 ) -> tuple[str | None, str, str, bool]:
@@ -870,9 +893,12 @@ async def send_message(
                     }
                     if cached_ids and thread_model not in cached_ids:
                         # Pinned model is gone from the live cache → deprecated.
-                        default_model = (
-                            _safe_user_default_model(db, user_id)
-                            or settings.llm_model
+                        # CR-01: re-apply the D-03 free-guard when mode=="demo" so a
+                        # paid/unknown user default can NEVER mint a paid completion
+                        # on the owner key. BOTH the notice copy and the model
+                        # override below use this guarded value.
+                        default_model = _deprecated_pin_default_model(
+                            db, user_id, mode, settings
                         )
                         # Composed server-side from controlled strings, inserted
                         # as plain text (FE escapes on render) — no HTML (T-13-XSS).
