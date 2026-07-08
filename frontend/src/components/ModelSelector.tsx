@@ -141,6 +141,13 @@ export default function ModelSelector({ value, onSelect, placeholder, extraOptio
   const listboxId = useId()
 
   const rows: ModelResponse[] = suppliedModels ?? fetched ?? []
+  // The panel render state must follow the LATE prop, not the mount-time `state` seed. When a
+  // caller supplies a non-empty catalog — at mount (chat) OR after mount (Settings seeds
+  // models=undefined, then setModels once /api/models resolves) — `state` never leaves its
+  // one-time 'idle'/'loaded' seed, so the four render gates must key off this derived value.
+  // suppliedModels undefined (no/[] catalog) → effectiveState === state, so the lazy-fetch path
+  // (idle → loading → loaded/error) is untouched (CR-02).
+  const effectiveState: LoadState = suppliedModels ? 'loaded' : state
   const searching = debouncedQuery !== ''
 
   // Build the two derived structures: a flat NAVIGABLE array of selectable options only
@@ -411,11 +418,11 @@ export default function ModelSelector({ value, onSelect, placeholder, extraOptio
             />
           </div>
 
-          {state === 'loading' && (
+          {effectiveState === 'loading' && (
             <p className="px-3 py-2 text-sm text-gray-600 dark:text-gray-400">{COPY.loading}</p>
           )}
 
-          {state === 'error' && (
+          {effectiveState === 'error' && (
             <button
               type="button"
               onClick={() => void loadModels()}
@@ -425,7 +432,7 @@ export default function ModelSelector({ value, onSelect, placeholder, extraOptio
             </button>
           )}
 
-          {state === 'loaded' && navigable.length === 0 && (
+          {effectiveState === 'loaded' && navigable.length === 0 && (
             searching ? (
               <p className="px-3 py-2 text-xs text-gray-600 dark:text-gray-400">{COPY.noMatch}</p>
             ) : (
@@ -433,7 +440,7 @@ export default function ModelSelector({ value, onSelect, placeholder, extraOptio
             )
           )}
 
-          {state === 'loaded' && navigable.length > 0 && (
+          {effectiveState === 'loaded' && navigable.length > 0 && (
             <ul
               id={listboxId}
               role="listbox"
