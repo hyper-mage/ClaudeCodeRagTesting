@@ -26,8 +26,8 @@ See: .planning/PROJECT.md (updated 2026-05-20 after v1.1 completion)
 ## Current Position
 
 Phase: 15 (options-ui-capstone-demo-gating) — EXECUTING
-Plan: 2 of 10
-Status: Ready to execute
+Plan: 15-09 (CR-01 gap closure) — PAUSED at Task 2 blocking human-verify checkpoint
+Status: Task 1 done + committed (code fix + regression tests green); Task 2 (prod redeploy + live security verification) awaits operator
 Progress: [█████████░] 90%
 Last activity: 2026-07-08
 
@@ -101,10 +101,10 @@ v1.2 roadmap-shaping decisions (to be promoted to PROJECT.md at phase transition
 
 ## Session Continuity
 
-Last session: 2026-07-08T14:30:38.303Z
-Stopped at: Phase 15 UI-SPEC approved
-Resume file: None
-Next: Phase 13 plans 05-06 remain (4/6 executed). 13-04 shipped the at-send deprecated-pin fallback (notice row + model override + history filter) in chat.py — test_deprecated_model_fallback.py GREEN, full backend suite 203 passed (2 pre-existing record_manager fixture errors out of scope, deferred-items.md).
+Last session: 2026-07-08T14:33:41Z
+Stopped at: 15-09 Task 2 — BLOCKING human-verify checkpoint (prod backend redeploy + live keyless deprecated-pin security check)
+Resume file: .planning/phases/15-options-ui-capstone-demo-gating/15-09-PLAN.md (Task 2)
+Next: 15-09 Task 1 CLOSED — CR-01 fix committed: RED 6804532 (deprecated-pin+demo regression tests + IN-03 Wave-0 scaffold cleanup), GREEN 164bff9 (_deprecated_pin_default_model free-guards the deprecated-pin override in demo mode). Resolution suite 18/18 green; test_deprecated_model_fallback.py 2/2 unchanged. AWAITING operator: redeploy backend to Fly prod (boardgame-rag-prod, `flyctl deploy` repo-root Dockerfile — flag DEMO_FALLBACK_ENABLED already ON, no migration/secret flip) and confirm a live keyless deprecated-pin turn resolves model==demo_fallback_model / is_byok:false. On "approved"/"approved-with-caveat", a continuation agent finishes Task 2 + writes 15-09-SUMMARY. Do NOT mark 15-09 complete until the checkpoint clears.
 
 ## Operator Next Steps
 
