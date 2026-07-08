@@ -13,7 +13,7 @@ Requirements for this milestone. Each maps to a roadmap phase (continues numberi
 - [x] **KEY-02**: User's OpenRouter key is stored encrypted at rest, RLS-scoped to the user, and never returned to the frontend
 - [x] **KEY-03**: User can see their key connection status (connected vs not connected, masked label only)
 - [x] **KEY-04**: User can disconnect and reconnect their OpenRouter key
-- [ ] **KEY-05**: Selecting a model with no connected key triggers the OAuth connect flow (key-gated)
+- [x] **KEY-05**: Selecting a model with no connected key triggers the OAuth connect flow (key-gated)
 
 ### Model Selection (MODEL)
 
@@ -24,7 +24,7 @@ Requirements for this milestone. Each maps to a roadmap phase (continues numberi
 - [x] **MODEL-05**: User can set a default model
 - [x] **MODEL-06**: User can select a model per chat thread, persisted on the thread
 - [x] **MODEL-07**: Picker shows context-length and per-Mtok price hints per model
-- [ ] **MODEL-08**: User can favorite/pin models to the top of the picker
+- [x] **MODEL-08**: User can favorite/pin models to the top of the picker
 
 ### Usage & Cost (COST)
 
@@ -92,7 +92,7 @@ Each requirement maps to exactly one phase. Phases continue numbering from v1.1 
 | KEY-02 | Phase 9 | Complete |
 | KEY-03 | Phase 10 | Complete |
 | KEY-04 | Phase 10 | Complete |
-| KEY-05 | Phase 15 | Pending |
+| KEY-05 | Phase 15 | Complete |
 | MODEL-01 | Phase 12 | Complete |
 | MODEL-02 | Phase 12 | Complete |
 | MODEL-03 | Phase 12 | Complete |
@@ -100,7 +100,7 @@ Each requirement maps to exactly one phase. Phases continue numbering from v1.1 
 | MODEL-05 | Phase 13 | Complete |
 | MODEL-06 | Phase 13 | Complete |
 | MODEL-07 | Phase 12 | Complete |
-| MODEL-08 | Phase 15 | Pending |
+| MODEL-08 | Phase 15 | Complete |
 | COST-01 | Phase 14 | Complete |
 | COST-02 | Phase 14 | Complete |
 | COST-03 | Phase 14 | Complete |

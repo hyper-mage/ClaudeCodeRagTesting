@@ -4,13 +4,13 @@ milestone: v1.2
 milestone_name: User Options & BYOK
 status: executing
 stopped_at: Phase 15 UI-SPEC approved
-last_updated: "2026-07-08T01:28:59.379Z"
-last_activity: 2026-07-08 -- Phase 15 planning complete
+last_updated: "2026-07-08T14:31:21.680Z"
+last_activity: 2026-07-08
 progress:
   total_phases: 1
   completed_phases: 0
   total_plans: 10
-  completed_plans: 8
+  completed_plans: 9
   percent: 0
 ---
 
@@ -26,10 +26,10 @@ See: .planning/PROJECT.md (updated 2026-05-20 after v1.1 completion)
 ## Current Position
 
 Phase: 15 (options-ui-capstone-demo-gating) — EXECUTING
-Plan: 1 of 8
+Plan: 2 of 10
 Status: Ready to execute
-Progress: [█████████░] 92%
-Last activity: 2026-07-08 -- Phase 15 planning complete
+Progress: [█████████░] 90%
+Last activity: 2026-07-08
 
 ## Performance Metrics
 
@@ -101,9 +101,9 @@ v1.2 roadmap-shaping decisions (to be promoted to PROJECT.md at phase transition
 
 ## Session Continuity
 
-Last session: 2026-07-02T19:00:26.435Z
+Last session: 2026-07-08T14:30:38.303Z
 Stopped at: Phase 15 UI-SPEC approved
-Resume file: .planning/phases/15-options-ui-capstone-demo-gating/15-UI-SPEC.md
+Resume file: None
 Next: Phase 13 plans 05-06 remain (4/6 executed). 13-04 shipped the at-send deprecated-pin fallback (notice row + model override + history filter) in chat.py — test_deprecated_model_fallback.py GREEN, full backend suite 203 passed (2 pre-existing record_manager fixture errors out of scope, deferred-items.md).
 
 ## Operator Next Steps
