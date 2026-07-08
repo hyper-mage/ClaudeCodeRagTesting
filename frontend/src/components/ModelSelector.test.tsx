@@ -238,6 +238,38 @@ describe('ModelSelector (a11y contract — UI-SPEC LOCKED)', () => {
     expect(mockApiFetch).toHaveBeenCalledWith('/api/models')
   })
 
+  it('renders the sectioned panel when the catalog prop arrives LATE (post-mount), no lazy fetch', async () => {
+    // Reproduces the Settings surface: SettingsPage seeds models=undefined and the /api/models
+    // fetch resolves AFTER mount, then flows the catalog down as a prop. The panel must flip to
+    // 'loaded' off the late prop — not stay stuck on the mount-time 'idle' seed (CR-02 / gap 2+3).
+    const user = userEvent.setup()
+    const onSelect = vi.fn()
+    mockCatalog({ favorites: ['anthropic/claude'] })
+
+    const { rerender } = renderWithProviders(
+      <ModelSelector value={null} onSelect={onSelect} placeholder="Pick a model" />
+    )
+    // Drain the mount-time /api/preferences microtask (favorites read) before the prop lands.
+    await act(async () => {})
+
+    // The post-mount catalog fetch resolves → SettingsPage passes the models prop down.
+    rerender(<ModelSelector value={null} onSelect={onSelect} placeholder="Pick a model" models={MODELS} />)
+
+    await user.click(screen.getByRole('button', { name: /pick a model/i }))
+    const listbox = await screen.findByRole('listbox')
+
+    // Section headers render in the LOCKED order with the one seeded favorite.
+    const headers = Array.from(listbox.querySelectorAll('li[role="presentation"]'))
+    expect(headers.map(h => h.textContent)).toEqual(['Favorites', 'Popular', 'All models'])
+
+    // Catalog rows render: Favorites(1) + Popular(2) + All(3) = SECTIONED_COUNT + 1.
+    const options = within(listbox).getAllByRole('option')
+    expect(options).toHaveLength(SECTIONED_COUNT + 1)
+
+    // The late prop supplied the catalog — the lazy /api/models fetch must NOT fire.
+    expect(mockApiFetch).not.toHaveBeenCalledWith('/api/models')
+  })
+
   it('shows an empty-state when the catalog genuinely loads zero models', async () => {
     const user = userEvent.setup()
     mockCatalog({ models: [] })
