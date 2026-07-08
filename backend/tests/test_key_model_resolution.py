@@ -1,25 +1,24 @@
-"""Phase 11 Wave 0 scaffold — DEMO-03 + SEC-04 + D-03 per-request key/model resolution.
+"""Per-request key/model resolution suite — DEMO-03 + SEC-04 + D-03 + CR-01.
 
-Covers the `_resolve_key_and_model` seam (built in plan 11-04):
+Live regression coverage for the resolution seam in routers/chat.py:
   - DEMO-03: keyless user fail-closed (flag OFF) vs owner-key + `:free` demo (flag ON)
   - SEC-04: decrypted user key threaded to all call sites; no cross-user bleed;
             fail-closed shape (never `user_key or owner_key`)
-  - D-03:   model fall-through to owner default when thread/user_preferences absent
+  - D-03:   model fall-through to owner default when thread/user_preferences absent,
+            plus the server-side free-guard (`_demo_model_for`) that keeps the
+            keyless demo path structurally $0 on the owner key
+  - CR-01 (plan 15-09): the deprecated-pin override (`_deprecated_pin_default_model`)
+            re-applies the D-03 free-guard in demo mode so a paid/unknown user
+            default can NEVER mint a paid completion on the owner key
 
-Every function below is a Wave 0 STUB: created + collected green now, un-skipped and
-implemented by plan 11-04. Function names MUST match the RESEARCH Test Map verbatim
-so plan 11-04's `<verify>` commands resolve.
-
-Config-touching tests (when un-skipped) MUST follow each `monkeypatch.setenv(...)`
-on a cached settings field with `get_settings.cache_clear()` (mirror
-test_crypto_service.py:11-20) — get_settings() is @lru_cache'd.
+Config-touching tests MUST follow each `monkeypatch.setenv(...)` on a cached
+settings field with `get_settings.cache_clear()` (mirror test_crypto_service.py:11-20)
+— get_settings() is @lru_cache'd.
 """
 import inspect
 from unittest.mock import MagicMock, patch
 
 import pytest
-
-_WAVE0 = "Wave 0 stub — turned green by plan 11-04"
 
 # A resolved per-user turn: the DECRYPTED user key + the resolved model. The owner
 # key/model must NOT appear at any aux call site when these are supplied (D-01/SEC-04).
@@ -539,3 +538,68 @@ def test_use_demo_inert_when_flag_off_keyless():
     assert api_key != settings.resolved_llm_api_key
     assert mode == "no_key"
     assert is_user_key is False
+
+
+# ---------------------------------------------------------------------------
+# Plan 15-09 (CR-01): deprecated-pin override must re-apply the D-03 free-guard
+# in demo mode. The caller's deprecated-pin block recomputes a default model when
+# the thread is pinned to a model missing from model_cache; that default is
+# user-influenceable (user_preferences.default_model, written unvalidated). Before
+# this fix the override clobbered the already-free-guarded demo model with an
+# UNGUARDED paid default → a paid completion on the OWNER key for any keyless
+# demo turn. `_deprecated_pin_default_model` re-runs `_demo_model_for` when
+# mode == "demo" so the override can only ever resolve a free / pinned-fallback
+# model; the free-guard stays demo-only (a connected user still pays with their
+# own key). Closes 15-02 #1 end-to-end; restores the SEC-03 structural $0 bound.
+# ---------------------------------------------------------------------------
+
+
+def test_deprecated_pin_demo_paid_default_falls_back():
+    """CR-01: demo mode + a PAID user default (model_cache is_free=False) →
+    the deprecated-pin default is free-guarded to settings.demo_fallback_model,
+    never the paid slug. This is the owner-key paid-spend path being closed."""
+    from routers import chat
+
+    db = _db_with_key_row(
+        None, pref_model="anthropic/claude-3.5-sonnet", cache_is_free=False
+    )
+    settings = _fake_settings(demo_fallback_enabled=True)
+
+    result = chat._deprecated_pin_default_model(db, "user-1", "demo", settings)
+
+    assert result == settings.demo_fallback_model
+    assert result != "anthropic/claude-3.5-sonnet"  # the paid default is NEVER used
+
+
+def test_deprecated_pin_demo_unknown_default_falls_back():
+    """CR-01 / unknown ≠ free: demo mode + a user default ABSENT from model_cache
+    (maybe_single .data is None) → still free-guarded to settings.demo_fallback_model
+    (an unknown model is not proven free, so it must not run on the owner key)."""
+    from routers import chat
+
+    # cache_is_free=None → model_cache read returns .data is None (no row / unknown).
+    db = _db_with_key_row(None, pref_model="anthropic/claude-3.5-sonnet")
+    settings = _fake_settings(demo_fallback_enabled=True)
+
+    result = chat._deprecated_pin_default_model(db, "user-1", "demo", settings)
+
+    assert result == settings.demo_fallback_model
+    assert result != "anthropic/claude-3.5-sonnet"
+
+
+def test_deprecated_pin_user_mode_keeps_paid_default():
+    """CR-01 control (guard is demo-only): a NON-demo turn (mode == 'user') keeps
+    the paid user default UNCHANGED — a connected user pays with their own key as
+    before, so the free-guard must NOT rewrite the deprecated-pin default here.
+    cache_is_free=False proves `_demo_model_for` is not consulted off the demo path."""
+    from routers import chat
+
+    db = _db_with_key_row(
+        "sk-or-v1-CIPHER", pref_model="anthropic/claude-3.5-sonnet", cache_is_free=False
+    )
+    settings = _fake_settings()
+
+    result = chat._deprecated_pin_default_model(db, "user-1", "user", settings)
+
+    assert result == "anthropic/claude-3.5-sonnet"  # paid user default, unchanged
+    assert result != settings.demo_fallback_model
