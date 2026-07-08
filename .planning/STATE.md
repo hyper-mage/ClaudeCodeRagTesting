@@ -4,13 +4,13 @@ milestone: v1.2
 milestone_name: User Options & BYOK
 status: executing
 stopped_at: Phase 15 UI-SPEC approved
-last_updated: "2026-07-06T01:19:20.314Z"
-last_activity: 2026-07-06 -- Phase 15 execution started
+last_updated: "2026-07-08T01:28:59.379Z"
+last_activity: 2026-07-08 -- Phase 15 planning complete
 progress:
   total_phases: 1
   completed_phases: 0
-  total_plans: 8
-  completed_plans: 0
+  total_plans: 10
+  completed_plans: 8
   percent: 0
 ---
 
@@ -27,9 +27,9 @@ See: .planning/PROJECT.md (updated 2026-05-20 after v1.1 completion)
 
 Phase: 15 (options-ui-capstone-demo-gating) — EXECUTING
 Plan: 1 of 8
-Status: Executing Phase 15
+Status: Ready to execute
 Progress: [█████████░] 92%
-Last activity: 2026-07-06 -- Phase 15 execution started
+Last activity: 2026-07-08 -- Phase 15 planning complete
 
 ## Performance Metrics
 
