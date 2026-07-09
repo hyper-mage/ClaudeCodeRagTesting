@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: User Options & BYOK
-status: executing
-stopped_at: Phase 15 UI-SPEC approved
-last_updated: "2026-07-08T14:31:21.680Z"
-last_activity: 2026-07-08
+status: verifying
+stopped_at: 15-09 COMPLETE — CR-01 fixed + verified live in prod (approved-with-caveat, free-provider 429)
+last_updated: "2026-07-09T21:12:45.947Z"
+last_activity: 2026-07-09
 progress:
   total_phases: 1
-  completed_phases: 0
+  completed_phases: 1
   total_plans: 10
-  completed_plans: 9
-  percent: 0
+  completed_plans: 10
+  percent: 100
 ---
 
 # Project State
@@ -25,11 +25,11 @@ See: .planning/PROJECT.md (updated 2026-05-20 after v1.1 completion)
 
 ## Current Position
 
-Phase: 15 (options-ui-capstone-demo-gating) — EXECUTING
-Plan: 15-09 (CR-01 gap closure) — PAUSED at Task 2 blocking human-verify checkpoint
-Status: Task 1 done + committed (code fix + regression tests green); Task 2 (prod redeploy + live security verification) awaits operator
-Progress: [█████████░] 90%
-Last activity: 2026-07-08
+Phase: 15 (options-ui-capstone-demo-gating) — COMPLETE (10 of 10 plans)
+Plan: 10 of 10
+Status: All plans + gap-closure (CR-01/15-09, CR-02/15-10) shipped; CR-01 fix verified live in prod
+Progress: [██████████] 100%
+Last activity: 2026-07-09
 
 ## Performance Metrics
 
@@ -38,6 +38,7 @@ Last activity: 2026-07-08
 - Plans complete: 6 (Phase 9: 3/3; Phase 10: 3/4 — 10-01 migration 028 ~14 min; 10-02 backend exchange path ~4 min, 3 tasks, 7 files, 12 tests green; 10-03 FE connect core ~5 min, 3 tasks, 5 files, build green + new files lint-clean)
 - Phase 999.1: 3/3 — 999.1-01 runner+closure-proof send; 999.1-02 ~7 min empty-state chips (2 files, 12 tests green); 999.1-03 ~25 min auto-create-on-send (3 files, 7 ChatPage tests, full suite 19/19 green, tsc+lint clean) — human-verify APPROVED-WITH-CAVEAT (deliverable verified live; live LLM streamed round-trip deferred to a separate provider error, deferred-items D-999.1-LLM-A)
 - Requirements mapped: 26/26 ✓
+- Phase 15 gap closure: 15-09 (CR-01) ~8 min active — 2 tasks, 2 files, TDD (RED 6804532 / GREEN 164bff9); resolution suite 18/18 green; Task 2 BLOCKING prod redeploy APPROVED-WITH-CAVEAT (free-provider 429) — live keyless bogus-pin + paid openai/gpt-4o default resolved to meta-llama/llama-3.3-70b-instruct:free, owner-key paid-spend path closed in prod
 
 ## Accumulated Context
 
@@ -101,10 +102,10 @@ v1.2 roadmap-shaping decisions (to be promoted to PROJECT.md at phase transition
 
 ## Session Continuity
 
-Last session: 2026-07-08T14:33:41Z
-Stopped at: 15-09 Task 2 — BLOCKING human-verify checkpoint (prod backend redeploy + live keyless deprecated-pin security check)
-Resume file: .planning/phases/15-options-ui-capstone-demo-gating/15-09-PLAN.md (Task 2)
-Next: 15-09 Task 1 CLOSED — CR-01 fix committed: RED 6804532 (deprecated-pin+demo regression tests + IN-03 Wave-0 scaffold cleanup), GREEN 164bff9 (_deprecated_pin_default_model free-guards the deprecated-pin override in demo mode). Resolution suite 18/18 green; test_deprecated_model_fallback.py 2/2 unchanged. AWAITING operator: redeploy backend to Fly prod (boardgame-rag-prod, `flyctl deploy` repo-root Dockerfile — flag DEMO_FALLBACK_ENABLED already ON, no migration/secret flip) and confirm a live keyless deprecated-pin turn resolves model==demo_fallback_model / is_byok:false. On "approved"/"approved-with-caveat", a continuation agent finishes Task 2 + writes 15-09-SUMMARY. Do NOT mark 15-09 complete until the checkpoint clears.
+Last session: 2026-07-09T21:12:45Z
+Stopped at: 15-09 COMPLETE — CR-01 fixed + verified live in prod (approved-with-caveat: free-provider 429)
+Resume file: None
+Next: Phase 15 (options-ui-capstone-demo-gating) all 10 plans complete, incl. gap closure CR-01 (15-09) + CR-02 (15-10). 15-09 shipped _deprecated_pin_default_model free-guarding the deprecated-pin override in demo mode (RED 6804532 / GREEN 164bff9, resolution suite 18/18); prod backend redeployed to Fly (boardgame-rag-prod, code-only, no migration/secret flip) and the live keyless exploit path proven closed — bogus pin `totally/bogus-deprecated-v9` + paid `openai/gpt-4o` default resolved to `meta-llama/llama-3.3-70b-instruct:free`, never the paid model (notice row 9612d3b9). SEC-03 structural $0 bound restored end-to-end; DEMO-01 holds in prod. Remaining v1.2 close-out (project memory project_v12_outstanding_gaps): 2 SEC-01 manual UAT gates, prod migrations 029-032 status, v1.2 audit.
 
 ## Operator Next Steps
 
