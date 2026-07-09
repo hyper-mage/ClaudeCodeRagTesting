@@ -36,7 +36,7 @@ Requirements for this milestone. Each maps to a roadmap phase (continues numberi
 ### Demo Fallback (DEMO)
 
 - [x] **DEMO-01**: Owner can enable/disable an owner-key demo fallback via a global flag (default OFF)
-- [ ] **DEMO-02**: When demo fallback is active for a user, a clear, non-dismissible "demo mode" banner is shown
+- [x] **DEMO-02**: When demo fallback is active for a user, a clear, non-dismissible "demo mode" banner is shown
 - [ ] **DEMO-03**: When the user has no key and demo is off, chat refuses with a connect-key prompt (fail-closed)
 
 ### Preferences & UI (PREF)
@@ -106,7 +106,7 @@ Each requirement maps to exactly one phase. Phases continue numbering from v1.1 
 | COST-03 | Phase 14 | Complete |
 | COST-04 | Phase 14 | Complete |
 | DEMO-01 | Phase 15 | Complete |
-| DEMO-02 | Phase 15 | Pending |
+| DEMO-02 | Phase 15 | Complete |
 | DEMO-03 | Phase 11 | Pending |
 | PREF-01 | Phase 14 | Complete |
 | PREF-02 | Phase 13 | Complete |
