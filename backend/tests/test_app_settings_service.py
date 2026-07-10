@@ -15,6 +15,7 @@ Supabase. Every test resets the module TTL cache first so state never leaks
 between tests; TTL expiry is driven deterministically (aging the cached
 timestamp), never by sleeping.
 """
+import logging
 from unittest.mock import MagicMock
 
 import pytest
@@ -131,12 +132,33 @@ def test_db_exception_keeps_last_known_false():
         ("False", False),
         (1, True),
         (0, False),
+        # WR-06: common falsy/truthy spellings an operator may plausibly
+        # write in the ad-hoc SQL control surface must be recognized.
+        ("0", False),
+        ("off", False),
+        ("OFF", False),
+        ("no", False),
+        ("1", True),
+        ("on", True),
+        ("yes", True),
     ],
 )
 def test_jsonb_coercion(raw, expected):
     """jsonb values delivered as bool/str/int all coerce defensively."""
     db, _, _ = _make_db({"value": raw})
     assert is_langsmith_enabled(db) is expected
+
+
+def test_unrecognized_string_defaults_on_and_warns(caplog):
+    """WR-06: an unrecognized string is not silent — the default-on fallback
+    must be observable in the logs (a mistyped kill-switch UPDATE otherwise
+    leaves tracing running with zero signal)."""
+    db, _, _ = _make_db({"value": "disabled-ish"})
+    with caplog.at_level(logging.WARNING, logger="services.app_settings_service"):
+        assert is_langsmith_enabled(db) is True
+    assert any(
+        "unrecognized value" in record.getMessage() for record in caplog.records
+    ), "unrecognized flag value did not log a warning"
 
 
 def test_ttl_cache_hits_then_expires():

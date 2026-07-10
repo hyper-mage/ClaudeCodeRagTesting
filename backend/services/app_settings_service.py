@@ -38,22 +38,34 @@ _cached_at: float | None = None
 def _coerce_bool(value) -> bool:
     """Coerce a jsonb-delivered value to bool defensively.
 
-    Accepts Python bool, the strings "true"/"false" (case-insensitive), and
-    numeric 0/1. Anything unrecognized falls back to True, matching the
-    module's default-on fail-safe.
+    Accepts Python bool, the common string spellings
+    "true"/"1"/"on"/"yes" and "false"/"0"/"off"/"no" (case-insensitive),
+    and numeric 0/1. Anything unrecognized falls back to True, matching the
+    module's default-on fail-safe -- and LOGS the fallback (WR-06): the
+    control surface for this flag is ad-hoc SQL, and a silently-ignored
+    mistyped kill-switch value would leave tracing running with the owner
+    believing it is off.
     """
     if isinstance(value, bool):
         return value
     if isinstance(value, str):
         lowered = value.strip().lower()
-        if lowered == "false":
+        if lowered in ("false", "0", "off", "no"):
             return False
-        if lowered == "true":
+        if lowered in ("true", "1", "on", "yes"):
             return True
-        return True  # unrecognized string -> default-on
+        logger.warning(
+            f"app_settings langsmith_enabled has unrecognized value {value!r}; "
+            f"defaulting ON"
+        )
+        return True
     if isinstance(value, (int, float)):
         return bool(value)
-    return True  # unrecognized type -> default-on
+    logger.warning(
+        f"app_settings langsmith_enabled has unrecognized type "
+        f"{type(value).__name__} ({value!r}); defaulting ON"
+    )
+    return True
 
 
 def _reset_cache() -> None:
