@@ -280,6 +280,20 @@ except ImportError:
             return func
         return lambda f: f
 
+# SEC-01 (a) run-level gate: `tracing_context(enabled=False)` suppresses EVERY
+# LangSmith run opened in the current context -- the parent chat run, both
+# asyncio.to_thread subagent child runs (the contextvar propagates into worker
+# threads), and the wrap_openai client spans -- in one place. Exposed as a
+# module attribute so the regression test can reference `chat.tracing_context`.
+try:
+    from langsmith import tracing_context
+except ImportError:
+    import contextlib
+
+    @contextlib.contextmanager
+    def tracing_context(**kwargs):
+        yield
+
 router = APIRouter(prefix="/api/threads", tags=["chat"])
 
 
@@ -731,7 +745,6 @@ def execute_tool(
 
 
 @router.post("/{thread_id}/messages")
-@traceable(name="chat_send_message")
 @limiter.limit(get_settings().chat_rate_limit)  # SEC-04: per-user 20/minute on /api/chat (decorator placed ADJACENT to fn so slowapi sees raw signature; #2128)
 async def send_message(
     request: Request,                            # SEC-04: REQUIRED by slowapi (RESEARCH Pitfall 1)
@@ -817,554 +830,593 @@ async def send_message(
     ]
 
     async def event_generator():
-        full_content = ""
-        tools_used_acc = []
-        assistant_msg_id = None
-        turn_usage: dict = {}  # summed OpenRouter usage across all tool-loop iterations
+        # --- Per-request key + model resolution (SEC-04/DEMO-03/D-03) --------
+        # HOISTED above the traced region (SEC-01 a): is_user_key must be known
+        # BEFORE any LangSmith run can open, so a BYOK turn's prompt/response
+        # never reaches the owner's LangSmith project. Resolve ONCE per turn,
+        # fail-closed. The decrypted key (when mode=="user") is a short-lived
+        # local -- threaded straight into the call sites below, never stashed
+        # in a closure beyond the turn.
         try:
-            # Build tools list based on availability
-            settings = get_settings()
-
-            # KB navigation tools -- always available (default KB always exists)
-            tools = [KB_LS_TOOL, KB_TREE_TOOL, KB_READ_TOOL, KB_GREP_TOOL, KB_GLOB_TOOL, EXPLORE_KB_TOOL]
-
-            # Document-specific tools -- only when user has completed documents
-            doc_check = (
-                db.table("documents")
-                .select("id")
-                .eq("user_id", user_id)
-                .eq("status", "completed")
-                .limit(1)
-                .execute()
-            )
-            if doc_check.data:
-                tools.append(RETRIEVAL_TOOL)
-                tools.append(ANALYZE_DOCUMENT_TOOL)
-
-            tools.append(SQL_TOOL)
-            if settings.web_search_enabled:
-                tools.append(WEB_SEARCH_TOOL)
-
-            # --- Source routing + scope parsing (Phase 6) -----------------------
-            user_latest = body.content
-            has_private_docs = bool(doc_check.data)
-            source_scope = infer_source_scope(user_latest, has_private_docs)
-            scope_hint = parse_scope_hint(user_latest)
-            if scope_hint.get("source_hint"):
-                source_scope = scope_hint["source_hint"]
-
-            # --- Per-request key + model resolution (SEC-04/DEMO-03/D-03) --------
-            # Resolve ONCE per turn, fail-closed. mode=="no_key" → refuse with a
-            # structured SSE error and make NO LLM call (DEMO-03). The decrypted
-            # key (when mode=="user") is a short-lived local — threaded straight
-            # into the call sites below, never stashed in a closure beyond the turn.
             api_key, model, mode, is_user_key = _resolve_key_and_model(
                 db, user_id, thread.data, body
             )
-            if mode == "no_key":
-                # Fail-closed: clean up the orphan placeholder is unnecessary (none
-                # created yet — the assistant row insert is below the budget block).
-                yield _sse_error(
-                    "no_api_key",
-                    "Connect your OpenRouter account to chat.",
-                )
-                return
-
-            # --- Deprecated-pin fallback (SC#4 / D-06, Open Question 2) -----------
-            # If the thread is pinned to a model that is no longer in the Phase 12
-            # model_cache, degrade gracefully: persist a role 'notice' line (D-06),
-            # then OVERRIDE the turn's model to the default so the call runs on the
-            # fallback instead of crashing. _resolve_key_and_model stays a pure
-            # 3-tier resolver — the override lives here in the caller.
-            thread_model = thread.data.get("model") if thread.data else None
-            if thread_model:
-                try:
-                    # Read the live cache as a set of model_ids. Assumption A2: a
-                    # mid-refresh / empty cache must NOT flag a valid pin as
-                    # deprecated — only treat "absent" as deprecated when the cache
-                    # actually has rows.
-                    cache_rows = (
-                        db.table("model_cache").select("model_id").execute()
-                    )
-                    cached_ids = {
-                        r["model_id"]
-                        for r in (cache_rows.data or [])
-                        if isinstance(r, dict) and r.get("model_id")
-                    }
-                    if cached_ids and thread_model not in cached_ids:
-                        # Pinned model is gone from the live cache → deprecated.
-                        # CR-01: re-apply the D-03 free-guard when mode=="demo" so a
-                        # paid/unknown user default can NEVER mint a paid completion
-                        # on the owner key. BOTH the notice copy and the model
-                        # override below use this guarded value.
-                        default_model = _deprecated_pin_default_model(
-                            db, user_id, mode, settings
-                        )
-                        # Composed server-side from controlled strings, inserted
-                        # as plain text (FE escapes on render) — no HTML (T-13-XSS).
-                        # LOCKED UI-SPEC copy (Copywriting Contract).
-                        db.table("messages").insert({
-                            "thread_id": thread_id,
-                            "user_id": user_id,
-                            "role": "notice",
-                            "content": (
-                                f'Model "{thread_model}" is no longer available '
-                                f"— using {default_model} instead."
-                            ),
-                        }).execute()
-                        # OVERRIDE the resolved model for THIS turn (fallback).
-                        model = default_model
-                except Exception as e:  # T-13-CRASH: a cache-read error never crashes the turn
-                    logger.warning(
-                        f"model_cache deprecation check failed; skipping notice: "
-                        f"{scrub_secrets(str(e))}"
-                    )
-
-            # --- Token budget (Phase 6) ------------------------------------------
-            budget = TokenBudget(
-                context_length=settings.model_context_length,
-                response_reserve=settings.response_reserve_tokens,
-                safety_margin=settings.budget_safety_margin,
-                tool_schema_tokens=settings.tool_schema_tokens,
-            )
-            # Best-effort dynamic context length lookup (OpenRouter).
-            if settings.llm_base_url and "openrouter" in settings.llm_base_url:
-                dynamic_length = fetch_model_context_length(model, api_key)
-                if dynamic_length and dynamic_length > 0:
-                    budget.context_length = dynamic_length
-                    logger.info(
-                        f"Using dynamic context length {dynamic_length} for {model}"
-                    )
-
-            # Create assistant message early for incremental tool persistence
-            assistant_msg = db.table("messages").insert({
-                "thread_id": thread_id,
-                "user_id": user_id,
-                "role": "assistant",
-                "content": "",
-                "tools_used": [],
-            }).execute()
-            assistant_msg_id = assistant_msg.data[0]["id"]
-
-            current_messages = list(messages)
-
-            # SEC-05 (Phase 6 D-08..D-11): counter-bounded loop with graceful cap-hit.
-            # Mirrors explorer_service.py:232 architecture (NOT numeric value: 15 vs explorer's 6).
-            iteration = 0
-            cap_hit = False
-            settings_local = get_settings()  # @lru_cache; safe to call inside the generator
-            while iteration < settings_local.chat_max_iterations:
-                iteration += 1
-                tool_call_happened = False
-
-                for event in stream_chat_completion(
-                    current_messages,
-                    tools=tools,
-                    tool_guide=TOOL_SELECTION_GUIDE if tools else None,
-                    source_hint=source_scope,
-                    scope_hint=scope_hint if scope_hint else None,
-                    api_key=api_key,
-                    model=model,
-                    trace=(not is_user_key),
-                ):
-                    if event["type"] == "system_content":
-                        # Budget bookkeeping before LLM sees the messages.
-                        budget.set_system(event["content"])
-                        budget.set_history(current_messages)
-                        if budget.is_over():
-                            current_messages = budget.truncate_oldest_tool_results(current_messages)
-                            logger.warning(
-                                f"Budget exceeded, truncated oldest tool results. "
-                                f"Remaining: {budget.remaining}"
-                            )
-                        continue
-                    if event["type"] == "text_delta":
-                        full_content += event["text"]
-                        yield {
-                            "event": "content_delta",
-                            "data": json.dumps({"text": event["text"]}),
-                        }
-                    elif event["type"] == "usage":
-                        # Sum the trailing OpenRouter usage across EVERY iteration
-                        # (it can fire once per tool-loop pass). Persisted as-is.
-                        _accumulate_usage(turn_usage, event.get("usage") or {})
-                    elif event["type"] == "tool_call":
-                        tool_call_happened = True
-
-                        # Add assistant message with tool calls
-                        current_messages.append({
-                            "role": "assistant",
-                            "tool_calls": event["tool_calls"],
-                        })
-
-                        for tc in event["tool_calls"]:
-                            fn_name = tc["function"]["name"]
-                            fn_args = json.loads(tc["function"]["arguments"])
-
-                            # Build args preview for display (includes scope indicator)
-                            args_preview = _build_args_preview(fn_name, fn_args, source_scope=source_scope)
-
-                            # Accumulate tool event for persistence
-                            tool_entry = {
-                                "tool": fn_name,
-                                "args_preview": args_preview,
-                                "call_id": tc["id"],
-                                "status": "running",
-                            }
-                            is_subagent = fn_name in ("analyze_document", "explore_kb")
-                            if is_subagent:
-                                tool_entry["subagent"] = True
-                            tools_used_acc.append(tool_entry)
-
-                            # Emit tool_start SSE event
-                            yield {
-                                "event": "tool_event",
-                                "data": json.dumps({
-                                    "tool_event": True,
-                                    "type": "tool_start",
-                                    "tool": fn_name,
-                                    "call_id": tc["id"],
-                                    "args_preview": args_preview,
-                                    **({"subagent": True} if is_subagent else {}),
-                                }),
-                            }
-
-                            # Dispatch
-                            if fn_name == "explore_kb":
-                                import asyncio
-                                from services.explorer_service import run_exploration
-
-                                import queue as _queue
-                                q: _queue.Queue = _queue.Queue()
-                                SENTINEL = object()
-
-                                def _drive():
-                                    try:
-                                        for ev in run_exploration(
-                                            user_id=user_id,
-                                            query=fn_args["query"],
-                                            mode=fn_args.get("mode", "deep_search"),
-                                            api_key=api_key,
-                                            model=model,
-                                            trace=(not is_user_key),
-                                        ):
-                                            q.put(ev)
-                                    except Exception as ex:
-                                        q.put({"type": "error", "error": str(ex)})
-                                    finally:
-                                        q.put(SENTINEL)
-
-                                task = asyncio.create_task(asyncio.to_thread(_drive))
-                                final_result_dict = None
-                                while True:
-                                    sub_ev = await asyncio.to_thread(q.get)
-                                    if sub_ev is SENTINEL:
-                                        break
-                                    if sub_ev.get("type") == "result":
-                                        final_result_dict = sub_ev["result"]
-                                        continue
-                                    if sub_ev.get("type") == "error":
-                                        final_result_dict = {
-                                            "mode": fn_args.get("mode", "deep_search"),
-                                            "query": fn_args["query"],
-                                            "findings": [],
-                                            "synthesis": f"Explorer failed: {sub_ev['error']}",
-                                            "tools_used": [],
-                                            "iterations": 0,
-                                            "budget_exhausted": True,
-                                        }
-                                        continue
-                                    # sub_iteration / sub_tool_start / sub_tool_result -> SSE sub_event row
-                                    yield {
-                                        "event": "tool_event",
-                                        "data": json.dumps({
-                                            "tool_event": True,
-                                            "type": "sub_event",
-                                            "subagent": True,
-                                            "parent_call_id": tc["id"],
-                                            "sub_event": sub_ev,
-                                        }),
-                                    }
-                                await task
-                                if final_result_dict is None:
-                                    final_result_dict = {
-                                        "mode": fn_args.get("mode", "deep_search"),
-                                        "query": fn_args["query"],
-                                        "findings": [],
-                                        "synthesis": "Explorer produced no result.",
-                                        "tools_used": [],
-                                        "iterations": 0,
-                                        "budget_exhausted": True,
-                                    }
-                                tool_result = json.dumps({"tool": "explore_kb", **final_result_dict})
-                            elif fn_name == "analyze_document":
-                                # Sub-agent with SSE alignment matching explore_kb (D-10/D-11/D-12).
-                                import asyncio as _asyncio
-                                import queue as _queue
-                                from services.subagent_service import run_document_analysis
-
-                                q2: _queue.Queue = _queue.Queue()
-                                SENTINEL2 = object()
-
-                                def _drive_doc():
-                                    try:
-                                        for ev in run_document_analysis(
-                                            user_id=user_id,
-                                            document_name=fn_args["document_name"],
-                                            analysis_query=fn_args["query"],
-                                            api_key=api_key,
-                                            model=model,
-                                            trace=(not is_user_key),
-                                        ):
-                                            q2.put(ev)
-                                    except Exception as ex:
-                                        q2.put({"type": "result", "result": {"error": str(ex)}})
-                                    finally:
-                                        q2.put(SENTINEL2)
-
-                                task2 = _asyncio.create_task(_asyncio.to_thread(_drive_doc))
-                                final_result_dict = None
-                                while True:
-                                    sub_ev = await _asyncio.to_thread(q2.get)
-                                    if sub_ev is SENTINEL2:
-                                        break
-                                    if sub_ev.get("type") == "result":
-                                        final_result_dict = sub_ev["result"]
-                                        continue
-                                    # sub_iteration / sub_tool_start / sub_tool_result -> SSE sub_event row
-                                    yield {
-                                        "event": "tool_event",
-                                        "data": json.dumps({
-                                            "tool_event": True,
-                                            "type": "sub_event",
-                                            "subagent": True,
-                                            "parent_call_id": tc["id"],
-                                            "sub_event": sub_ev,
-                                        }),
-                                    }
-                                await task2
-                                if final_result_dict is None:
-                                    final_result_dict = {"error": "Document analysis produced no result."}
-                                tool_result = json.dumps({"tool": "analyze_document", **final_result_dict})
-                            else:
-                                tool_result = execute_tool(
-                                    fn_name,
-                                    fn_args,
-                                    user_id,
-                                    api_key=api_key,
-                                    model=model,
-                                    trace=(not is_user_key),
-                                )
-
-                            current_messages.append({
-                                "role": "tool",
-                                "tool_call_id": tc["id"],
-                                "content": tool_result,
-                            })
-
-                            # Track this tool round-trip in the budget so oldest pairs
-                            # can be truncated first if we exceed the context window.
-                            # The assistant tool_calls message is at current_messages[-2 - offset];
-                            # we locate it by matching tool_call_id.
-                            assistant_tc_msg = None
-                            for m in reversed(current_messages[:-1]):
-                                if m.get("role") == "assistant" and m.get("tool_calls"):
-                                    tc_ids = {
-                                        _tc.get("id")
-                                        for _tc in (m.get("tool_calls") or [])
-                                    }
-                                    if tc["id"] in tc_ids:
-                                        assistant_tc_msg = m
-                                        break
-                            if assistant_tc_msg is not None:
-                                budget.add_tool_result_pair(
-                                    assistant_tc_msg, current_messages[-1]
-                                )
-
-                            # Update accumulated tool entry with result
-                            tool_output_preview = tool_result[:2000] if len(tool_result) > 2000 else tool_result
-                            tool_entry["status"] = "complete"
-                            tool_entry["output"] = tool_output_preview
-
-                            # Persist tool events incrementally
-                            db.table("messages").update({
-                                "tools_used": tools_used_acc,
-                            }).eq("id", assistant_msg_id).execute()
-
-                            # Emit tool_result SSE event
-                            yield {
-                                "event": "tool_event",
-                                "data": json.dumps({
-                                    "tool_event": True,
-                                    "type": "tool_result",
-                                    "tool": fn_name,
-                                    "call_id": tc["id"],
-                                    "output": tool_output_preview,
-                                    **({"subagent": True} if is_subagent else {}),
-                                }),
-                            }
-
-                if not tool_call_happened:
-                    break  # voluntary stop — main exit path
-            else:
-                # while-else: fires only when counter exhausts without `break`.
-                # This is the CAP-HIT path. Mirrors explorer's exhaustion flag.
-                cap_hit = True
-
-            if cap_hit:
-                notice = CAP_HIT_NOTICE.format(n=settings_local.chat_max_iterations)
-                full_content += notice
-                yield {
-                    "event": "content_delta",
-                    "data": json.dumps({"text": notice}),
-                }
-                logger.warning(
-                    f"Chat loop hit max_iterations cap "
-                    f"({settings_local.chat_max_iterations}) for user {user_id}, "
-                    f"thread {thread_id}"
-                )
-                # LangSmith metadata tag — RESEARCH Pitfall 5: best-effort, non-fatal.
-                try:
-                    from langsmith.run_helpers import get_current_run_tree
-                    run = get_current_run_tree()
-                    if run is not None:
-                        run.add_metadata({
-                            "iteration_cap_hit": True,
-                            "cap_value": settings_local.chat_max_iterations,
-                        })
-                except Exception as e:
-                    logger.debug(f"LangSmith metadata tag failed (non-fatal): {e}")
-
-            # Update assistant message with final content + summed usage (D-08).
-            db.table("messages").update({
-                "content": full_content,
-                "tools_used": tools_used_acc if tools_used_acc else None,
-                "usage": turn_usage or None,
-            }).eq("id", assistant_msg_id).execute()
-
-            # Auto-generate title from first message
-            if not thread.data.get("title"):
-                title = body.content[:50] + ("..." if len(body.content) > 50 else "")
-                db.table("threads").update({"title": title}).eq("id", thread_id).execute()
-
-            # done event — carry the summed usage; signal mode:"demo" so the FE
-            # can surface the owner-key demo banner (Phase 15). useChat.ts:185
-            # keys only on message_id, so extra keys are inert (D-08).
-            done_payload = {
-                "message_id": assistant_msg_id,
-                "content": full_content,
-            }
-            if turn_usage:
-                done_payload["usage"] = turn_usage
-            if mode == "demo":
-                done_payload["mode"] = "demo"
-            yield {
-                "event": "done",
-                "data": json.dumps(done_payload),
-            }
-        except openai.RateLimitError as e:
-            # 429 — model hit its rate limit (D-12). Distinct structured code so the
-            # UI can disambiguate from a 402. RateLimitError IS an APIStatusError
-            # subclass, so this MUST be caught BEFORE the APIStatusError branch.
-            logger.warning(f"Chat rate-limited: {scrub_secrets(str(e))}", exc_info=True)
-            _mark_error_row(db, assistant_msg_id)
-            yield _sse_error(
-                "rate_limit",
-                "This model hit its rate limit. Wait a minute or pick another "
-                "model / connect credits.",
-            )
-        except openai.APIStatusError as e:
-            # 402 → payment_required (no 402 subclass exists; branch on status_code).
-            # Use the TYPED exception + .status_code, never str(e) parsing (leak risk).
-            if e.status_code == 402:  # APIStatusError always carries .status_code
-                logger.warning(
-                    f"Chat payment-required: {scrub_secrets(str(e))}", exc_info=True
-                )
-                _mark_error_row(db, assistant_msg_id)
-                yield _sse_error(
-                    "payment_required",
-                    "This model needs credits. Connect your OpenRouter account or "
-                    "add credits.",
-                )
-            elif e.status_code == 401:
-                # 401 → no_api_key (SC#4 / D-09 backend half). A mid-stream 401 means
-                # OpenRouter rejected the STORED key as invalid/revoked. Emit the SAME
-                # structured code the pre-flight no-key path uses (chat.py:798-805) so the
-                # FE [Reconnect] mapping is reused — without this it would fall to the
-                # else → upstream_error generic dead-end Retry bubble that SC#4 forbids.
-                logger.warning(
-                    f"Chat unauthorized: {scrub_secrets(str(e))}", exc_info=True
-                )
-                _mark_error_row(db, assistant_msg_id)
-                yield _sse_error(
-                    "no_api_key",
-                    "Connect your OpenRouter account to chat.",
-                )
-            elif e.status_code == 403:
-                # 403 → forbidden, distinct from payment_required (402), no_api_key (401),
-                # and the generic upstream_error (else). The SSE payload carries only the
-                # structured CODE; the FE selects locked UI-SPEC copy from it.
-                logger.warning(
-                    f"Chat forbidden: {scrub_secrets(str(e))}", exc_info=True
-                )
-                _mark_error_row(db, assistant_msg_id)
-                yield _sse_error(
-                    "forbidden",
-                    "The model provider refused this request. Try another model or "
-                    "check your OpenRouter account.",
-                )
-            elif e.status_code == 404 or (
-                e.status_code == 400 and "no endpoints found" in str(e).lower()
-            ):
-                # model-unavailable family (FU-C). OpenRouter returns:
-                #   404 "No endpoints found for <model>"            — retired/stealth/parked
-                #                                                      model (e.g. owl-alpha)
-                #   400 "No endpoints found that support tool use"  — the agent loop ALWAYS
-                #                                                      sends tools; model has no
-                #                                                      tool-capable endpoint
-                #   400 "No endpoints found matching your data policy"
-                # The PINNED model has no live endpoint that can serve THIS request. This is NOT
-                # a key problem (no_api_key/402/403) and must NOT dead-end on the generic
-                # upstream_error Retry bubble — the user has to pick a DIFFERENT model. Distinct
-                # code so the FE renders model-specific copy + a plain Retry (no Reconnect).
-                # A static catalog filter can't fully prevent this: a model can 404 at call time
-                # even when the cached catalog looked valid. Detection is by status + OpenRouter
-                # message substring; the payload carries ONLY the fixed code/detail (scrubbed).
-                logger.warning(
-                    f"Chat model-unavailable: {scrub_secrets(str(e))}", exc_info=True
-                )
-                _mark_error_row(db, assistant_msg_id)
-                yield _sse_error(
-                    "model_unavailable",
-                    "That model isn't available right now. Pick a different model.",
-                )
-            else:
-                logger.error(
-                    f"Chat upstream error: {scrub_secrets(str(e))}", exc_info=True
-                )
-                _mark_error_row(db, assistant_msg_id)
-                yield _sse_error(
-                    "upstream_error",
-                    "The model provider returned an error. Try again or pick "
-                    "another model.",
-                )
         except Exception as e:
-            # Defense in depth: scrub str(e) on the message string too (the
-            # _ScrubFilter is the belt that also catches the exc_info traceback).
+            # Mirrors the worker's generic error branch (same SSE shape); no
+            # assistant row exists yet, so there is nothing to mark.
             logger.error(f"Chat error: {scrub_secrets(str(e))}", exc_info=True)
-            _mark_error_row(db, assistant_msg_id)
             yield {
                 "event": "error",
                 "data": json.dumps({"error": scrub_secrets(str(e))}),
             }
-        finally:
-            # Handle client disconnect (GeneratorExit) -- clean up ghost messages
-            if assistant_msg_id and not full_content:
-                try:
-                    db.table("messages").update({
-                        "content": "[Response interrupted]",
-                    }).eq("id", assistant_msg_id).execute()
-                except Exception:
-                    pass  # Best-effort cleanup
+            return
+        if mode == "no_key":
+            # Fail-closed refusal (DEMO-03) -- runs OUTSIDE the traced region,
+            # so a refused turn opens no run. Cleaning up an orphan placeholder
+            # is unnecessary (none created yet -- the assistant row insert
+            # lives in the worker, below the budget block).
+            yield _sse_error(
+                "no_api_key",
+                "Connect your OpenRouter account to chat.",
+            )
+            return
+
+        # SEC-01 (a): the ENTIRE turn body runs inside this traceable worker so
+        # the single run gate below controls the parent run AND -- via
+        # contextvar propagation through asyncio.to_thread -- both subagent
+        # child runs plus the wrap_openai client spans. Owner/demo turns
+        # (is_user_key=False) keep the full trace tree exactly as before; a
+        # user-key turn opens ZERO runs. The worker takes no explicit args
+        # (closure capture), so no request content is recorded as run inputs
+        # on entry. The inner `trace=(not is_user_key)` client/subagent args
+        # stay as defense-in-depth.
+        @traceable(name="chat_send_message")
+        async def _traced_turn():
+            nonlocal model  # the deprecated-pin fallback overrides the turn's model
+            full_content = ""
+            tools_used_acc = []
+            assistant_msg_id = None
+            turn_usage: dict = {}  # summed OpenRouter usage across all tool-loop iterations
+            try:
+                # Build tools list based on availability
+                settings = get_settings()
+
+                # KB navigation tools -- always available (default KB always exists)
+                tools = [KB_LS_TOOL, KB_TREE_TOOL, KB_READ_TOOL, KB_GREP_TOOL, KB_GLOB_TOOL, EXPLORE_KB_TOOL]
+
+                # Document-specific tools -- only when user has completed documents
+                doc_check = (
+                    db.table("documents")
+                    .select("id")
+                    .eq("user_id", user_id)
+                    .eq("status", "completed")
+                    .limit(1)
+                    .execute()
+                )
+                if doc_check.data:
+                    tools.append(RETRIEVAL_TOOL)
+                    tools.append(ANALYZE_DOCUMENT_TOOL)
+
+                tools.append(SQL_TOOL)
+                if settings.web_search_enabled:
+                    tools.append(WEB_SEARCH_TOOL)
+
+                # --- Source routing + scope parsing (Phase 6) -----------------------
+                user_latest = body.content
+                has_private_docs = bool(doc_check.data)
+                source_scope = infer_source_scope(user_latest, has_private_docs)
+                scope_hint = parse_scope_hint(user_latest)
+                if scope_hint.get("source_hint"):
+                    source_scope = scope_hint["source_hint"]
+
+                # --- Deprecated-pin fallback (SC#4 / D-06, Open Question 2) -----------
+                # If the thread is pinned to a model that is no longer in the Phase 12
+                # model_cache, degrade gracefully: persist a role 'notice' line (D-06),
+                # then OVERRIDE the turn's model to the default so the call runs on the
+                # fallback instead of crashing. _resolve_key_and_model stays a pure
+                # 3-tier resolver — the override lives here in the caller.
+                thread_model = thread.data.get("model") if thread.data else None
+                if thread_model:
+                    try:
+                        # Read the live cache as a set of model_ids. Assumption A2: a
+                        # mid-refresh / empty cache must NOT flag a valid pin as
+                        # deprecated — only treat "absent" as deprecated when the cache
+                        # actually has rows.
+                        cache_rows = (
+                            db.table("model_cache").select("model_id").execute()
+                        )
+                        cached_ids = {
+                            r["model_id"]
+                            for r in (cache_rows.data or [])
+                            if isinstance(r, dict) and r.get("model_id")
+                        }
+                        if cached_ids and thread_model not in cached_ids:
+                            # Pinned model is gone from the live cache → deprecated.
+                            # CR-01: re-apply the D-03 free-guard when mode=="demo" so a
+                            # paid/unknown user default can NEVER mint a paid completion
+                            # on the owner key. BOTH the notice copy and the model
+                            # override below use this guarded value.
+                            default_model = _deprecated_pin_default_model(
+                                db, user_id, mode, settings
+                            )
+                            # Composed server-side from controlled strings, inserted
+                            # as plain text (FE escapes on render) — no HTML (T-13-XSS).
+                            # LOCKED UI-SPEC copy (Copywriting Contract).
+                            db.table("messages").insert({
+                                "thread_id": thread_id,
+                                "user_id": user_id,
+                                "role": "notice",
+                                "content": (
+                                    f'Model "{thread_model}" is no longer available '
+                                    f"— using {default_model} instead."
+                                ),
+                            }).execute()
+                            # OVERRIDE the resolved model for THIS turn (fallback).
+                            model = default_model
+                    except Exception as e:  # T-13-CRASH: a cache-read error never crashes the turn
+                        logger.warning(
+                            f"model_cache deprecation check failed; skipping notice: "
+                            f"{scrub_secrets(str(e))}"
+                        )
+
+                # --- Token budget (Phase 6) ------------------------------------------
+                budget = TokenBudget(
+                    context_length=settings.model_context_length,
+                    response_reserve=settings.response_reserve_tokens,
+                    safety_margin=settings.budget_safety_margin,
+                    tool_schema_tokens=settings.tool_schema_tokens,
+                )
+                # Best-effort dynamic context length lookup (OpenRouter).
+                if settings.llm_base_url and "openrouter" in settings.llm_base_url:
+                    dynamic_length = fetch_model_context_length(model, api_key)
+                    if dynamic_length and dynamic_length > 0:
+                        budget.context_length = dynamic_length
+                        logger.info(
+                            f"Using dynamic context length {dynamic_length} for {model}"
+                        )
+
+                # Create assistant message early for incremental tool persistence
+                assistant_msg = db.table("messages").insert({
+                    "thread_id": thread_id,
+                    "user_id": user_id,
+                    "role": "assistant",
+                    "content": "",
+                    "tools_used": [],
+                }).execute()
+                assistant_msg_id = assistant_msg.data[0]["id"]
+
+                current_messages = list(messages)
+
+                # SEC-05 (Phase 6 D-08..D-11): counter-bounded loop with graceful cap-hit.
+                # Mirrors explorer_service.py:232 architecture (NOT numeric value: 15 vs explorer's 6).
+                iteration = 0
+                cap_hit = False
+                settings_local = get_settings()  # @lru_cache; safe to call inside the generator
+                while iteration < settings_local.chat_max_iterations:
+                    iteration += 1
+                    tool_call_happened = False
+
+                    for event in stream_chat_completion(
+                        current_messages,
+                        tools=tools,
+                        tool_guide=TOOL_SELECTION_GUIDE if tools else None,
+                        source_hint=source_scope,
+                        scope_hint=scope_hint if scope_hint else None,
+                        api_key=api_key,
+                        model=model,
+                        trace=(not is_user_key),
+                    ):
+                        if event["type"] == "system_content":
+                            # Budget bookkeeping before LLM sees the messages.
+                            budget.set_system(event["content"])
+                            budget.set_history(current_messages)
+                            if budget.is_over():
+                                current_messages = budget.truncate_oldest_tool_results(current_messages)
+                                logger.warning(
+                                    f"Budget exceeded, truncated oldest tool results. "
+                                    f"Remaining: {budget.remaining}"
+                                )
+                            continue
+                        if event["type"] == "text_delta":
+                            full_content += event["text"]
+                            yield {
+                                "event": "content_delta",
+                                "data": json.dumps({"text": event["text"]}),
+                            }
+                        elif event["type"] == "usage":
+                            # Sum the trailing OpenRouter usage across EVERY iteration
+                            # (it can fire once per tool-loop pass). Persisted as-is.
+                            _accumulate_usage(turn_usage, event.get("usage") or {})
+                        elif event["type"] == "tool_call":
+                            tool_call_happened = True
+
+                            # Add assistant message with tool calls
+                            current_messages.append({
+                                "role": "assistant",
+                                "tool_calls": event["tool_calls"],
+                            })
+
+                            for tc in event["tool_calls"]:
+                                fn_name = tc["function"]["name"]
+                                fn_args = json.loads(tc["function"]["arguments"])
+
+                                # Build args preview for display (includes scope indicator)
+                                args_preview = _build_args_preview(fn_name, fn_args, source_scope=source_scope)
+
+                                # Accumulate tool event for persistence
+                                tool_entry = {
+                                    "tool": fn_name,
+                                    "args_preview": args_preview,
+                                    "call_id": tc["id"],
+                                    "status": "running",
+                                }
+                                is_subagent = fn_name in ("analyze_document", "explore_kb")
+                                if is_subagent:
+                                    tool_entry["subagent"] = True
+                                tools_used_acc.append(tool_entry)
+
+                                # Emit tool_start SSE event
+                                yield {
+                                    "event": "tool_event",
+                                    "data": json.dumps({
+                                        "tool_event": True,
+                                        "type": "tool_start",
+                                        "tool": fn_name,
+                                        "call_id": tc["id"],
+                                        "args_preview": args_preview,
+                                        **({"subagent": True} if is_subagent else {}),
+                                    }),
+                                }
+
+                                # Dispatch
+                                if fn_name == "explore_kb":
+                                    import asyncio
+                                    from services.explorer_service import run_exploration
+
+                                    import queue as _queue
+                                    q: _queue.Queue = _queue.Queue()
+                                    SENTINEL = object()
+
+                                    def _drive():
+                                        try:
+                                            for ev in run_exploration(
+                                                user_id=user_id,
+                                                query=fn_args["query"],
+                                                mode=fn_args.get("mode", "deep_search"),
+                                                api_key=api_key,
+                                                model=model,
+                                                trace=(not is_user_key),
+                                            ):
+                                                q.put(ev)
+                                        except Exception as ex:
+                                            q.put({"type": "error", "error": str(ex)})
+                                        finally:
+                                            q.put(SENTINEL)
+
+                                    task = asyncio.create_task(asyncio.to_thread(_drive))
+                                    final_result_dict = None
+                                    while True:
+                                        sub_ev = await asyncio.to_thread(q.get)
+                                        if sub_ev is SENTINEL:
+                                            break
+                                        if sub_ev.get("type") == "result":
+                                            final_result_dict = sub_ev["result"]
+                                            continue
+                                        if sub_ev.get("type") == "error":
+                                            final_result_dict = {
+                                                "mode": fn_args.get("mode", "deep_search"),
+                                                "query": fn_args["query"],
+                                                "findings": [],
+                                                "synthesis": f"Explorer failed: {sub_ev['error']}",
+                                                "tools_used": [],
+                                                "iterations": 0,
+                                                "budget_exhausted": True,
+                                            }
+                                            continue
+                                        # sub_iteration / sub_tool_start / sub_tool_result -> SSE sub_event row
+                                        yield {
+                                            "event": "tool_event",
+                                            "data": json.dumps({
+                                                "tool_event": True,
+                                                "type": "sub_event",
+                                                "subagent": True,
+                                                "parent_call_id": tc["id"],
+                                                "sub_event": sub_ev,
+                                            }),
+                                        }
+                                    await task
+                                    if final_result_dict is None:
+                                        final_result_dict = {
+                                            "mode": fn_args.get("mode", "deep_search"),
+                                            "query": fn_args["query"],
+                                            "findings": [],
+                                            "synthesis": "Explorer produced no result.",
+                                            "tools_used": [],
+                                            "iterations": 0,
+                                            "budget_exhausted": True,
+                                        }
+                                    tool_result = json.dumps({"tool": "explore_kb", **final_result_dict})
+                                elif fn_name == "analyze_document":
+                                    # Sub-agent with SSE alignment matching explore_kb (D-10/D-11/D-12).
+                                    import asyncio as _asyncio
+                                    import queue as _queue
+                                    from services.subagent_service import run_document_analysis
+
+                                    q2: _queue.Queue = _queue.Queue()
+                                    SENTINEL2 = object()
+
+                                    def _drive_doc():
+                                        try:
+                                            for ev in run_document_analysis(
+                                                user_id=user_id,
+                                                document_name=fn_args["document_name"],
+                                                analysis_query=fn_args["query"],
+                                                api_key=api_key,
+                                                model=model,
+                                                trace=(not is_user_key),
+                                            ):
+                                                q2.put(ev)
+                                        except Exception as ex:
+                                            q2.put({"type": "result", "result": {"error": str(ex)}})
+                                        finally:
+                                            q2.put(SENTINEL2)
+
+                                    task2 = _asyncio.create_task(_asyncio.to_thread(_drive_doc))
+                                    final_result_dict = None
+                                    while True:
+                                        sub_ev = await _asyncio.to_thread(q2.get)
+                                        if sub_ev is SENTINEL2:
+                                            break
+                                        if sub_ev.get("type") == "result":
+                                            final_result_dict = sub_ev["result"]
+                                            continue
+                                        # sub_iteration / sub_tool_start / sub_tool_result -> SSE sub_event row
+                                        yield {
+                                            "event": "tool_event",
+                                            "data": json.dumps({
+                                                "tool_event": True,
+                                                "type": "sub_event",
+                                                "subagent": True,
+                                                "parent_call_id": tc["id"],
+                                                "sub_event": sub_ev,
+                                            }),
+                                        }
+                                    await task2
+                                    if final_result_dict is None:
+                                        final_result_dict = {"error": "Document analysis produced no result."}
+                                    tool_result = json.dumps({"tool": "analyze_document", **final_result_dict})
+                                else:
+                                    tool_result = execute_tool(
+                                        fn_name,
+                                        fn_args,
+                                        user_id,
+                                        api_key=api_key,
+                                        model=model,
+                                        trace=(not is_user_key),
+                                    )
+
+                                current_messages.append({
+                                    "role": "tool",
+                                    "tool_call_id": tc["id"],
+                                    "content": tool_result,
+                                })
+
+                                # Track this tool round-trip in the budget so oldest pairs
+                                # can be truncated first if we exceed the context window.
+                                # The assistant tool_calls message is at current_messages[-2 - offset];
+                                # we locate it by matching tool_call_id.
+                                assistant_tc_msg = None
+                                for m in reversed(current_messages[:-1]):
+                                    if m.get("role") == "assistant" and m.get("tool_calls"):
+                                        tc_ids = {
+                                            _tc.get("id")
+                                            for _tc in (m.get("tool_calls") or [])
+                                        }
+                                        if tc["id"] in tc_ids:
+                                            assistant_tc_msg = m
+                                            break
+                                if assistant_tc_msg is not None:
+                                    budget.add_tool_result_pair(
+                                        assistant_tc_msg, current_messages[-1]
+                                    )
+
+                                # Update accumulated tool entry with result
+                                tool_output_preview = tool_result[:2000] if len(tool_result) > 2000 else tool_result
+                                tool_entry["status"] = "complete"
+                                tool_entry["output"] = tool_output_preview
+
+                                # Persist tool events incrementally
+                                db.table("messages").update({
+                                    "tools_used": tools_used_acc,
+                                }).eq("id", assistant_msg_id).execute()
+
+                                # Emit tool_result SSE event
+                                yield {
+                                    "event": "tool_event",
+                                    "data": json.dumps({
+                                        "tool_event": True,
+                                        "type": "tool_result",
+                                        "tool": fn_name,
+                                        "call_id": tc["id"],
+                                        "output": tool_output_preview,
+                                        **({"subagent": True} if is_subagent else {}),
+                                    }),
+                                }
+
+                    if not tool_call_happened:
+                        break  # voluntary stop — main exit path
+                else:
+                    # while-else: fires only when counter exhausts without `break`.
+                    # This is the CAP-HIT path. Mirrors explorer's exhaustion flag.
+                    cap_hit = True
+
+                if cap_hit:
+                    notice = CAP_HIT_NOTICE.format(n=settings_local.chat_max_iterations)
+                    full_content += notice
+                    yield {
+                        "event": "content_delta",
+                        "data": json.dumps({"text": notice}),
+                    }
+                    logger.warning(
+                        f"Chat loop hit max_iterations cap "
+                        f"({settings_local.chat_max_iterations}) for user {user_id}, "
+                        f"thread {thread_id}"
+                    )
+                    # LangSmith metadata tag — RESEARCH Pitfall 5: best-effort, non-fatal.
+                    try:
+                        from langsmith.run_helpers import get_current_run_tree
+                        run = get_current_run_tree()
+                        if run is not None:
+                            run.add_metadata({
+                                "iteration_cap_hit": True,
+                                "cap_value": settings_local.chat_max_iterations,
+                            })
+                    except Exception as e:
+                        logger.debug(f"LangSmith metadata tag failed (non-fatal): {e}")
+
+                # Update assistant message with final content + summed usage (D-08).
+                db.table("messages").update({
+                    "content": full_content,
+                    "tools_used": tools_used_acc if tools_used_acc else None,
+                    "usage": turn_usage or None,
+                }).eq("id", assistant_msg_id).execute()
+
+                # Auto-generate title from first message
+                if not thread.data.get("title"):
+                    title = body.content[:50] + ("..." if len(body.content) > 50 else "")
+                    db.table("threads").update({"title": title}).eq("id", thread_id).execute()
+
+                # done event — carry the summed usage; signal mode:"demo" so the FE
+                # can surface the owner-key demo banner (Phase 15). useChat.ts:185
+                # keys only on message_id, so extra keys are inert (D-08).
+                done_payload = {
+                    "message_id": assistant_msg_id,
+                    "content": full_content,
+                }
+                if turn_usage:
+                    done_payload["usage"] = turn_usage
+                if mode == "demo":
+                    done_payload["mode"] = "demo"
+                yield {
+                    "event": "done",
+                    "data": json.dumps(done_payload),
+                }
+            except openai.RateLimitError as e:
+                # 429 — model hit its rate limit (D-12). Distinct structured code so the
+                # UI can disambiguate from a 402. RateLimitError IS an APIStatusError
+                # subclass, so this MUST be caught BEFORE the APIStatusError branch.
+                logger.warning(f"Chat rate-limited: {scrub_secrets(str(e))}", exc_info=True)
+                _mark_error_row(db, assistant_msg_id)
+                yield _sse_error(
+                    "rate_limit",
+                    "This model hit its rate limit. Wait a minute or pick another "
+                    "model / connect credits.",
+                )
+            except openai.APIStatusError as e:
+                # 402 → payment_required (no 402 subclass exists; branch on status_code).
+                # Use the TYPED exception + .status_code, never str(e) parsing (leak risk).
+                if e.status_code == 402:  # APIStatusError always carries .status_code
+                    logger.warning(
+                        f"Chat payment-required: {scrub_secrets(str(e))}", exc_info=True
+                    )
+                    _mark_error_row(db, assistant_msg_id)
+                    yield _sse_error(
+                        "payment_required",
+                        "This model needs credits. Connect your OpenRouter account or "
+                        "add credits.",
+                    )
+                elif e.status_code == 401:
+                    # 401 → no_api_key (SC#4 / D-09 backend half). A mid-stream 401 means
+                    # OpenRouter rejected the STORED key as invalid/revoked. Emit the SAME
+                    # structured code the pre-flight no-key path uses (chat.py:798-805) so the
+                    # FE [Reconnect] mapping is reused — without this it would fall to the
+                    # else → upstream_error generic dead-end Retry bubble that SC#4 forbids.
+                    logger.warning(
+                        f"Chat unauthorized: {scrub_secrets(str(e))}", exc_info=True
+                    )
+                    _mark_error_row(db, assistant_msg_id)
+                    yield _sse_error(
+                        "no_api_key",
+                        "Connect your OpenRouter account to chat.",
+                    )
+                elif e.status_code == 403:
+                    # 403 → forbidden, distinct from payment_required (402), no_api_key (401),
+                    # and the generic upstream_error (else). The SSE payload carries only the
+                    # structured CODE; the FE selects locked UI-SPEC copy from it.
+                    logger.warning(
+                        f"Chat forbidden: {scrub_secrets(str(e))}", exc_info=True
+                    )
+                    _mark_error_row(db, assistant_msg_id)
+                    yield _sse_error(
+                        "forbidden",
+                        "The model provider refused this request. Try another model or "
+                        "check your OpenRouter account.",
+                    )
+                elif e.status_code == 404 or (
+                    e.status_code == 400 and "no endpoints found" in str(e).lower()
+                ):
+                    # model-unavailable family (FU-C). OpenRouter returns:
+                    #   404 "No endpoints found for <model>"            — retired/stealth/parked
+                    #                                                      model (e.g. owl-alpha)
+                    #   400 "No endpoints found that support tool use"  — the agent loop ALWAYS
+                    #                                                      sends tools; model has no
+                    #                                                      tool-capable endpoint
+                    #   400 "No endpoints found matching your data policy"
+                    # The PINNED model has no live endpoint that can serve THIS request. This is NOT
+                    # a key problem (no_api_key/402/403) and must NOT dead-end on the generic
+                    # upstream_error Retry bubble — the user has to pick a DIFFERENT model. Distinct
+                    # code so the FE renders model-specific copy + a plain Retry (no Reconnect).
+                    # A static catalog filter can't fully prevent this: a model can 404 at call time
+                    # even when the cached catalog looked valid. Detection is by status + OpenRouter
+                    # message substring; the payload carries ONLY the fixed code/detail (scrubbed).
+                    logger.warning(
+                        f"Chat model-unavailable: {scrub_secrets(str(e))}", exc_info=True
+                    )
+                    _mark_error_row(db, assistant_msg_id)
+                    yield _sse_error(
+                        "model_unavailable",
+                        "That model isn't available right now. Pick a different model.",
+                    )
+                else:
+                    logger.error(
+                        f"Chat upstream error: {scrub_secrets(str(e))}", exc_info=True
+                    )
+                    _mark_error_row(db, assistant_msg_id)
+                    yield _sse_error(
+                        "upstream_error",
+                        "The model provider returned an error. Try again or pick "
+                        "another model.",
+                    )
+            except Exception as e:
+                # Defense in depth: scrub str(e) on the message string too (the
+                # _ScrubFilter is the belt that also catches the exc_info traceback).
+                logger.error(f"Chat error: {scrub_secrets(str(e))}", exc_info=True)
+                _mark_error_row(db, assistant_msg_id)
+                yield {
+                    "event": "error",
+                    "data": json.dumps({"error": scrub_secrets(str(e))}),
+                }
+            finally:
+                # Handle client disconnect (GeneratorExit) -- clean up ghost messages
+                if assistant_msg_id and not full_content:
+                    try:
+                        db.table("messages").update({
+                            "content": "[Response interrupted]",
+                        }).eq("id", assistant_msg_id).execute()
+                    except Exception:
+                        pass  # Best-effort cleanup
+
+        with tracing_context(enabled=not is_user_key):
+            worker = _traced_turn()
+            try:
+                async for ev in worker:
+                    yield ev
+            finally:
+                # A client disconnect raises GeneratorExit at the `yield ev`
+                # above -- OUTSIDE the worker. aclose() throws it into
+                # _traced_turn at its suspension point so its finally cleanup
+                # (the "[Response interrupted]" stamp) still runs, and the
+                # traceable wrapper closes the parent run deterministically.
+                await worker.aclose()
 
     return EventSourceResponse(event_generator())
