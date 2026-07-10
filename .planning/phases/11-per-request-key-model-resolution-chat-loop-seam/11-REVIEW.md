@@ -15,7 +15,13 @@ findings:
   warning: 6
   info: 1
   total: 8
-status: issues_found
+fixes:
+  fixed_at: 2026-07-10T18:14:44Z
+  scope: critical_warning
+  fixed: 7
+  skipped: 0
+  out_of_scope: 1
+status: fixes_applied
 ---
 
 # Phase 11: Code Review Report (gap-closure 11-05 / 11-06)
@@ -23,7 +29,7 @@ status: issues_found
 **Reviewed:** 2026-07-10T17:31:57Z
 **Depth:** standard
 **Files Reviewed:** 6
-**Status:** issues_found
+**Status:** fixes_applied — all 7 Critical+Warning findings fixed (CR-01, WR-01..WR-06); IN-01 out of fix scope (Info)
 
 ## Summary
 
@@ -37,6 +43,7 @@ However, the composed gate has a semantic defect on the *enable* side: `tracing_
 
 ### CR-01: `tracing_context(enabled=True)` force-enables tracing, overriding the env-level opt-out and firing run posts in keyless deployments
 
+**Disposition:** FIXED — commit `8c2be21`. Gate now composes `False if (is_user_key or not langsmith_on) else None` (force-off only, `None` defers to env); both suite mirrors and all docstring quotes of the old expression updated. All 4 truth-table rows green (allow row env-driven via `LANGCHAIN_TRACING_V2=true` fixture).
 **File:** `backend/routers/chat.py:1421`
 **Issue:** The composed gate passes a hard boolean both ways:
 
@@ -66,6 +73,7 @@ All four truth-table rows in `test_langsmith_runtime_toggle.py` still hold under
 
 ### WR-01: Flag-read error clobbers a known-good OFF state back to ON for the next TTL window
 
+**Disposition:** FIXED — commit `8e90828`. Stale-while-error: read failure keeps the last successfully-read value (`_cached_value if _cached_at is not None else True`); stamp refresh retained (one retry per TTL window). New regression test `test_db_exception_keeps_last_known_false` pins keep-OFF + single-retry; docstrings updated to the new contract.
 **File:** `backend/services/app_settings_service.py:91-98`
 **Issue:** The exception path sets `value = True` and then unconditionally caches it (`_cached_value = value`). If the owner has flipped the kill-switch OFF (last successful read cached `False`) and a single transient DB error occurs at the next TTL refresh, tracing silently re-enables for at least a full TTL window — discarding the owner's most recent explicit decision. The module docstring defends default-on for the *never-read / missing-row* case, but it does not justify overwriting known state. Combined with CR-01's force-enable this made the OFF state fragile end-to-end.
 **Fix:** Stale-while-error — keep the last successfully-read value; only default to True when there has never been a successful read:
@@ -82,6 +90,7 @@ except Exception as e:
 
 ### WR-02: `tracing_context` ImportError fallback fails open while `traceable` stays live
 
+**Disposition:** FIXED — commit `42a150e`. The `tracing_context` ImportError branch now also redefines `traceable` as the no-op passthrough (fail closed): losing the run gate means losing run creation entirely. Unreachable under the `langsmith==0.3.42` pin; posture fix as suggested.
 **File:** `backend/routers/chat.py:289-296`
 **Issue:** The two langsmith imports degrade independently. If `langsmith` is fully absent, both `traceable` and `tracing_context` become no-ops — safe. But in the skew case where `langsmith` imports and exports `traceable` yet not `tracing_context` (older version, partial install, future rename), the gate becomes a `yield`-only stub while `@traceable(name="chat_send_message")` (chat.py:882) still opens real runs — silently re-introducing the exact SEC-01 leak, with the run *outputs* capturing the full yielded SSE stream (content deltas). Today the `==0.3.42` pin makes this unreachable, but the fallback encodes a fail-open posture for a security gate.
 **Fix:** Make the security gate fail closed — if `tracing_context` cannot be imported while `traceable` was imported for real, neuter `traceable` too (or raise at import):
@@ -106,6 +115,7 @@ except ImportError:
 
 ### WR-03: Disconnect cleanup via `await worker.aclose()` is not deterministic through the langsmith async-generator wrapper — the code comment overstates the guarantee
 
+**Disposition:** FIXED — commit `c049c5a`. Took the stronger option: the "[Response interrupted]" stamp now runs in `event_generator`'s own finally (deterministically closed by sse-starlette) on turn state (`full_content`/`assistant_msg_id`) shared via `nonlocal`; worker-level finally removed; both seams carry honest best-effort comments about `aclose()`. Normal/error-path behavior unchanged (same condition/ordering). NOTE: the disconnect path itself has no automated coverage — recommend a manual disconnect smoke check before milestone closure.
 **File:** `backend/routers/chat.py:1426-1432`
 **Issue:** The comment claims `aclose()` "throws it into `_traced_turn` at its suspension point so its finally cleanup ... still runs". That is not what langsmith 0.3.42 does. `worker` is langsmith's `async_generator_wrapper`, and `_process_async_iterator` (`run_helpers.py:1615`) has **no `finally: await generator.aclose()`** — on `aclose()`, GeneratorExit is thrown into the *wrapper's* `yield item`, its `except BaseException` ends the run (recording the disconnect as a run error) and re-raises, leaving the inner `_traced_turn` generator suspended and unclosed. Its `finally` (the `"[Response interrupted]"` stamp, chat.py:1408-1416) then runs only when the asyncgen GC finalizer hook later schedules an `aclose()` task on the loop — delayed by at least a tick, non-deterministically ordered, and lost entirely if the loop is shutting down. (The *cancellation* disconnect path — CancelledError injected at an inner await — still cleans up synchronously; only the explicit close/GC path degrades.) This is a robustness regression versus the pre-11-05 shape where the turn body ran directly in `event_generator` and close was deterministic.
 **Fix:** Hoist the interruption stamp to the seam that *is* closed deterministically. E.g. track state in `event_generator` scope:
@@ -128,12 +138,14 @@ At minimum, correct the comment so future readers don't build on the false deter
 
 ### WR-04: Master toggle does not deliver "flag OFF => zero runs for everyone" — ingestion-time runs are ungated
 
+**Disposition:** FIXED — commit `aad4a39`. Took the scope-the-claim option (per fix directive; gate NOT expanded to ingestion in this pass): chat.py toggle comment and the runtime-toggle test docstring now state flag OFF kills CHAT-TURN runs only; ingestion-time embedding/metadata spans remain env-gated. Gating the ingestion pipeline stays available as follow-up work.
 **File:** `backend/routers/chat.py:1418-1420` (claim); `backend/services/llm_service.py:38-39`, `backend/services/metadata_service.py:31` (ungated surfaces)
 **Issue:** The gate comment states "flag OFF => zero runs for everyone (live kill-switch)". The gate only wraps the *chat turn*. Document ingestion (upload path in the documents router) runs entirely outside it: `get_embedding_client()` **always** applies `wrap_openai` when `settings.langsmith_api_key` is set (llm_service.py:38-39, no `trace` parameter at all), and `metadata_service.py:31` calls `get_llm_client()` with the default `trace=True`. With env tracing on, flipping `app_settings.langsmith_enabled` to false stops chat-turn runs but ingestion-time LLM/embedding spans — which carry user document content — keep flowing to LangSmith. An owner using the kill-switch during a privacy incident would reasonably believe all tracing stopped.
 **Fix:** Either gate the ingestion pipeline with the same flag (e.g. wrap `process_document()` in `tracing_context(enabled=False if not is_langsmith_enabled(db) else None)`), or scope the claim honestly in the chat.py comment and the 11-06 plan docs ("flag OFF => zero *chat-turn* runs; ingestion tracing is env-gated only").
 
 ### WR-05: Security suites test a hand-copied mirror of the gate, not the shipped seam — the composed expression in `event_generator` has zero regression coverage
 
+**Disposition:** FIXED — commit `f040ae1`. Gate extracted into `chat._compose_run_gate` (called by `event_generator`); both suites now drive the REAL function (`_run_composed_turn`, `_run_probe_turn`); added identity-asserted truth-table test on the shipped function plus the suggested source-level binding test (`test_event_generator_binds_composed_gate`) pinning the flag read, the `_compose_run_gate` call, and `with tracing_context(enabled=gate):` in `send_message`.
 **File:** `backend/tests/test_langsmith_runtime_toggle.py:85`; `backend/tests/test_langsmith_run_gate.py:86-116`
 **Issue:** `_run_composed_turn` computes `enabled = langsmith_on and not is_user_key  # mirrors chat.py verbatim` and `_run_probe_turn` builds its own `@traceable` parent/children. Both suites therefore validate *langsmith's* contextvar semantics against a copy of the expression, not `chat.py`'s actual code. The only bindings to shipped code are the `chat.tracing_context` symbol reference and the `chat.is_langsmith_enabled` identity assertion (test_langsmith_runtime_toggle.py:155-166) — neither of which fails if `event_generator` regresses to `langsmith_on or not is_user_key`, drops the `with tracing_context(...)` block entirely, or stops calling `is_langsmith_enabled`. For the project's single most security-critical line, every test stays green through a full re-leak. This is compounded now that CR-01 requires editing that exact line plus both mirrors.
 **Fix:** Add a binding test on the real seam. Cheapest: a source-level assertion, e.g.
@@ -149,6 +161,7 @@ Better: an integration test that drives `send_message` with a mocked supabase cl
 
 ### WR-06: `_coerce_bool` silently coerces falsy-looking strings ("0", "off", "no") to True — a mistyped kill-switch UPDATE leaves tracing on with no signal
 
+**Disposition:** FIXED — commit `9083845`. `_coerce_bool` now accepts "false"/"0"/"off"/"no" and "true"/"1"/"on"/"yes" (case-insensitive) and logs a warning on any unrecognized string or type before defaulting ON. Coercion matrix extended (+7 cases) and a caplog test pins the observable fallback.
 **File:** `backend/services/app_settings_service.py:44-53`
 **Issue:** The only recognized false spellings are jsonb `false`, string `"false"`, and numeric `0`. An operator running ad-hoc SQL (the documented control surface for this flag) who writes `value='"off"'::jsonb`, `'"0"'::jsonb`, or `'"no"'::jsonb` gets a silent default-**on** — the failure mode is "owner believes tracing is off while it keeps running", and nothing is logged, so it is invisible until traces show up in LangSmith. Documented-and-tested does not make it observable.
 **Fix:** Log the fallback and accept the common falsy spellings:
@@ -170,6 +183,7 @@ if isinstance(value, str):
 
 ### IN-01: Exception interpolated unscrubbed into log message, against the module convention used everywhere else in this seam
 
+**Disposition:** NOT FIXED — Info severity, excluded from fix scope (critical_warning). Note: WR-01 reworded this log line ("keeping last value"); the raw `{e}` interpolation remains and this finding still applies to it.
 **File:** `backend/services/app_settings_service.py:94`
 **Issue:** `logger.warning(f"...read failed; defaulting ON: {e}")` interpolates the raw exception. Every comparable DB-error log in `chat.py` (e.g. lines 149, 175, 966) routes through `scrub_secrets(str(e))`, and `app_settings_service` records are emitted by a logger (`services.app_settings_service`) that the `_ScrubFilter` root-handler attachment covers only if a root handler existed at `chat.py` import time — so the call-site scrub is the reliable layer. Secret exposure risk on this specific path is low (postgrest error strings), but the inconsistency invites copy-paste into paths where it is not.
 **Fix:** `logger.warning(f"app_settings langsmith_enabled read failed; defaulting ON: {scrub_secrets(str(e))}")` (import `scrub_secrets` from `services.log_scrub`).
@@ -184,6 +198,15 @@ if isinstance(value, str):
 
 ---
 
+## Fix pass
+
+Scope: Critical + Warning (CR-01, WR-01..WR-06). Fixed 7/7 in scope; 0 skipped; IN-01 (Info) out of scope. Commits: `8c2be21` (CR-01), `8e90828` (WR-01), `42a150e` (WR-02), `c049c5a` (WR-03), `aad4a39` (WR-04), `f040ae1` (WR-05), `9083845` (WR-06).
+
+Verification: `test_langsmith_run_gate.py` + `test_langsmith_gate.py` + `test_langsmith_runtime_toggle.py` + `test_app_settings_service.py` + `test_key_model_resolution.py` = 57 passed. Full backend suite: 278 passed; only the 3 documented pre-existing issues remain (`test_config.py::test_key_encryption_secret_default` env-leak failure, 2 `test_record_manager` integration fixture ERRORS). SEC-01 invariants re-verified green: BYOK turn zero runs at every layer, flag OFF zero chat-turn runs, owner/demo traced with flag ON (now env-deferred, honoring the `LANGCHAIN_TRACING_V2` kill-switch).
+
+---
+
 _Reviewed: 2026-07-10T17:31:57Z_
 _Reviewer: Claude (gsd-code-reviewer)_
 _Depth: standard_
+_Fixes applied: 2026-07-10T18:14:44Z — Claude (gsd-code-fixer)_
