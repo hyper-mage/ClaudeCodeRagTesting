@@ -21,12 +21,16 @@ broken flag read can never trace a BYOK turn.
 
 Empirical + offline (same approach the 11-05 run-gate suite validated against
 langsmith 0.3.42): run presence is asserted via get_current_run_tree() (None
-== no run) inside a @traceable worker driven under chat.tracing_context;
-Client run submission is neutered so nothing touches the network. A binding
-structural assertion ties the suite to OUR code: chat.py must import and use
-the app_settings flag reader (chat.is_langsmith_enabled IS the service fn).
+== no run) inside a @traceable worker driven under chat.tracing_context, with
+the gate value produced by chat._compose_run_gate — the SHIPPED seam, not a
+mirror (WR-05); Client run submission is neutered so nothing touches the
+network. Binding assertions tie the suite to OUR code: chat.py must import
+and use the app_settings flag reader (chat.is_langsmith_enabled IS the
+service fn), and send_message's source must call _compose_run_gate and feed
+its value to tracing_context (test_event_generator_binds_composed_gate).
 """
 import asyncio
+import inspect
 from unittest.mock import MagicMock
 
 import pytest
@@ -73,9 +77,9 @@ def _fresh_flag_cache():
 def _run_composed_turn(langsmith_on: bool, is_user_key: bool):
     """Drive a @traceable worker under chat.tracing_context with the composed gate.
 
-    The enabled expression is computed EXACTLY as chat.py composes it:
-    `enabled = False if (is_user_key or not langsmith_on) else None` — False
-    forces suppression, None defers to the env (the module fixture sets
+    The enabled value comes from chat._compose_run_gate — THE shipped seam
+    event_generator calls, not a hand-copied mirror (WR-05): False forces
+    suppression, None defers to the env (the module fixture sets
     LANGCHAIN_TRACING_V2=true, so the deferred row is traced). Returns the run
     tree recorded inside the worker — None means no LangSmith run was opened.
     """
@@ -87,7 +91,9 @@ def _run_composed_turn(langsmith_on: bool, is_user_key: bool):
         yield {"event": "done"}
 
     async def drive():
-        enabled = False if (is_user_key or not langsmith_on) else None  # mirrors chat.py verbatim
+        # The REAL gate function (WR-05) — the same object event_generator
+        # calls — driven under the same chat.tracing_context symbol.
+        enabled = chat._compose_run_gate(langsmith_on, is_user_key)
         with chat.tracing_context(enabled=enabled):
             async for _ in worker():
                 pass
@@ -157,6 +163,41 @@ def test_flag_read_error_defaults_true_byok_still_gated():
 
     run = _run_composed_turn(langsmith_on=langsmith_on, is_user_key=True)
     assert run is None, f"default-on flag read traced a BYOK turn: {run!r}"
+
+
+@pytest.mark.parametrize(
+    "langsmith_on,is_user_key,expected",
+    [
+        (True, False, None),    # allow row: DEFER to env — never force True (CR-01)
+        (True, True, False),    # BYOK beats flag ON (SEC-01)
+        (False, False, False),  # kill-switch beats owner/demo tracing
+        (False, True, False),   # both switches closed
+    ],
+)
+def test_compose_run_gate_truth_table(langsmith_on, is_user_key, expected):
+    """The shipped gate function never returns True (CR-01): False forces
+    suppression, None defers to the environment. Identity-asserted (`is`) so
+    a truthy-but-wrong value cannot slip through."""
+    assert chat._compose_run_gate(langsmith_on, is_user_key) is expected
+
+
+def test_event_generator_binds_composed_gate():
+    """Binding gate (WR-05): the seam inside send_message must (1) read the
+    runtime toggle, (2) compose the gate via THE _compose_run_gate function
+    this suite exercises, and (3) feed that value to tracing_context. Without
+    this, every truth-table test above stays green through a full re-leak
+    (e.g. the composed line dropped or regressed to `or`).
+    """
+    src = inspect.getsource(chat.send_message)
+    assert "langsmith_on = is_langsmith_enabled(db)" in src, (
+        "send_message no longer reads the runtime master toggle per turn"
+    )
+    assert "gate = _compose_run_gate(langsmith_on, is_user_key)" in src, (
+        "send_message no longer composes the run gate via _compose_run_gate"
+    )
+    assert "with tracing_context(enabled=gate):" in src, (
+        "send_message no longer applies the composed gate to tracing_context"
+    )
 
 
 def test_chat_binds_app_settings_flag_reader():

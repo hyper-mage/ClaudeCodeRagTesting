@@ -88,13 +88,13 @@ def test_subagent_sites_remain_traceable():
 def _run_probe_turn(is_user_key: bool) -> dict:
     """Drive a full probe turn under the chat.py run gate (master flag ON).
 
-    The gate value mirrors chat.py's composition with langsmith_on=True:
-    `False if is_user_key else None` — False forces suppression, None defers
-    to the env (the module fixture sets LANGCHAIN_TRACING_V2=true). Mirrors
-    the real chat seam: a @traceable async-generator parent (the _traced_turn
-    worker shape) dispatches a @traceable child BOTH directly (execute_tool
-    path) AND via asyncio.to_thread (the explorer/doc-analysis _drive
-    pattern), recording get_current_run_tree() at every site.
+    The gate value comes from the SHIPPED chat._compose_run_gate with
+    langsmith_on=True (WR-05) — False forces suppression, None defers to the
+    env (the module fixture sets LANGCHAIN_TRACING_V2=true). Mirrors the real
+    chat seam: a @traceable async-generator parent (the _traced_turn worker
+    shape) dispatches a @traceable child BOTH directly (execute_tool path)
+    AND via asyncio.to_thread (the explorer/doc-analysis _drive pattern),
+    recording get_current_run_tree() at every site.
     """
     recorded: dict = {}
 
@@ -113,7 +113,9 @@ def _run_probe_turn(is_user_key: bool) -> dict:
         # Binds to OUR code's gate symbol (routers.chat.tracing_context) — RED
         # with AttributeError until chat.py exposes it, GREEN once the run gate
         # exists at the parent seam.
-        with chat.tracing_context(enabled=False if is_user_key else None):
+        with chat.tracing_context(
+            enabled=chat._compose_run_gate(True, is_user_key)
+        ):
             async for _ in parent():
                 pass
 

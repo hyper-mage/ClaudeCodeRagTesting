@@ -306,6 +306,22 @@ except ImportError:
             return func
         return lambda f: f
 
+
+def _compose_run_gate(langsmith_on: bool, is_user_key: bool) -> bool | None:
+    """Compose the SEC-01 run-gate value for tracing_context(enabled=...).
+
+    False FORCES suppression (BYOK turn or master flag off); None defers to
+    the environment (LANGCHAIN_TRACING_V2 / setup_tracing -- the pre-11-05
+    allow semantics). NEVER returns True: in langsmith 0.3.42 a non-None
+    `enabled` overrides the env (utils.tracing_is_enabled checks the
+    contextvar first), so force-enabling would defeat the env-level opt-out
+    and post runs in keyless deployments (CR-01). Extracted as a named seam
+    (WR-05) so the security suites exercise THIS function -- the one
+    event_generator calls -- rather than a hand-copied mirror expression.
+    """
+    return False if (is_user_key or not langsmith_on) else None
+
+
 router = APIRouter(prefix="/api/threads", tags=["chat"])
 
 
@@ -1435,14 +1451,12 @@ async def send_message(
             # The "[Response interrupted]" stamp lives at the event_generator
             # seam instead, on the nonlocal turn state above.
 
-        # Composed run gate (11-05/11-06): False FORCES suppression (BYOK
-        # turn or master flag off); None defers to the environment
-        # (LANGCHAIN_TRACING_V2 / setup_tracing) -- the pre-11-05 semantics.
-        # NEVER pass True: in langsmith 0.3.42 a non-None `enabled` overrides
-        # the env (utils.tracing_is_enabled checks the contextvar first), so
-        # force-enabling would defeat the env-level opt-out and post runs in
-        # keyless deployments (CR-01). The gate only ever needed to suppress.
-        gate = False if (is_user_key or not langsmith_on) else None
+        # Composed run gate (11-05/11-06): see _compose_run_gate -- False
+        # forces suppression (BYOK turn or master flag off), None defers to
+        # the env; NEVER True (CR-01). The security suites pin this exact
+        # call + `with` line via a source-level binding test (WR-05), so do
+        # not inline or rename without updating them.
+        gate = _compose_run_gate(langsmith_on, is_user_key)
         with tracing_context(enabled=gate):
             worker = _traced_turn()
             try:
