@@ -76,10 +76,12 @@ def test_missing_row_empty_list_defaults_true():
 
 
 def test_db_exception_defaults_true():
-    """ANY read exception => True, and the exception NEVER propagates.
+    """A read exception with NO prior successful read => True, never propagates.
 
     Security-invariant support (T-11-06-04): a broken flag read may only ever
-    (re)enable NON-BYOK tracing; it must not take down the chat turn.
+    (re)enable NON-BYOK tracing; it must not take down the chat turn. (With a
+    prior successful read the error path keeps the cached value instead --
+    see test_db_exception_keeps_last_known_false.)
     """
     db = MagicMock()
     (
@@ -90,6 +92,32 @@ def test_db_exception_defaults_true():
         .execute
     ).side_effect = RuntimeError("db down")
     assert is_langsmith_enabled(db) is True  # must not raise
+
+
+def test_db_exception_keeps_last_known_false():
+    """Stale-while-error (WR-01): a transient refresh error must NOT revert a
+    known-good OFF back to ON for the next TTL window.
+
+    Last successful read cached False (owner kill-switch OFF); the TTL then
+    expires and the refresh read raises -> the reader keeps False, preserving
+    the owner's most recent explicit decision. The failure still refreshes the
+    cache stamp, so a failing DB is read at most once per TTL window.
+    """
+    db, execute_mock, _ = _make_db({"value": False})
+    assert is_langsmith_enabled(db) is False
+    assert execute_mock.call_count == 1
+
+    # Age the cache past the TTL, then make the refresh read fail.
+    assert app_settings_service._cached_at is not None
+    app_settings_service._cached_at -= app_settings_service._TTL_SECONDS + 1
+    execute_mock.side_effect = RuntimeError("transient db blip")
+
+    assert is_langsmith_enabled(db) is False  # stale-while-error keeps OFF
+    assert execute_mock.call_count == 2
+    # The failed refresh re-stamped the cache: the next call inside the TTL
+    # window hits the cache (no third DB read -- the failing DB isn't hammered).
+    assert is_langsmith_enabled(db) is False
+    assert execute_mock.call_count == 2
 
 
 @pytest.mark.parametrize(

@@ -6,13 +6,16 @@ The owner flips the flag live with one SQL UPDATE in the Supabase SQL editor;
 the change goes live on every backend instance within the ~15s cache window --
 no restart, no admin UI.
 
-Fail-safe contract (T-11-06-04): a missing row or ANY read error returns True
-(default-on) and NEVER raises. Default-on is deliberately SAFE for SEC-01
-because chat.py composes the gate as `enabled = False if (is_user_key or not
-langsmith_on) else None` -- the locally-resolved BYOK term forces suppression
-for a user-key turn regardless of this read's outcome; a broken flag read can
-only ever (re)enable NON-BYOK tracing. Default-off would instead silently
-kill owner observability on a transient DB blip.
+Fail-safe contract (T-11-06-04): a missing row returns True (default-on); a
+read ERROR keeps the last successfully-read value (stale-while-error, True
+only when no read has ever succeeded) so a transient DB blip cannot silently
+revert an owner's OFF flip back to ON; and the reader NEVER raises.
+Default-on is deliberately SAFE for SEC-01 because chat.py composes the gate
+as `enabled = False if (is_user_key or not langsmith_on) else None` -- the
+locally-resolved BYOK term forces suppression for a user-key turn regardless
+of this read's outcome; a broken flag read can only ever (re)enable NON-BYOK
+tracing. Default-off would instead silently kill owner observability on a
+transient DB blip.
 """
 import logging
 import time
@@ -65,9 +68,10 @@ def is_langsmith_enabled(db) -> bool:
 
     Reads app_settings key='langsmith_enabled' through the passed service-role
     client, cached for _TTL_SECONDS so the per-turn call costs at most one DB
-    read per window. Missing row or ANY read error -> True (default-on); the
-    caller's gate forces False for any BYOK turn, keeping user-key turns
-    untraced no matter what this returns (SEC-01 invariant).
+    read per window. Missing row -> True (default-on); read error -> the last
+    successfully-cached value (stale-while-error; True when nothing was ever
+    read). The caller's gate forces False for any BYOK turn, keeping user-key
+    turns untraced no matter what this returns (SEC-01 invariant).
     """
     global _cached_value, _cached_at
     now = time.monotonic()
@@ -91,8 +95,15 @@ def is_langsmith_enabled(db) -> bool:
     except Exception as e:
         # Never propagate -- a broken flag read must not take down the chat
         # turn, and default-on cannot leak a BYOK turn (see module docstring).
-        logger.warning(f"app_settings langsmith_enabled read failed; defaulting ON: {e}")
-        value = True
+        # Stale-while-error (WR-01): keep the LAST successfully-read value so
+        # a transient DB blip at TTL refresh cannot silently revert an owner's
+        # OFF flip back to ON; default to True only when there has never been
+        # a read (_cached_at is None). The stamp refresh below still applies,
+        # so a failing DB is retried at most once per TTL window.
+        logger.warning(
+            f"app_settings langsmith_enabled read failed; keeping last value: {e}"
+        )
+        value = _cached_value if _cached_at is not None else True
 
     _cached_value = value
     _cached_at = now
