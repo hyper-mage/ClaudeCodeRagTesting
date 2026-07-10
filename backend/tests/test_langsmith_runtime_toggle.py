@@ -101,7 +101,8 @@ def test_flag_off_owner_zero_runs():
     """Flag OFF + owner/demo turn -> enabled False -> NO run.
 
     The master kill-switch beats owner/demo tracing: flag OFF means ZERO
-    LangSmith runs for EVERYONE.
+    chat-turn LangSmith runs for EVERYONE. (Scope, WR-04: ingestion-time
+    embedding/metadata spans live outside this gate and stay env-gated.)
     """
     run = _run_composed_turn(langsmith_on=False, is_user_key=False)
     assert run is None, f"flag OFF still opened an owner run: {run!r}"

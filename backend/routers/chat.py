@@ -879,6 +879,10 @@ async def send_message(
         # failed/missing read defaults to True -- SAFE because the composed
         # gate below still forces False for the locally-resolved BYOK case,
         # so a user-key turn opens zero runs regardless of this read's outcome.
+        # Scope (WR-04): flag OFF kills CHAT-TURN runs only. Ingestion-time
+        # tracing (the wrap_openai embedding client in llm_service and the
+        # metadata-extraction client in metadata_service) runs OUTSIDE this
+        # gate and remains env-gated (LANGCHAIN_TRACING_V2 / API key) only.
         langsmith_on = is_langsmith_enabled(db)
 
         # Turn state shared with the worker via nonlocal (WR-03): the
