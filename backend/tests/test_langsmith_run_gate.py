@@ -14,7 +14,9 @@ This module is the run-level regression coverage that gap could not provide:
 - structural: the endpoint handler must NOT be `@traceable`-wrapped;
 - behavioral: a full user-key turn — INCLUDING a tool-call dispatch to a child
   both directly and via `asyncio.to_thread` (the real explorer/doc-analysis
-  pattern) — opens ZERO runs under `chat.tracing_context(enabled=not is_user_key)`;
+  pattern) — opens ZERO runs under the chat.py run gate (`enabled=False`
+  forces suppression for BYOK; `enabled=None` defers to the env for
+  owner/demo — the gate never forces True, CR-01);
 - guardrail: owner/demo turns remain fully traced (observability NOT regressed),
   and the subagent sites stay `@traceable` so the single parent-seam contextvar
   provably covers them.
@@ -84,12 +86,15 @@ def test_subagent_sites_remain_traceable():
 
 
 def _run_probe_turn(is_user_key: bool) -> dict:
-    """Drive a full probe turn under chat.tracing_context(enabled=not is_user_key).
+    """Drive a full probe turn under the chat.py run gate (master flag ON).
 
-    Mirrors the real chat seam: a @traceable async-generator parent (the
-    _traced_turn worker shape) dispatches a @traceable child BOTH directly
-    (execute_tool path) AND via asyncio.to_thread (the explorer/doc-analysis
-    _drive pattern), recording get_current_run_tree() at every site.
+    The gate value mirrors chat.py's composition with langsmith_on=True:
+    `False if is_user_key else None` — False forces suppression, None defers
+    to the env (the module fixture sets LANGCHAIN_TRACING_V2=true). Mirrors
+    the real chat seam: a @traceable async-generator parent (the _traced_turn
+    worker shape) dispatches a @traceable child BOTH directly (execute_tool
+    path) AND via asyncio.to_thread (the explorer/doc-analysis _drive
+    pattern), recording get_current_run_tree() at every site.
     """
     recorded: dict = {}
 
@@ -108,7 +113,7 @@ def _run_probe_turn(is_user_key: bool) -> dict:
         # Binds to OUR code's gate symbol (routers.chat.tracing_context) — RED
         # with AttributeError until chat.py exposes it, GREEN once the run gate
         # exists at the parent seam.
-        with chat.tracing_context(enabled=not is_user_key):
+        with chat.tracing_context(enabled=False if is_user_key else None):
             async for _ in parent():
                 pass
 
@@ -133,9 +138,10 @@ def test_user_key_turn_creates_zero_runs():
 def test_owner_turn_still_traced():
     """Guardrail: owner/demo turns (is_user_key=False) remain FULLY traced.
 
-    enabled=True must restore the parent run and both child runs (direct +
-    threaded) so owner observability — including the cap-hit
-    get_current_run_tree() metadata tag — is not regressed by the gate.
+    enabled=None (defer to the env; the fixture sets LANGCHAIN_TRACING_V2=true)
+    must restore the parent run and both child runs (direct + threaded) so
+    owner observability — including the cap-hit get_current_run_tree()
+    metadata tag — is not regressed by the gate.
     """
     recorded = _run_probe_turn(is_user_key=False)
     assert set(recorded) == {"parent", "child_direct", "child_threaded"}

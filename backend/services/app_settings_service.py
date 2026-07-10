@@ -8,11 +8,11 @@ no restart, no admin UI.
 
 Fail-safe contract (T-11-06-04): a missing row or ANY read error returns True
 (default-on) and NEVER raises. Default-on is deliberately SAFE for SEC-01
-because chat.py composes the flag as `enabled = langsmith_on and not
-is_user_key` -- the locally-resolved BYOK conjunct keeps a user-key turn
-untraced regardless of this read's outcome; a broken flag read can only ever
-(re)enable NON-BYOK tracing. Default-off would instead silently kill owner
-observability on a transient DB blip.
+because chat.py composes the gate as `enabled = False if (is_user_key or not
+langsmith_on) else None` -- the locally-resolved BYOK term forces suppression
+for a user-key turn regardless of this read's outcome; a broken flag read can
+only ever (re)enable NON-BYOK tracing. Default-off would instead silently
+kill owner observability on a transient DB blip.
 """
 import logging
 import time
@@ -66,8 +66,8 @@ def is_langsmith_enabled(db) -> bool:
     Reads app_settings key='langsmith_enabled' through the passed service-role
     client, cached for _TTL_SECONDS so the per-turn call costs at most one DB
     read per window. Missing row or ANY read error -> True (default-on); the
-    caller's `and not is_user_key` conjunct keeps BYOK turns untraced no
-    matter what this returns (SEC-01 invariant).
+    caller's gate forces False for any BYOK turn, keeping user-key turns
+    untraced no matter what this returns (SEC-01 invariant).
     """
     global _cached_value, _cached_at
     now = time.monotonic()

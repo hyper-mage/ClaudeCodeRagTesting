@@ -5,9 +5,9 @@ The runtime LangSmith master toggle reads a GLOBAL app_settings row
 cache, so the owner can flip tracing live via one SQL UPDATE — no backend
 restart. The reader must NEVER raise and must default to True (default-on) on
 a missing row or any read error: that default is SAFE because chat.py composes
-the flag as `enabled = langsmith_on and not is_user_key`, so a BYOK turn stays
-untraced regardless of the flag read outcome (SEC-01 invariant — covered
-end-to-end in test_langsmith_runtime_toggle.py).
+the gate as `enabled = False if (is_user_key or not langsmith_on) else None`,
+so a BYOK turn stays untraced regardless of the flag read outcome (SEC-01
+invariant — covered end-to-end in test_langsmith_runtime_toggle.py).
 
 Unit-level, offline: the db is a MagicMock mirroring the supabase-py chain
 `db.table(...).select(...).eq(...).maybe_single().execute()` — no real

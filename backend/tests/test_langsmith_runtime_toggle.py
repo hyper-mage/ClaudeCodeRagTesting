@@ -1,18 +1,22 @@
 """Phase 11 gap-closure (11-06) — runtime LangSmith master toggle composition.
 
 11-05 moved the SEC-01 gate to the run layer: chat.py wraps the whole turn in
-`tracing_context(enabled=not is_user_key)`. This plan layers a GLOBAL,
+a `tracing_context(enabled=...)` gate. This plan layers a GLOBAL,
 runtime-flippable master toggle ABOVE that gate — the composed rule is
 
-    enabled = langsmith_on and (not is_user_key)
+    enabled = False if (is_user_key or not langsmith_on) else None
 
-- Flag OFF -> enabled False for EVERYONE (live kill-switch beats owner tracing).
-- Flag ON  -> enabled = not is_user_key (the 11-05 BYOK gate, unchanged).
+- Flag OFF or BYOK -> enabled False (forced suppression; the live kill-switch
+  beats owner tracing, the BYOK gate beats everything).
+- Flag ON + owner/demo -> enabled None (defer to the environment — the gate
+  NEVER forces True, so an env-level opt-out / keyless deploy stays untraced;
+  CR-01). This module's fixture sets LANGCHAIN_TRACING_V2=true, so the
+  deferred row opens a run — the exact traced-prod condition.
 
 SECURITY INVARIANT (T-11-06-01): is_user_key is resolved LOCALLY, independent
 of the flag read. A failed/missing flag read defaults langsmith_on to True
-(default-on) — SAFE because the `not is_user_key` conjunct is False for any
-user key, so enabled stays False no matter what the flag read returns. A
+(default-on) — SAFE because is_user_key alone forces the gate to False for
+any user key, so enabled stays False no matter what the flag read returns. A
 broken flag read can never trace a BYOK turn.
 
 Empirical + offline (same approach the 11-05 run-gate suite validated against
@@ -41,10 +45,10 @@ from services.app_settings_service import is_langsmith_enabled  # noqa: E402
 def _force_tracing_offline():
     """Force tracing ON for the module (dummy keys) and neuter run submission.
 
-    LANGCHAIN_TRACING_V2=true makes the enabled=True assertions meaningful
-    (the exact prod condition). Patching Client.create_run/update_run to
-    no-ops guarantees no network I/O — the assertion surface is
-    get_current_run_tree() presence, never HTTP.
+    LANGCHAIN_TRACING_V2=true makes the enabled=None (defer-to-env) assertions
+    meaningful (the exact traced-prod condition). Patching
+    Client.create_run/update_run to no-ops guarantees no network I/O — the
+    assertion surface is get_current_run_tree() presence, never HTTP.
     """
     mp = pytest.MonkeyPatch()
     mp.setenv("LANGCHAIN_TRACING_V2", "true")
@@ -70,9 +74,10 @@ def _run_composed_turn(langsmith_on: bool, is_user_key: bool):
     """Drive a @traceable worker under chat.tracing_context with the composed gate.
 
     The enabled expression is computed EXACTLY as chat.py composes it:
-    `enabled = langsmith_on and not is_user_key` (Python binds `not` tighter
-    than `and`). Returns the run tree recorded inside the worker — None means
-    no LangSmith run was opened.
+    `enabled = False if (is_user_key or not langsmith_on) else None` — False
+    forces suppression, None defers to the env (the module fixture sets
+    LANGCHAIN_TRACING_V2=true, so the deferred row is traced). Returns the run
+    tree recorded inside the worker — None means no LangSmith run was opened.
     """
     recorded: list = []
 
@@ -82,7 +87,7 @@ def _run_composed_turn(langsmith_on: bool, is_user_key: bool):
         yield {"event": "done"}
 
     async def drive():
-        enabled = langsmith_on and not is_user_key  # mirrors chat.py verbatim
+        enabled = False if (is_user_key or not langsmith_on) else None  # mirrors chat.py verbatim
         with chat.tracing_context(enabled=enabled):
             async for _ in worker():
                 pass
@@ -103,10 +108,11 @@ def test_flag_off_owner_zero_runs():
 
 
 def test_flag_on_owner_traced():
-    """Flag ON + owner/demo turn -> enabled True -> a RunTree exists.
+    """Flag ON + owner/demo turn -> enabled None -> env decides -> RunTree exists.
 
-    The toggle must not regress owner/demo observability — flag ON reduces
-    the composed gate to exactly the 11-05 BYOK gate.
+    The toggle must not regress owner/demo observability — flag ON defers to
+    the environment (the fixture sets LANGCHAIN_TRACING_V2=true, the exact
+    traced-prod condition), never force-enables over an env opt-out (CR-01).
     """
     run = _run_composed_turn(langsmith_on=True, is_user_key=False)
     assert run is not None, "flag ON lost the owner/demo run"
