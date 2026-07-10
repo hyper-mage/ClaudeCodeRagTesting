@@ -881,6 +881,13 @@ async def send_message(
         # so a user-key turn opens zero runs regardless of this read's outcome.
         langsmith_on = is_langsmith_enabled(db)
 
+        # Turn state shared with the worker via nonlocal (WR-03): the
+        # "[Response interrupted]" disconnect stamp must run at THIS scope's
+        # finally -- the seam sse-starlette closes deterministically -- so it
+        # needs to read the worker's progress after the worker is gone.
+        full_content = ""
+        assistant_msg_id = None
+
         # SEC-01 (a): the ENTIRE turn body runs inside this traceable worker so
         # the single run gate below controls the parent run AND -- via
         # contextvar propagation through asyncio.to_thread -- both subagent
@@ -892,10 +899,11 @@ async def send_message(
         # stay as defense-in-depth.
         @traceable(name="chat_send_message")
         async def _traced_turn():
-            nonlocal model  # the deprecated-pin fallback overrides the turn's model
-            full_content = ""
+            # model: the deprecated-pin fallback overrides the turn's model.
+            # full_content/assistant_msg_id: shared turn state for the
+            # disconnect stamp at the event_generator seam (WR-03).
+            nonlocal model, full_content, assistant_msg_id
             tools_used_acc = []
-            assistant_msg_id = None
             turn_usage: dict = {}  # summed OpenRouter usage across all tool-loop iterations
             try:
                 # Build tools list based on availability
@@ -1416,15 +1424,12 @@ async def send_message(
                     "event": "error",
                     "data": json.dumps({"error": scrub_secrets(str(e))}),
                 }
-            finally:
-                # Handle client disconnect (GeneratorExit) -- clean up ghost messages
-                if assistant_msg_id and not full_content:
-                    try:
-                        db.table("messages").update({
-                            "content": "[Response interrupted]",
-                        }).eq("id", assistant_msg_id).execute()
-                    except Exception:
-                        pass  # Best-effort cleanup
+            # NO worker-level finally for the disconnect stamp (WR-03): on
+            # aclose() the langsmith wrapper does NOT deterministically close
+            # this inner generator (see the seam comment below), so cleanup
+            # placed here could be delayed to GC or lost at loop shutdown.
+            # The "[Response interrupted]" stamp lives at the event_generator
+            # seam instead, on the nonlocal turn state above.
 
         # Composed run gate (11-05/11-06): False FORCES suppression (BYOK
         # turn or master flag off); None defers to the environment
@@ -1441,10 +1446,23 @@ async def send_message(
                     yield ev
             finally:
                 # A client disconnect raises GeneratorExit at the `yield ev`
-                # above -- OUTSIDE the worker. aclose() throws it into
-                # _traced_turn at its suspension point so its finally cleanup
-                # (the "[Response interrupted]" stamp) still runs, and the
-                # traceable wrapper closes the parent run deterministically.
+                # above -- OUTSIDE the worker. aclose() is BEST-EFFORT through
+                # the langsmith wrapper: 0.3.42's _process_async_iterator has
+                # no `finally: await generator.aclose()`, so GeneratorExit
+                # ends the WRAPPER (closing the parent run, recording the
+                # disconnect) but can leave the inner _traced_turn suspended
+                # until the GC asyncgen finalizer -- delayed, unordered, and
+                # lost entirely at loop shutdown (WR-03). The interruption
+                # stamp therefore runs HERE, at the seam sse-starlette closes
+                # deterministically, on the nonlocal turn state the worker
+                # shares -- never inside a worker finally.
                 await worker.aclose()
+                if assistant_msg_id and not full_content:
+                    try:
+                        db.table("messages").update({
+                            "content": "[Response interrupted]",
+                        }).eq("id", assistant_msg_id).execute()
+                    except Exception:
+                        pass  # Best-effort cleanup
 
     return EventSourceResponse(event_generator())
