@@ -295,6 +295,17 @@ except ImportError:
     def tracing_context(**kwargs):
         yield
 
+    # Fail CLOSED (WR-02): if langsmith imported and exported a REAL traceable
+    # above but not tracing_context (version skew / partial install), the
+    # no-op gate stub would leave @traceable opening ungated runs -- silently
+    # re-introducing the SEC-01 leak, with run outputs capturing the yielded
+    # SSE stream. Without a working run gate, force the no-op traceable
+    # fallback as well so no run can open at all.
+    def traceable(func=None, **kwargs):  # noqa: F811
+        if func:
+            return func
+        return lambda f: f
+
 router = APIRouter(prefix="/api/threads", tags=["chat"])
 
 
