@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: User Options & BYOK
-status: milestone_complete
-stopped_at: Milestone complete (Phase 15 was final phase)
-last_updated: 2026-07-09T21:26:30.059Z
-last_activity: 2026-07-09
+status: executing
+stopped_at: "15-09 COMPLETE — CR-01 fixed + verified live in prod (approved-with-caveat: free-provider 429)"
+last_updated: "2026-07-10T12:30:05.818Z"
+last_activity: 2026-07-10 -- Phase 11 execution started
 progress:
   total_phases: 1
   completed_phases: 1
   total_plans: 10
-  completed_plans: 41
+  completed_plans: 10
   percent: 100
 ---
 
@@ -21,15 +21,15 @@ progress:
 See: .planning/PROJECT.md (updated 2026-05-20 after v1.1 completion)
 
 **Core value:** The agent can intelligently search and reason across a structured board game knowledge base -- finding rules, comparing mechanics, and recommending games -- using the right tool for the job, transparently.
-**Current focus:** Milestone complete
+**Current focus:** Phase 11 — per-request-key-model-resolution-chat-loop-seam
 
 ## Current Position
 
-Phase: 15 of 10 (options-ui-capstone-demo-gating)
-Plan: Not started
-Status: Milestone complete
+Phase: 11 (per-request-key-model-resolution-chat-loop-seam) — EXECUTING
+Plan: 1 of 6
+Status: Executing Phase 11
 Progress: [██████████] 100%
-Last activity: 2026-07-09
+Last activity: 2026-07-10 -- Phase 11 execution started
 
 ## Performance Metrics
 
