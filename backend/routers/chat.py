@@ -16,6 +16,7 @@ from services.web_search_service import search_web
 from services.kb_tools_service import kb_ls, kb_tree, kb_read, kb_grep, kb_glob
 from services.crypto_service import decrypt_key
 from services.log_scrub import scrub_secrets
+from services.app_settings_service import is_langsmith_enabled
 from services.budget_service import (
     TokenBudget,
     infer_source_scope,
@@ -861,6 +862,14 @@ async def send_message(
             )
             return
 
+        # Runtime LangSmith master toggle (11-06): read the GLOBAL flag once
+        # per turn, OUTSIDE the traced region (~15s TTL-cached DB read; a SQL
+        # flip on app_settings goes live within the window, no restart). A
+        # failed/missing read defaults to True -- SAFE because the composed
+        # gate below still ANDs the locally-resolved BYOK conjunct, so a
+        # user-key turn opens zero runs regardless of this read's outcome.
+        langsmith_on = is_langsmith_enabled(db)
+
         # SEC-01 (a): the ENTIRE turn body runs inside this traceable worker so
         # the single run gate below controls the parent run AND -- via
         # contextvar propagation through asyncio.to_thread -- both subagent
@@ -1406,7 +1415,10 @@ async def send_message(
                     except Exception:
                         pass  # Best-effort cleanup
 
-        with tracing_context(enabled=not is_user_key):
+        # Composed run gate (11-06): master flag AND the 11-05 BYOK gate --
+        # flag OFF => zero runs for everyone (live kill-switch); flag ON =>
+        # exactly the 11-05 behavior (owner/demo traced, BYOK never).
+        with tracing_context(enabled=langsmith_on and not is_user_key):
             worker = _traced_turn()
             try:
                 async for ev in worker:
