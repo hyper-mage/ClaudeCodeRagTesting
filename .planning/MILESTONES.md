@@ -1,5 +1,26 @@
 # Milestones
 
+## v1.2 User Options & BYOK (Shipped: 2026-07-11)
+
+**Phases completed:** 9 phases (9-15 + backlog 999.1, 999.2), 43 plans, ~150 tasks
+**Audit:** passed at close — 26/26 requirements satisfied; sole audit blocker (SEC-01 live human gates) cleared on prod 2026-07-11 (see `milestones/v1.2-MILESTONE-AUDIT.md`)
+**Stats:** 337 commits (v1.1..v1.2), app code 104 files +13,766/−539, 2026-05-20 → 2026-07-10
+
+**Delivered:** Users run LLMs of their choice from their own OpenRouter keys — one-click OAuth PKCE connect, encrypted key custody, per-thread model choice from a cached catalog, and per-message cost visibility — while a flag-gated, cost-bounded owner-key demo fallback preserves the public demo.
+
+**Key accomplishments:**
+
+- **OpenRouter BYOK via OAuth PKCE** — one-click connect with no manual key paste; keys encrypted at rest (MultiFernet with rotation), RLS-scoped, never returned to the frontend; Text-to-SQL exfiltration lockdown via REVOKE + RPC table allowlist (SEC-02).
+- **Per-request key + model resolution seam** — uncached resolver, fresh client per call, zero cross-user key/model bleed under concurrency (SEC-04); fail-closed keyless refuse with a typed connect prompt (DEMO-03).
+- **SEC-01 secret custody, prod-verified** — LangSmith gate moved to the run layer with a runtime `app_settings` master toggle (migration 034); backend `_ScrubFilter` + SSE error scrub + frontend Sentry `sk-or-` scrub. Both mandatory live gates passed on prod 2026-07-11: BYOK turn (incl. tool call) produced zero LangSmith runs; Fly log sink key-free on a forced 401.
+- **Model catalog + picker** — Supabase-cached OpenRouter catalog (lazy 24h TTL, serve-stale-on-failure, never-empty by design), searchable picker with Favorites/Popular/All sections, free/paid + per-Mtok price + context-length hints, per-thread model pin with a free-guarded deprecated-pin fallback.
+- **Usage/cost surface + settings** — per-message cost from `usage.cost`, account balance with low-balance warning, per-thread running totals; settings page with key state (masked label, disconnect/reconnect), default model, and persisted light/dark theme.
+- **Gated owner-key demo fallback** — global flag default-OFF, hard-gated on a live-trip-tested $0 structural cost bound (999.2 burn script + guardrail), non-dismissible demo banner; plus chat empty-state prompts and auto-create-on-send (999.1).
+
+**Known deferred items at close:** 2 non-blocking Phase 11 UAT scenarios (live 402-vs-429 SSE codes; prod SQL-flip smoke of the LangSmith toggle — suppress-only post-CR-01); 6 audit tech-debt warnings W-1..W-6 (dead-pin notice accumulation/not SSE-emitted, stale demo banner until thread switch, FE/BE scrub regex breadth mismatch, budget_service logger not directly filtered, no post-turn balance refresh); Phase 13 Nyquist PARTIAL (`/gsd-validate-phase 13`).
+
+---
+
 ## v1.1 Portfolio Deployment (Shipped: 2026-05-20)
 
 **Phases completed:** 9 phases (1-8 + inserted 6.1), 28 plans, 53 tasks

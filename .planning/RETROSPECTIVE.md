@@ -96,6 +96,54 @@
 
 ---
 
+## Milestone: v1.2 — User Options & BYOK
+
+**Shipped:** 2026-07-11
+**Phases:** 9 (09-15 + backlog 999.1, 999.2) | **Plans:** 43 | **Tasks:** ~150
+**Timeline:** 2026-05-20 → 2026-07-10 (~7 weeks) | **Commits:** 337
+
+### What Was Built
+- OpenRouter BYOK via OAuth PKCE — one-click connect, encrypted key storage (MultiFernet + rotation), SQL-tool exfiltration lockdown
+- Per-request key + model resolution seam — fresh client per call, no cross-user bleed, fail-closed keyless refuse
+- SEC-01 secret custody — LangSmith run-layer gate + runtime DB master toggle, backend `_ScrubFilter` + SSE scrub, FE Sentry scrub; prod-verified zero-leak
+- Supabase-cached model catalog (lazy 24h TTL, never-empty) + searchable picker with favorites/popular, price/context hints
+- Per-thread model pin with free-guarded deprecated-pin fallback + persisted theme + default model preferences
+- Usage/cost surface — per-message cost, balance + low-balance warn, per-thread totals; settings page
+- Flag-gated owner-key demo fallback with live-trip-tested $0 cost bound (999.2) + non-dismissible banner
+- Chat empty-state prompts + auto-create-on-send, and the frontend vitest test runner bootstrap (999.1)
+
+### What Worked
+- **Security front-loading + hard gates** — SEC requirements assigned to the single phase that *enforces* them; demo flag deliberately last, hard-gated on a live guardrail trip test (999.2). CR-01 (paid-spend path via deprecated pin) was caught by verification *because* the gate structure made the invariant explicit.
+- **Milestone audit caught a real blocker** — the 07-09 audit refused to clear SEC-01 from code alone; running the mandated live gates found nothing new *because* the earlier live UAT had already caught the LangSmith leak. The gate discipline (never sign off secret custody from source) is validated.
+- **Live human UAT caught the milestone's worst bug** — the BYOK LangSmith leak (ungated endpoint `@traceable`) passed CI because the test asserted only the client wrap. Only a real prod trace check exposed it.
+- **Backlog phases (999.x) as first-class phases** — 999.1/999.2 ran the full discuss/plan/execute/verify chain and closed cleanly; 999.2 produced the SEC-03 finding artifact Phase 15 depended on.
+- **Gap-closure plans inside the phase** (15-09/15-10, 11-05/11-06) — verification findings turned into numbered plans with TDD RED/GREEN commits instead of ad-hoc patches.
+
+### What Was Inefficient
+- **ROADMAP.md got damaged mid-milestone** — the header + Phases 9-14 list were lost (discovered by the audit as an "orphaned" Phase 15); the v1.2 archive had to be partially reconstructed at close. No tooling guards the file's structural integrity.
+- **Test asserting the mechanism, not the invariant** — test_langsmith_gate.py asserted the client wrap was gated, not "zero runs emitted"; the leak shipped green. Cost: an emergency 2-plan gap closure + re-verification.
+- **STATE.md frontmatter drifted badly** — progress block read "1 phase / 10 plans / 22 tasks" at close (actual: 9/43/~150), which fed wrong stats into the milestone CLI entry and needed manual correction.
+- **Stale audit + memory conflicts at close** — a 07-02 audit predated Phase 15; a memory note claimed prod migrations unapplied after they'd shipped. Both needed supersession reasoning instead of being auto-invalidated.
+
+### Patterns Established
+- **Run-layer tracing gate + runtime DB kill switch** — `tracing_context` around the whole turn with resolution hoisted above the traced region, plus a TTL-cached `app_settings` suppress-only toggle; env kill-switch stays authoritative
+- **Fail-closed resolution seam** — keyless + demo-off refuses with a typed SSE prompt; every resolver output is per-request, uncached
+- **Human-gated plans marked `autonomous: false`** — prod deploys and live secret-custody gates modeled as blocking checkpoints inside plans, not out-of-band chores
+- **SEC finding artifacts as cross-phase dependencies** — 999.2-SEC-03-FINDING.md consumed by Phase 15's flag-enable decision
+
+### Key Lessons
+1. Security tests must assert the *invariant* (zero runs, zero key bytes in sink), not the mechanism (wrapper gated). Mechanism tests pass while the invariant leaks.
+2. Live prod gates for secret custody are non-negotiable and cheap relative to the risk — both v1.2 gates ran in minutes once scheduled.
+3. Keep STATE.md progress frontmatter honest per-phase or fix the updater — bad frontmatter propagates into CLI-generated milestone records.
+4. Protect ROADMAP.md structure (or checksum it) — a damaged roadmap silently orphans phases until an audit trips over it.
+
+### Cost Observations
+- Model mix: primarily Opus (gsd agents inherit)
+- Sessions: ~25-35 across 7 weeks
+- Notable: 337 commits, app code +13.8k LOC; free-model provider 429s repeatedly slowed live smokes (approved-with-caveat pattern used twice)
+
+---
+
 ## Cross-Milestone Trends
 
 ### Process Evolution
@@ -104,6 +152,7 @@
 |-----------|-------|--------|------------|
 | v1.0 | 21 | 7 (incl. 03.1) | Baseline — gsd workflow + decimal gap closure |
 | v1.1 | 28 | 9 (incl. 06.1) | Deploy milestone — interactive resume for human-driven work; UAT-driven gap-fix loop |
+| v1.2 | 43 | 9 (incl. 999.1/999.2) | Security milestone — invariant-level live gates, human-gated plans (`autonomous: false`), backlog phases run the full chain |
 
 ### Cumulative Quality
 
@@ -111,9 +160,11 @@
 |-----------|--------------|-------------|---------|
 | v1.0 | 39/39 (100%) | 0 orphans, 0 broken | 1/7 compliant |
 | v1.1 | 23/23 (100%) | 0 orphans, 0 broken (live E2E) | 0/9 compliant — tech debt |
+| v1.2 | 26/26 (100%) | 6/6 flows wired, 1 orphaned endpoint (informational) | 8/9 compliant — Phase 13 PARTIAL |
 
 ### Top Lessons (Verified Across Milestones)
 
-1. **Run `/gsd:verify-work` at every phase boundary.** Verified across v1.0 (Phase 03 → 03.1) and v1.1 (Phases 03 + 07 retroactive). Skipping it always costs at milestone-audit time.
-2. **Nyquist validation slips to tech debt every milestone** (v1.0: 1/7, v1.1: 0/9). Either enforce it per-phase or formally accept it as a recurring deferral — the current middle ground just accumulates.
-3. **A well-designed SSE / contract layer compounds** — v1.0's tool_start/tool_result/sub_event protocol carried into v1.1's error-event handling (the one gap was the frontend not handling `event: error`, fixed in Phase 8).
+1. **Run `/gsd:verify-work` at every phase boundary.** Verified across v1.0 (Phase 03 → 03.1) and v1.1 (Phases 03 + 07 retroactive). Skipping it always costs at milestone-audit time. v1.2 finally ran it consistently — and it caught CR-01/CR-02.
+2. **Nyquist validation slips to tech debt every milestone** (v1.0: 1/7, v1.1: 0/9, v1.2: 8/9). v1.2's per-phase enforcement mostly fixed this — one PARTIAL remains.
+3. **A well-designed SSE / contract layer compounds** — v1.0's tool_start/tool_result/sub_event protocol carried through v1.1's error events into v1.2's typed refuse prompts and demo-mode signal.
+4. **Live verification beats code verification for anything touching prod or secrets** — v1.1's deployed UAT bugs and v1.2's LangSmith leak were both invisible to code-only review and CI.

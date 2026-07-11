@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: User Options & BYOK
-status: ready_to_plan
-stopped_at: Phase 11 complete (6/6) — ready to discuss Phase 12
-last_updated: 2026-07-11T04:22:52.029Z
-last_activity: 2026-07-10 -- Phase 11 execution started
+status: Awaiting next milestone
+stopped_at: "v1.2 shipped 2026-07-11 — archived, tagged"
+last_updated: "2026-07-11T04:45:00.000Z"
+last_activity: 2026-07-11 — Milestone v1.2 completed and archived
 progress:
-  total_phases: 1
-  completed_phases: 1
-  total_plans: 10
+  total_phases: 9
+  completed_phases: 9
+  total_plans: 43
   completed_plans: 43
   percent: 100
 ---
@@ -18,98 +18,55 @@ progress:
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-05-20 after v1.1 completion)
+See: .planning/PROJECT.md (updated 2026-07-11 after v1.2 completion)
 
-**Core value:** The agent can intelligently search and reason across a structured board game knowledge base -- finding rules, comparing mechanics, and recommending games -- using the right tool for the job, transparently.
-**Current focus:** Phase 12 — model cache catalog
+**Core value:** The agent can intelligently search and reason across a structured board game knowledge base — finding rules, comparing mechanics, and recommending games — using the right tool for the job, transparently.
+**Current focus:** Planning next milestone (`/gsd:new-milestone`)
 
 ## Current Position
 
-Phase: 12
-Plan: Not started
-Status: Ready to plan
-Progress: [██████████] 100%
-Last activity: 2026-07-11
+Phase: Milestone v1.2 complete (9/9 phases, 43/43 plans, 26/26 requirements)
+Plan: —
+Status: Awaiting next milestone
+Last activity: 2026-07-11 — Milestone v1.2 completed and archived
 
-## Performance Metrics
+## Deferred Items
 
-- Phases planned: 7 (Phases 9-15)
-- Phases complete: 1/7 (Phase 9)
-- Plans complete: 6 (Phase 9: 3/3; Phase 10: 3/4 — 10-01 migration 028 ~14 min; 10-02 backend exchange path ~4 min, 3 tasks, 7 files, 12 tests green; 10-03 FE connect core ~5 min, 3 tasks, 5 files, build green + new files lint-clean)
-- Phase 999.1: 3/3 — 999.1-01 runner+closure-proof send; 999.1-02 ~7 min empty-state chips (2 files, 12 tests green); 999.1-03 ~25 min auto-create-on-send (3 files, 7 ChatPage tests, full suite 19/19 green, tsc+lint clean) — human-verify APPROVED-WITH-CAVEAT (deliverable verified live; live LLM streamed round-trip deferred to a separate provider error, deferred-items D-999.1-LLM-A)
-- Requirements mapped: 26/26 ✓
-- Phase 15 gap closure: 15-09 (CR-01) ~8 min active — 2 tasks, 2 files, TDD (RED 6804532 / GREEN 164bff9); resolution suite 18/18 green; Task 2 BLOCKING prod redeploy APPROVED-WITH-CAVEAT (free-provider 429) — live keyless bogus-pin + paid openai/gpt-4o default resolved to meta-llama/llama-3.3-70b-instruct:free, owner-key paid-spend path closed in prod
+Items acknowledged and deferred at milestone close on 2026-07-11:
+
+| Category | Item | Status |
+|----------|------|--------|
+| uat_gap | Phase 11 UAT test 3 — live 402 vs 429 distinct SSE codes | pending (non-blocking; unit coverage green) |
+| uat_gap | Phase 11 UAT test 4 — prod SQL-flip smoke of LangSmith master toggle | pending (non-blocking; suppress-only post-CR-01, dev flip smoke passed) |
+| tech_debt | W-1/W-2 (Phase 13) — dead-pin notice accumulates per send + not SSE-emitted | open |
+| tech_debt | W-3 (Phase 15) — stale Demo-mode banner until thread switch after mid-thread connect | open |
+| tech_debt | W-4/W-5 (Phase 11) — FE scrub regex narrower than backend; budget_service logger not directly filtered | open |
+| tech_debt | W-6 (Phase 14) — no post-turn balance refresh | open |
+| validation | Phase 13 Nyquist PARTIAL — `/gsd:validate-phase 13`; v1.1 phases 1, 3, 6, 6.1, 7, 8 unvalidated | open |
+| test_debt | test_record_manager.py missing `user_id` fixture (pre-v1.1) | open |
+| ops | Free-model provider 429s make live smokes flaky (D-999.1-LLM-A) | open |
+| ops | execute_readonly_query 42501 SET LOCAL role quirk (D-09-A) | open |
 
 ## Accumulated Context
 
-### Roadmap Evolution
-
-- Phase 15 added 2026-07-02: Options UI Capstone + Demo Gating — recreated after v1.2 audit found it orphaned (ROADMAP.md remnant lost the Phases 9-15 list); carries KEY-05, MODEL-08, DEMO-01, DEMO-02, SEC-03 per REQUIREMENTS.md traceability + audit fold-ins B-1 (MODEL-03 popular-mark render) and W-1 (MODEL-01 picker search).
-- v1.2 roadmap created 2026-06-18: 7 phases (9-15), continuing numbering from v1.1 (which ended at Phase 8 + inserted 6.1). Standard granularity. Phase shape follows the research-recommended dependency-ordered build sequence: crypto/storage → OAuth → per-request resolution (critical-path 9-10-11), model cache parallelizable (12), prefs/thread-model (13), usage-cost/settings (14), options-UI capstone + demo-fallback gating last (15).
-- Phase 06.1 inserted after Phase 6 (v1.1): mobile-responsive-chat-layout — always-visible w-64 sidebar ate the mobile viewport; decimal phase kept numbering clean. Verified 2026-05-15.
-
 ### Decisions
 
-Full decision log lives in PROJECT.md Key Decisions table. v1.1 decisions folded in at milestone close.
+v1.2 decisions promoted to PROJECT.md Key Decisions table at milestone close (2026-07-11). Full log there.
 
-v1.2 roadmap-shaping decisions (to be promoted to PROJECT.md at phase transitions as they harden):
+### Blockers/Concerns (carried forward)
 
-- Security findings treated as release blockers, front-loaded: SQL-tool lockdown + encryption hygiene in Phase 9; LangSmith/Sentry/SSE scrub + fail-closed resolution + cross-user isolation at the Phase 11 chat-loop seam.
-- Demo-fallback flag enablement is deliberately LAST (Phase 15) and hard-gated on the SEC-06 cost guardrail (backlog 999.2) being trip-tested with a kill switch — the fail-closed *shape* lands earlier in Phase 11.
-- Model-list refresh is lazy TTL refresh-if-stale + deploy seed (NOT an in-process scheduler — Fly free-tier suspend kills timers).
-- BYOK is additive-by-reuse: Fernet (already-pinned `cryptography`), `httpx` for all OpenRouter calls, Web Crypto PKCE (no lib); only new frontend dep surface is shadcn/ui Combobox.
-- [Phase ?]: Phase 9 BYOK encryption uses MultiFernet from day one (D-02): KEY_ENCRYPTION_SECRET is a comma-separated NEW-KEY-FIRST list; encrypt uses keys[0], decrypt tries all, rotate re-encrypts under keys[0].
-- [Phase ?]: crypto_service reads KEY_ENCRYPTION_SECRET at call-time via get_settings() so @lru_cache is test-clearable; secret/plaintext/ciphertext never logged, traced, or returned (D-04, T-09-01).
-- [Phase ?]: [Phase 9]: SQL-tool keys-table allowlist reconciled to {threads, messages, documents, document_chunks} (RESEARCH Open Question 1 closed) — matches QUERYABLE_SCHEMA; RESEARCH-era folders dropped.
-- [Phase ?]: [Phase 9]: execute_readonly_query allowlist is positive default-deny; CTE self-referencing aliases are NOT tolerated (would otherwise let an attacker alias user_api_keys past the gate). Allowlist helper in sql_service.py is additive-only — the DB RPC remains the enforcing gate.
-- [Phase ?]: [Phase 9]: Migrations 025/026 applied LIVE to dev (ntkkmljbariflblldmha) after a 001-024 migration-history repair; SEC-02 lockdown verified live — select * from user_api_keys rejected by the migration-026 allowlist (P0001 non-allowlisted table). Prod deferred to deploy (D-03).
-- [Phase ?]: [Phase 9]: Pre-existing execute_readonly_query 42501 (SET LOCAL role inside SECURITY DEFINER, identical in migrations 015 and 026) logged to deferred-items.md D-09-A — out of scope for the verify plan, orthogonal to SEC-02; triage in Phase 11 or a dedicated RPC-fix plan.
-- [Phase ?]: [Phase 10]: connected_at added as a dedicated nullable TIMESTAMPTZ column (migration 028); set explicitly in the exchange upsert (ON CONFLICT skips defaults); backs 'Connected since' (KEY-03) + reconnect (KEY-04).
-- [Phase ?]: [Phase 10]: Migration 028 applied LIVE to dev (ntkkmljbariflblldmha), additive-only; SEC-02 lockdown verified intact (live P0001 RPC probe + unit test); prod deferred to deploy (D-03).
-- [Phase ?]: [Phase 10]: BYOK exchange returns {connected:True} only — the sk-or-v1 key (plaintext OR ciphertext) is NEVER in any response; a 403 from OpenRouter surfaces a generic HTTPException(502) scrubbed of the body/key (T-10-03/T-10-04/SEC-01, Plan 10-02).
-- [Phase ?]: [Phase 10]: keys.py exchange sets connected_at EXPLICITLY in the .upsert payload (PK=user_id, one key per user) so reconnect re-stamps; user_id bound to JWT sub; sql_service.py left untouched so the Phase 9 SEC-02 lockdown stays green (Plan 10-02).
-- [Phase ?]: [Phase 10]: FE PKCE round-trip stores code_verifier + CSRF state in sessionStorage (NOT localStorage) so a same-tab hard-refresh on the callback is the SUCCESS path (D-07); the callback reads them from sessionStorage (not React state), validates returnedState !== storedState before the bearer'd exchange POST, and renders a LOCKED generic failure sentence that never interpolates the caught error / HTTP status / sk-or- fragment (D-06). Shared startOpenRouterConnect() helper in lib/pkce.ts powers both the Connect CTA and the callback Retry (Plan 10-03).
-- [Phase ?]: [Phase 10]: SEC-01 frontend half landed — lib/sentry.ts scrubs /sk-or-v1-[A-Za-z0-9_-]+/g -> [redacted-key] in BOTH beforeSend (message/exception/request.url incl. callback URL) and beforeBreadcrumb (message/data), additive beside the existing Authorization/sb-…-auth-token rules (Plan 10-03).
-- [Phase ?]: Plan 10-04 Tasks 1-2 shipped: /settings + callback routes, IconSidebar Settings gear (rail + drawer), display-only connection dot on chat route (MobileTopBar + IconSidebar desktop) via useKeyStatus, no polling. Task 3 prod round-trip is a blocking human-verify checkpoint, pending the real user.
-- [Phase ?]: [Phase 999.1]: Frontend component-test runner installed (vitest + @testing-library/react + jsdom); npm run test = vitest run (no watch); shared src/test/utils.tsx (renderWithProviders + mockSSEResponse + makeApiMock/makeAuthMock) reused by Plans 02/03.
-- [Phase ?]: [Phase 999.1]: useChat.sendMessage is closure-proof via effectiveThreadId = opts?.threadId ?? threadId (deps unchanged); loadMessages gains an isStreaming no-clobber guard so the thread-switch effect cannot wipe the optimistic bubble mid-send.
-- [Phase ?]: [Phase 999.1]: Auth in tests supplied via a vi.mock factory (makeAuthMock over a mutable authMockState), NOT by exporting the production AuthContext; react-refresh ESLint rule disabled for test files only — AuthContext.tsx left byte-identical to HEAD.
-- [Phase ?]: [Phase 999.1]: Chat empty-state chips rendered inline in ChatContainer (no EmptyState extraction); filled bg-gray-800 treatment never bg-blue-600; anon D&D cue preserved as an isAnon-gated text-xs hint line; chip tap sends immediately via onSend(q); EXAMPLE_PROMPTS is module-level UPPER_SNAKE_CASE.
-- [Phase ?]: [Phase 999.1]: Auto-create-on-send wired in ChatPage.handleSend (D-01/D-04) — null activeThreadId POSTs /api/threads {}, then sendMessage(content,{threadId:newId}) passes the server-issued id BY VALUE (closure-proof, no flushSync/no create-in-hook); skipNextLoadRef suppresses the post-create load-effect clobber of the optimistic bubble; create failures Sentry+generic-toast and abort the send (T-999.1-06/07/08).
-- [Phase ?]: [Phase 999.1]: Live human-verify (999.1-03-03) surfaced a post-stream refetch clobber — Plan 01's adding isStreaming to loadMessages deps made the thread-load effect re-fire on stream-END, refetching /api/threads/{id} and wiping the streamed reply. Fix ad43b9a: in-stream guard moved to isStreamingRef; loadMessages deps reduced to [threadId] only. Checkpoint APPROVED-WITH-CAVEAT — live LLM streamed answer+title deferred to a separate :free-model provider error (deferred-items D-999.1-LLM-A), NOT a phase defect.
-- [Phase 13]: [13-01]: user_preferences mirrors user_api_keys own-row RLS but OMITS REVOKE SELECT — prefs are non-secret (T-13-03 accept); own-row RLS is the only isolation (migration 20240301000032, authored not applied).
-- [Phase 13]: [13-01]: default_model is plain TEXT, NOT a FK to model_cache (D-06) — a deprecated-but-pinned slug must persist so the at-send fallback notice can fire; threads.model added nullable, no DEFAULT/backfill (D-05).
-- [Phase 13]: [13-01]: messages_role_check (Postgres auto-named from migration 000002 inline CHECK) DROP+re-ADD'd to allow 'notice' — the persisted deprecation line, excluded from LLM history (D-06). Confirms RESEARCH A1.
-- [Phase 13]: [13-01]: 13-01 authored migration only (Plan 02 owns db push); 8 Wave 0 backend tests RED by design (routers.preferences absent, PATCH/notice logic absent) — Plans 03/04 turn them green. test_thread_model_wins_when_set added without regression (7/7 in resolution suite).
-- [Phase ?]: [Phase 13]: [13-03]: GET/PUT /api/preferences ship the prefs write side (partial upsert exclude_unset keyed on user_id, JWT-bound, updated_at explicit) + PATCH /api/threads/{id} sets/clears threads.model (explicit-null clear, ownership re-check -> 404); preferences router wired into main.py. Resolution (chat.py) UNCHANGED. 6 Wave-0 RED tests GREEN; ThreadResponse timestamps made Optional so the PATCH echo row validates.
-- [Phase ?]: [Phase 13]: [13-03]: 4 full-suite non-green items are out of scope (deferred-items.md): 2 test_deprecated_model_fallback.py = Plan 13-04 RED (chat.py notice-role), 2 test_record_manager.py = pre-existing fixture debt. resolution suite 13/13 green incl. test_thread_model_wins_when_set on the now-real threads.model column.
-- [Phase ?]: [13-04]: at-send deprecated-pin fallback in chat.py event_generator — non-empty model_cache membership check (Assumption A2 guard); persisted role='notice' row with LOCKED UI-SPEC copy; model OVERRIDDEN to user/owner default in the CALLER (_resolve_key_and_model stays pure 3-tier, Open Question 2); history map filters role in (user,assistant) so notice never reaches the LLM; cache reads defensive (T-13-CRASH). Both test_deprecated_model_fallback.py GREEN; full suite 203 passed (2 pre-existing record_manager errors out of scope).
-
-### Pending Todos
-
-- Pre-existing test debt: `backend/tests/test_record_manager.py::test_check_duplicate_integration` references a missing `user_id` fixture (conftest provides only `test_user_id` / `mock_user_id`). Pre-dates v1.1 — fix in a future plan-checker pass.
-- shadcn `init` against Vite + Tailwind 4 is a Phase 15 prerequisite — project has not used shadcn before; verify `components.json` does not pre-exist before adding Combobox.
-
-### Blockers/Concerns
-
-- [Phase 15 hard dep]: SEC-03 / backlog 999.2 — OpenRouter cost-cap live trip-test not yet exercised. MUST be closed before enabling the demo-fallback flag in prod.
-- [Phase 11 research flag]: LangSmith `wrap_openai` redaction of `api_key` + Sentry/SSE scrub + concurrent-key isolation are the highest-blast-radius work; validate the disable-wrapper approach against the prod LangSmith project during planning.
-- [Phase 14 gap]: OpenRouter `/api/v1/key` exact balance field names are MEDIUM confidence — validate live against a real OAuth-provisioned key; tolerate null `limit_remaining` for pay-as-you-go.
-- [v1.2+]: Supabase free-tier `pg_cron` availability affects any future scheduled model-refresh upgrade (lazy TTL is the v1.2 baseline; pg_cron is documented-optional).
-- [tech debt]: Nyquist test-coverage validation incomplete for several v1.1 phases — run `/gsd:validate-phase N` when convenient.
-- [testing/ops, out-of-scope of 999.1]: Chat completion fails for the configured :free OpenRouter model (nvidia/nemotron-3-super-120b-a12b:free) — HTTP 200 then in-band SSE event: error (free-tier rate-limit/provider). Affects ANY chat on ANY thread. Revisit LLM_MODEL/provider for a reliable live round-trip. Logged deferred-items D-999.1-LLM-A. No new plan.
-- [testing/ops, pre-existing]: POST /api/demo/bootstrap fails ('Couldn't start the demo') — blocks the anon-session / anon-hint live check; untouched by Phase 999.1. Logged deferred-items D-999.1-DEMO-A; relevant to Phase 15 demo-fallback gating. No new plan.
+- [v1.2+]: Supabase free-tier `pg_cron` availability affects any future scheduled model-refresh upgrade (lazy TTL is the shipped baseline).
+- [ops]: Supabase key migration deferred — legacy anon/service_role keys in use; new publishable/secret keys are a future-version task.
+- [ops]: POST /api/demo/bootstrap failure (D-999.1-DEMO-A) — anon-session demo bootstrap; revisit if demo UX work returns.
 
 ## Session Continuity
 
-Last session: 2026-07-09T21:12:45Z
-Stopped at: 15-09 COMPLETE — CR-01 fixed + verified live in prod (approved-with-caveat: free-provider 429)
+Last session: 2026-07-11
+Stopped at: v1.2 milestone completed — archives written, PROJECT.md evolved, ROADMAP.md reorganized, tagged v1.2
 Resume file: None
-Next: Phase 15 (options-ui-capstone-demo-gating) all 10 plans complete, incl. gap closure CR-01 (15-09) + CR-02 (15-10). 15-09 shipped _deprecated_pin_default_model free-guarding the deprecated-pin override in demo mode (RED 6804532 / GREEN 164bff9, resolution suite 18/18); prod backend redeployed to Fly (boardgame-rag-prod, code-only, no migration/secret flip) and the live keyless exploit path proven closed — bogus pin `totally/bogus-deprecated-v9` + paid `openai/gpt-4o` default resolved to `meta-llama/llama-3.3-70b-instruct:free`, never the paid model (notice row 9612d3b9). SEC-03 structural $0 bound restored end-to-end; DEMO-01 holds in prod. Remaining v1.2 close-out (project memory project_v12_outstanding_gaps): 2 SEC-01 manual UAT gates, prod migrations 029-032 status, v1.2 audit.
+Next: `/gsd:new-milestone` to scope the next milestone (questioning → research → requirements → roadmap)
 
 ## Operator Next Steps
 
-- Plan the first phase: `/gsd:plan-phase 9` (Crypto + Encrypted Key Storage Foundation)
-- Phase 12 (Model Cache) is parallelizable with 9-11 — can be planned/built alongside the key path
-- Before Phase 15: close SEC-03 / backlog 999.2 (cost-guardrail trip-test) — hard dependency for the demo-fallback flag
-- Optional: close Nyquist tech debt with `/gsd:validate-phase N` for v1.1 phases 1, 3, 6, 6.1, 7, 8
+- Start next milestone: `/clear` then `/gsd:new-milestone`
+- Optional debt paydown before new scope: `/gsd:validate-phase 13`, Phase 11 UAT tests 3-4, W-1..W-6 warnings

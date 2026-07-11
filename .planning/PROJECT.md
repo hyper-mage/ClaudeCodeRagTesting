@@ -2,7 +2,7 @@
 
 ## What This Is
 
-An agentic RAG application specialized for board games. It combines a pre-seeded default knowledge base of popular board games with user-uploaded private collections, providing intelligent chat that can search, compare, and recommend across the entire library. The agent uses Claude Code-inspired tooling (ls, tree, grep, glob, read) with transparent tool calls to navigate a hierarchical folder-based knowledge base stored in Supabase.
+An agentic RAG application specialized for board games. It combines a pre-seeded default knowledge base of popular board games with user-uploaded private collections, providing intelligent chat that can search, compare, and recommend across the entire library. The agent uses Claude Code-inspired tooling (ls, tree, grep, glob, read) with transparent tool calls to navigate a hierarchical folder-based knowledge base stored in Supabase. Users bring their own OpenRouter key via one-click OAuth (BYOK) and chat on any model they choose, with per-message cost visibility; a flag-gated, cost-bounded owner-key demo fallback keeps the public demo alive for keyless visitors.
 
 ## Core Value
 
@@ -68,33 +68,27 @@ The agent can intelligently search and reason across a structured board game kno
 - ✓ One-click Try-demo anon onboarding + graceful chat error/retry UX — v1.1 (Phase 8)
 - ✓ Portfolio README + architecture diagram + screenshots + hero GIF + shields.io badges — v1.1 (Phase 8)
 
-## Current Milestone: v1.2 User Options & BYOK
+**v1.2 User Options & BYOK (shipped 2026-07-11 — 26/26 requirements):**
 
-**Goal:** Users run LLMs of their choice from their own OpenRouter keys with near-zero-friction onboarding, while a gated owner-key demo fallback preserves the public demo.
-
-**Target features:**
-- OpenRouter OAuth (PKCE) auto key retrieval — no manual key paste
-- User keys stored encrypted server-side, RLS-scoped, decrypted only in backend
-- Model picker with free/paid tags + popularity, cached with scheduled refresh
-- Key-gated model selection that triggers OAuth when no key is connected
-- Owner-key demo fallback behind a global flag, off by default
-- Usage/cost display (OpenRouter balance + per-request token/cost)
-- Per-thread model selection, persisted
-- Settings/account page (key status, default model, theme, profile)
-- Theme toggle (light/dark), persisted per user
+- ✓ OpenRouter OAuth (PKCE) connect — auto-provisioned user key, no manual paste — v1.2 (Phase 10)
+- ✓ Encrypted server-side key storage (MultiFernet + rotation), RLS-scoped, never returned to frontend — v1.2 (Phase 9)
+- ✓ Text-to-SQL lockdown of the user-keys table (REVOKE + RPC allowlist) — v1.2 (Phase 9)
+- ✓ Per-request key + model resolution — fresh client per call, no cross-user bleed — v1.2 (Phase 11)
+- ✓ Secret custody: keys never in LangSmith/Sentry/logs/SSE — prod-verified live gates — v1.2 (Phase 11)
+- ✓ Fail-closed keyless refuse with connect prompt when demo is off — v1.2 (Phase 11)
+- ✓ Model catalog: cached OpenRouter list, free/paid tags, popular marks, price + context hints — v1.2 (Phase 12)
+- ✓ Lazy TTL model-list refresh (24h, serve-stale-on-failure, never-empty) — v1.2 (Phase 12)
+- ✓ Default model + per-thread model pin (persisted, free-guarded deprecated-pin fallback) — v1.2 (Phase 13)
+- ✓ Theme toggle light/dark, persisted per user — v1.2 (Phase 13)
+- ✓ Usage/cost: per-message cost, account balance + low-balance warning, per-thread totals — v1.2 (Phase 14)
+- ✓ Settings/account page (key status masked, disconnect/reconnect, default model) — v1.2 (Phases 10/14)
+- ✓ Key-gated model selection → OAuth connect flow, searchable picker with favorites — v1.2 (Phase 15)
+- ✓ Owner-key demo fallback: global flag default-OFF, $0 structural cost bound live-trip-tested, non-dismissible banner — v1.2 (Phases 15/999.2)
+- ✓ Chat empty-state prompts + auto-create-thread-on-send — v1.2 (Phase 999.1)
 
 ### Active
 
-- OpenRouter OAuth (PKCE) key retrieval — auto-provision user-scoped key — v1.2
-- Encrypted server-side storage of user OpenRouter keys, RLS-scoped — v1.2
-- Model picker: list from OpenRouter /models, free/paid + popularity tags — v1.2
-- Scheduled model-list refresh to pick up new models — v1.2
-- Key-gated model selection → trigger OAuth when no key — v1.2
-- Owner-key demo fallback, global flag, default off — v1.2
-- Usage/cost display (balance + per-request) — v1.2
-- Per-thread model selection (persisted) — v1.2
-- Settings/account page — v1.2
-- Theme toggle (light/dark, persisted) — v1.2
+(None — next milestone not yet scoped. Define via `/gsd:new-milestone`.)
 
 ### Out of Scope
 
@@ -144,7 +138,14 @@ The agent can intelligently search and reason across a structured board game kno
 | Two Supabase projects — dev (`.env`) + prod (`.env.prod`) | Isolate prod data + keys from local dev; one env file per environment | ✓ v1.1 Phase 3 |
 | Anonymous Supabase auth for Try-demo | One-click demo with no signup; 7-day cleanup sweep; `aud="authenticated"` (Supabase default) | ✓ v1.1 Phase 8 |
 | Insert Phase 6.1 (mobile) mid-milestone | Always-visible sidebar broke mobile viewport — urgent fix, decimal phase kept numbering clean | ✓ v1.1 Phase 6.1 |
-| OpenRouter Guardrail as cost cap | Guardrails replaced spend-alert toggle ($0.10 min threshold); live trip-test deferred to backlog 999.2 | ⚠️ v1.1 Phase 6 (SEC-06 trip-test deferred) |
+| OpenRouter Guardrail as cost cap | Guardrails replaced spend-alert toggle ($0.10 min threshold); live trip-test deferred to backlog 999.2 | ✓ Closed v1.2 (999.2 live trip PASSED; SEC-03 finding artifact) |
+| OAuth-only BYOK posture (no manual key paste) | Manual paste doubles the failure + security surface; OpenRouter PKCE auto-provisions a scoped key | ✓ v1.2 Phase 10 |
+| MultiFernet from day one for key encryption | KEY_ENCRYPTION_SECRET is a new-key-first list; rotation re-encrypts under keys[0] without a migration | ✓ v1.2 Phase 9 |
+| Lazy TTL model cache, no scheduler | Fly free-tier suspend kills in-process timers; refresh-if-stale on read + deploy seed | ✓ v1.2 Phase 12 |
+| Security front-loaded as release blockers; demo flag last | SQL lockdown in Phase 9, custody/isolation at the Phase 11 seam; demo flag hard-gated on the 999.2 cost-guardrail trip test | ✓ v1.2 (SEC-01 leak caught + fixed pre-close) |
+| LangSmith gate at the run layer + runtime master toggle | Client-wrap-only gating leaked BYOK turns via the endpoint `@traceable`; `tracing_context` + `app_settings.langsmith_enabled` (suppress-only) close every flag state | ✓ v1.2 Phase 11 (prod-verified zero-run) |
+| Per-request uncached key/model resolution | Module-level cache risks cross-user bleed; fresh resolver + fresh client per call | ✓ v1.2 Phase 11 |
+| Plain-TEXT default_model, no FK to model_cache | A deprecated-but-pinned slug must persist so the at-send fallback notice can fire | ✓ v1.2 Phase 13 |
 
 ## Evolution
 
@@ -166,22 +167,20 @@ This document evolves at phase transitions and milestone boundaries.
 ---
 ## Current State
 
-**Shipped:** v1.1 Portfolio Deployment (2026-05-20) — 9 phases, 28 plans, 53 tasks, 23/23 requirements satisfied. Milestone audit passed. The Board Game KB RAG is live and public at **https://boardgame-rag-prod.pages.dev** — backend on Fly.io, frontend on Cloudflare Pages, dedicated prod Supabase project — with auth, CORS, rate limiting, observability, and a portfolio README hardened for a shared demo URL. See [milestones/v1.1-ROADMAP.md](milestones/v1.1-ROADMAP.md).
+**Shipped:** v1.2 User Options & BYOK (2026-07-11) — 9 phases (9-15 + 999.1/999.2), 43 plans, 26/26 requirements satisfied. Milestone audit passed at close (sole blocker — SEC-01 live human gates — cleared on prod 2026-07-11). Users connect their own OpenRouter key via one-click OAuth PKCE, pick any model per thread from a cached searchable catalog, and see per-message/per-thread cost; keys are encrypted at rest with prod-verified zero-leak custody, and a flag-gated, cost-bounded owner-key demo fallback keeps the public demo alive. See [milestones/v1.2-ROADMAP.md](milestones/v1.2-ROADMAP.md).
 
-**Prior:** v1.0 KB Navigation & Agentic RAG (2026-04-23) — 7 phases, 21 plans, 39/39 requirements. See [milestones/v1.0-ROADMAP.md](milestones/v1.0-ROADMAP.md).
+**Prior:** v1.1 Portfolio Deployment (2026-05-20) — 9 phases, 28 plans, 23/23 requirements; live at **https://boardgame-rag-prod.pages.dev** (Fly.io + Cloudflare Pages + dedicated prod Supabase). See [milestones/v1.1-ROADMAP.md](milestones/v1.1-ROADMAP.md). · v1.0 KB Navigation & Agentic RAG (2026-04-23) — 7 phases, 21 plans, 39/39 requirements. See [milestones/v1.0-ROADMAP.md](milestones/v1.0-ROADMAP.md).
 
-**Tech stack:** React 19 + Vite 6 + Tailwind 4 frontend; Python 3.11 + FastAPI backend; Supabase (Postgres + pgvector + Auth + Storage + Realtime); OpenRouter LLM; Docling parsing; Sentry + LangSmith + UptimeRobot observability.
+**Tech stack:** React 19 + Vite 6 + Tailwind 4 frontend (vitest + Testing Library); Python 3.11 + FastAPI backend (278 tests passing); Supabase (Postgres + pgvector + Auth + Storage + Realtime, migrations through 034); OpenRouter LLM (BYOK + owner demo key); Docling parsing; Sentry + LangSmith (run-layer gated) + UptimeRobot observability.
 
 **Known tech debt carried into next milestone:**
-- Nyquist test-coverage validation incomplete for several phases — run `/gsd:validate-phase N`.
-- SEC-06 OpenRouter cost-cap live trip-test deferred to backlog `999.2`.
-- Backlog: `999.1` chat empty-state UX, `999.2` cost-guardrail burn script.
+- 2 non-blocking Phase 11 UAT scenarios (live 402-vs-429 SSE codes; prod SQL-flip smoke of the LangSmith toggle).
+- Audit warnings W-1..W-6: dead-pin notice accumulates + not SSE-emitted (Phase 13); stale demo banner until thread switch (Phase 15); FE/BE scrub regex breadth mismatch + `budget_service` logger not directly filtered (Phase 11); no post-turn balance refresh (Phase 14).
+- Phase 13 Nyquist PARTIAL — run `/gsd:validate-phase 13`; v1.1 phases 1, 3, 6, 6.1, 7, 8 also unvalidated.
+- Pre-existing: `test_record_manager.py` fixture debt; `execute_readonly_query` 42501 SET LOCAL quirk (D-09-A); free-model provider 429s make live smokes flaky (D-999.1-LLM-A).
+- Orphaned capability: `GET /api/models?free_only=true` has no frontend consumer.
 
-**Current milestone:** v1.2 User Options & BYOK — scoped 2026-06-18. **Phase 9 complete** (Crypto + Encrypted Key Storage Foundation): KEY-02 + SEC-02 validated — encrypted BYOK key storage live on dev (Fernet/MultiFernet round-trip + rotation, ciphertext-only RLS `user_api_keys` table, REVOKE + hardened FROM-table allowlist provably blocking Text-to-SQL exfiltration incl. comma/schema bypass vectors). Prod apply deferred to the deploy step (D-03). Pre-existing RPC `42501 SET LOCAL role` issue logged for Phase 11 (D-09-A).
-
-**Phase 12 complete** (2026-06-23) — Model Cache + Catalog: MODEL-01/02/03/04/07 validated. `GET /api/models[?free_only]` serves a Supabase-backed (`model_cache`, migration 030) catalog with defensive free/paid tagging, guarded per-Mtok price + context-length hints, curated `POPULAR_MODELS` popularity, and lazy refresh-if-stale (24h TTL, serve-stale-on-failure). Catalog is never-empty **by design** after gap closure (CR-01): corrective migration 031 relaxed `model_cache.name` to nullable + a `name → model_id` coalesce + empty-catalog guard, so one nameless upstream model can no longer empty the cold cache. Inverted RLS (permissive SELECT, service-role-only writes) live on dev; prod 031 apply deferred to deploy (D-03).
-
-**Phase 11 complete** (2026-07-11, after gap closure) — Per-Request Key + Model Resolution: SEC-01/SEC-04/DEMO-03 validated, including live prod confirmation of both MANDATORY SEC-01 gates. The 2026-07-09 BYOK LangSmith leak (ungated endpoint `@traceable`) was closed by moving the gate to the run layer (`tracing_context`, resolution hoisted above the traced region) plus a runtime `app_settings.langsmith_enabled` master toggle (migration 034, ~15s TTL, suppress-only after CR-01 — env kill-switch stays authoritative). Prod-verified 2026-07-11: BYOK turn incl. tool call = zero LangSmith runs; live Fly log sink key-free on a forced 401. Code-review fix pass landed 7/7 Critical+Warning findings; +14 regression tests (278 passing). This was the final v1.2 phase — all 26 requirements Complete; milestone ready for `/gsd:complete-milestone`.
+**Next milestone:** not yet scoped — run `/gsd:new-milestone`.
 
 ---
-*Last updated: 2026-07-11 — v1.2 Phase 11 (Per-Request Resolution) complete after SEC-01 gap closure; all v1.2 requirements satisfied.*
+*Last updated: 2026-07-11 after v1.2 milestone*

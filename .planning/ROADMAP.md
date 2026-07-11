@@ -1,40 +1,57 @@
-**Requirements:** SEC-03 (dependency)
-**Plans:** 2 plans
+# Roadmap: Board Game Knowledge Base RAG
 
-Plans:
+## Milestones
 
-- [x] 999.2-01-PLAN.md — Safe-by-default burn script + pure-logic unit tests (no spend) + greppable D-05a app-kill-switch test
-- [x] 999.2-02-PLAN.md — Human-gated LIVE guardrail trip on the prod owner account + SEC-03 finding artifact (autonomous: false)
+- ✅ **v1.0 KB Navigation & Agentic RAG** — Phases 1-7 (shipped 2026-04-23) — [archive](milestones/v1.0-ROADMAP.md)
+- ✅ **v1.1 Portfolio Deployment** — Phases 1-8 + 6.1 (shipped 2026-05-20) — [archive](milestones/v1.1-ROADMAP.md)
+- ✅ **v1.2 User Options & BYOK** — Phases 9-15 + 999.1/999.2 (shipped 2026-07-11) — [archive](milestones/v1.2-ROADMAP.md)
+- 📋 **Next milestone** — not yet scoped (`/gsd:new-milestone`)
 
-### Phase 15: Options UI Capstone + Demo Gating
+## Phases
 
-**Goal:** Close out v1.2: key-gated model selection (picking a model with no key triggers OAuth connect), favorite/pin models, demo-fallback flag decision + non-dismissible demo banner (gated on the 999.2 SEC-03 PASS finding), and the picker polish the audit flagged — render popular marking (B-1/MODEL-03) and add catalog search (W-1/MODEL-01).
-**Requirements**: KEY-05, MODEL-08, DEMO-01, DEMO-02, SEC-03 (+ audit fold-ins: MODEL-03 render seam, MODEL-01 search)
-**Depends on:** Phase 14, Phase 999.2 (SEC-03 finding: .planning/phases/999.2-cost-guardrail-burn-script/999.2-SEC-03-FINDING.md)
-**Plans:** 10/10 plans complete
+<details>
+<summary>✅ v1.2 User Options & BYOK (Phases 9-15 + 999.1/999.2) — SHIPPED 2026-07-11</summary>
 
-Plans:
-**Wave 1**
+- [x] Phase 9: Crypto + Encrypted Key Storage Foundation (3/3 plans)
+- [x] Phase 10: OAuth PKCE Backend Exchange + Frontend Connect (4/4 plans)
+- [x] Phase 11: Per-Request Key + Model Resolution Chat-Loop Seam (6/6 plans) — completed 2026-07-11 (SEC-01 prod gates)
+- [x] Phase 12: Model Cache + Catalog (4/4 plans) — completed 2026-06-23
+- [x] Phase 13: Preferences + Per-Thread Model (6/6 plans)
+- [x] Phase 14: Usage/Cost Display + Settings Key-State UX (5/5 plans)
+- [x] Phase 15: Options UI Capstone + Demo Gating (10/10 plans) — completed 2026-07-09
+- [x] Phase 999.1: Chat Empty-State UX (3/3 plans) (INSERTED from backlog)
+- [x] Phase 999.2: Cost Guardrail Burn Script (2/2 plans) (INSERTED from backlog — SEC-03 gate for Phase 15)
 
-- [x] 15-01-PLAN.md — Migration 033 + schema fields + favorite_models roundtrip + demo_enabled in both status branches + [BLOCKING] dev db push (wave 1)
-- [x] 15-02-PLAN.md — chat.py demo resolution: _demo_model_for free-guard + flag-gated use_demo override, SEC-03 killswitch tests pinned green (wave 1)
-- [x] 15-03-PLAN.md — OAuthCallbackPage one-shot pending-selection resume + combined toasts + new page test file (wave 1)
+Full phase details: [milestones/v1.2-ROADMAP.md](milestones/v1.2-ROADMAP.md)
 
-**Wave 2** *(blocked on Wave 1 completion)*
+</details>
 
-- [x] 15-04-PLAN.md — Picker rebuild: hand-rolled fuzzy matcher, Favorites/Popular/All sections, Popular chip (B-1), search + combobox a11y migration (W-1) (wave 2)
-- [x] 15-05-PLAN.md — useKeyGate shared gate + ConfirmDialog primary variant + both-surface wiring + stale-stash hygiene (KEY-05) (wave 2)
+<details>
+<summary>✅ v1.1 Portfolio Deployment (Phases 1-8 + 6.1) — SHIPPED 2026-05-20</summary>
 
-**Wave 3** *(blocked on Wave 2 completion)*
+See [milestones/v1.1-ROADMAP.md](milestones/v1.1-ROADMAP.md)
 
-- [x] 15-06-PLAN.md — Favorite star + optimistic whole-array PUT persistence + Shift+Enter (MODEL-08) (wave 3)
-- [x] 15-07-PLAN.md — Demo banner (locked copy, non-dismissible) + mode:"demo" signal read + [Use demo] 403 recovery wiring (wave 3)
+</details>
 
-**Wave 4** *(blocked on Wave 3 completion)*
+<details>
+<summary>✅ v1.0 KB Navigation & Agentic RAG (Phases 1-7) — SHIPPED 2026-04-23</summary>
 
-- [x] 15-08-PLAN.md — Human-gated prod deploy: migrations 029-033, LLM_API_KEY verify, DEMO_FALLBACK_ENABLED=true, live smoke (autonomous: false) (wave 4)
+See [milestones/v1.0-ROADMAP.md](milestones/v1.0-ROADMAP.md)
 
-**Gap Closure** *(from 15-VERIFICATION.md — CR-01, CR-02)*
+</details>
 
-- [x] 15-09-PLAN.md — CR-01 fix: free-guard the deprecated-pin override in demo mode (_deprecated_pin_default_model) + regression test + [BLOCKING] prod backend redeploy (SEC-03, DEMO-01; autonomous: false)
-- [x] 15-10-PLAN.md — CR-02 fix: ModelSelector effectiveState derivation so a late catalog prop unlocks the settings panel + late-arrival test (KEY-05, MODEL-08, MODEL-01, MODEL-03)
+## Progress
+
+| Phase | Milestone | Plans Complete | Status | Completed |
+| ----- | --------- | -------------- | ------ | --------- |
+| 9. Crypto + Key Storage | v1.2 | 3/3 | Complete | 2026-06 |
+| 10. OAuth PKCE Connect | v1.2 | 4/4 | Complete | 2026-06 |
+| 11. Per-Request Resolution Seam | v1.2 | 6/6 | Complete | 2026-07-11 |
+| 12. Model Cache + Catalog | v1.2 | 4/4 | Complete | 2026-06-23 |
+| 13. Preferences + Per-Thread Model | v1.2 | 6/6 | Complete | 2026-07 |
+| 14. Usage/Cost + Settings UX | v1.2 | 5/5 | Complete | 2026-07 |
+| 15. Options UI Capstone + Demo Gating | v1.2 | 10/10 | Complete | 2026-07-09 |
+| 999.1 Chat Empty-State UX | v1.2 | 3/3 | Complete | 2026-06 |
+| 999.2 Cost Guardrail Burn Script | v1.2 | 2/2 | Complete | 2026-07 |
+
+Next milestone phases will be added by `/gsd:new-milestone`.
