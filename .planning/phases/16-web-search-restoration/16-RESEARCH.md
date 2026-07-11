@@ -376,17 +376,19 @@ Not applicable — this is a fix + config + verification phase, not a rename/ref
 | A2 | Substring `'"error"' in tool_result` reliably flags tool failures | Code Examples (D-03) | Low — all tools serialize an `"error"` key on failure; a `json.loads(...).get("error")` classifier removes even this small risk |
 | A3 | Fly restarts the machine on `secrets set`, re-reading `@lru_cache` settings | Pitfall 4 / Env Availability | Low — standard Fly behavior; executor confirms `web_search_enabled` live before UAT |
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **How should the agent's "couldn't reach the web" acknowledgement be triggered (D-03 discretion)?**
    - What we know: the LLM already receives the `{"error": ...}` in the tool message, so it *can* narrate the failure without extra plumbing.
    - What's unclear: whether prompt reliability needs an explicit system-prompt nudge ("if a tool returns an error, briefly tell the user, then answer best-effort").
    - Recommendation: add a one-sentence nudge to `system_prompt` for reliability; rely on the existing error-in-tool-result payload for the mechanism (no separate injection).
+   - **RESOLVED:** Plan 16-02 T2 adds the one-sentence system-prompt error-ack nudge; mechanism stays the existing error-in-tool-result payload (no separate injection).
 
 2. **Should 401/429/432/433 be mapped to friendlier error text?**
    - What we know: all collapse to `str(e)` today; graceful degradation still works.
    - What's unclear: whether the vague message is acceptable for the tool card + agent note.
    - Recommendation: optional status-code mapping (Pitfall 3); not required by any REQ. Planner's call on scope.
+   - **RESOLVED:** Deliberately omitted — not required by any WSRCH requirement; CONTEXT D-03 leaves it to planner discretion. Left for a future enhancement if desired.
 
 ## Environment Availability
 

@@ -18,7 +18,7 @@ created: 2026-07-11
 
 | Property | Value |
 |----------|-------|
-| **Framework** | pytest + pytest-asyncio (backend); vitest + Testing Library (frontend) |
+| **Framework** | pytest + pytest-asyncio (backend). Frontend: no test runner installed — verification is `npm run build` (tsc + vite) + manual browser smoke (16-04). |
 | **Config file** | backend: `backend/tests/conftest.py`; frontend: vitest config in `frontend/` |
 | **Quick run command** | `cd backend && venv/Scripts/python -m pytest tests/test_web_search.py -q` |
 | **Full suite command** | `cd backend && venv/Scripts/python -m pytest -q` |
