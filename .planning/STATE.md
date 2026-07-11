@@ -2,9 +2,10 @@
 gsd_state_version: 1.0
 milestone: v1.3
 milestone_name: Web Search & Agent Personas
-status: roadmap
-last_updated: "2026-07-11T00:00:00.000Z"
-last_activity: 2026-07-11
+status: planning
+stopped_at: Phase 16 context gathered
+last_updated: "2026-07-11T16:38:32.224Z"
+last_activity: 2026-07-11 — v1.3 roadmap created (Phases 16-17, 10/10 requirements mapped)
 progress:
   total_phases: 2
   completed_phases: 0
@@ -38,6 +39,7 @@ Progress: [░░░░░░░░░░] 0%
 v1.2 decisions promoted to PROJECT.md Key Decisions table at milestone close (2026-07-11). Full log there.
 
 Recent decisions affecting v1.3 work:
+
 - [v1.3 roadmap]: Phase 16 is a fix + prod-verify of the existing `web_search` tool (not greenfield) — likely Tavily Bearer-auth vs `api_key`-in-body and/or unset key.
 - [v1.3 roadmap]: Phase 17 personas reuse the v1.2 model-pin infra — `user_preferences` default + per-thread column (migration 032 pattern), the per-request resolution seam in `chat.py`/`llm_service.stream_chat_completion`, and the `ModelSelector`/`DefaultModelSelector` UI. Predefined personas only.
 
@@ -70,7 +72,7 @@ Items acknowledged and deferred at v1.2 milestone close on 2026-07-11:
 
 ## Session Continuity
 
-Last session: 2026-07-11
-Stopped at: v1.3 roadmap created — ROADMAP.md continued (Phases 16-17), STATE.md updated, REQUIREMENTS.md traceability confirmed
-Resume file: None
+Last session: 2026-07-11T16:38:32.218Z
+Stopped at: Phase 16 context gathered
+Resume file: .planning/phases/16-web-search-restoration/16-CONTEXT.md
 Next: `/gsd:plan-phase 16` to plan Web Search Restoration
