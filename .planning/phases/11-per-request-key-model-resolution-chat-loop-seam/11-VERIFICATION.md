@@ -1,9 +1,14 @@
 ---
 phase: 11-per-request-key-model-resolution-chat-loop-seam
-verified: 2026-07-10T18:35:00Z
-status: human_needed
-score: 14/14 must-haves verified (automated) — 2 MANDATORY live SEC-01 gates pending human confirmation after prod redeploy
+verified: 2026-07-11T04:30:00Z
+status: passed
+score: 14/14 must-haves verified (automated) + 2/2 MANDATORY live SEC-01 gates confirmed by human on prod (2026-07-11)
 overrides_applied: 0
+human_gate_results:
+  - gate: "SEC-01 (a) prod-LangSmith zero-run for BYOK turn (re-run of the 2026-07-09 FAILED gate)"
+    result: PASSED 2026-07-11 — prod v32 (post 11-05/11-06 + CR-01..WR-06 fix pass, migration 034 applied to prod). BYOK "hi" + KB tool turn produced zero LangSmith runs; control owner/demo turn (key disconnected, same thread) produced exactly one chat_send_message trace as expected. Noted: the demo turn's traced Input legitimately contains prior BYOK thread messages as stateless-completions history — inherent to history tracing, not a gate leak; hardening idea recorded in 11-HUMAN-UAT.md.
+  - gate: "SEC-01 (b) live exc_info traceback at Fly log sink"
+    result: PASSED 2026-07-11 — provisioned key revoked at OpenRouter, BYOK turn forced openai.AuthenticationError 401; full traceback logged at the Fly sink with ZERO sk-or- occurrences. Note: this error path carries no key text in the exception, so [redacted-key] did not appear because nothing required redaction; live sink confirmed key-free, filter trigger remains covered in-process (test_logging_filter_scrubs_exc_info).
 re_verification:
   previous_status: human_needed
   previous_score: 4/4 (automated) — 2 MANDATORY manual SEC-01 gates pending
@@ -29,8 +34,8 @@ human_verification:
 # Phase 11: Per-Request Key + Model Resolution (chat-loop seam) — Re-Verification Report
 
 **Phase Goal:** Every chat turn resolves the correct key and model per request — the user's own key when connected, a gated owner-key fallback only when explicitly enabled, and a clean fail-closed refusal otherwise — with no cross-user key bleed and no secret leaking into observability.
-**Verified:** 2026-07-10T18:35:00Z
-**Status:** human_needed
+**Verified:** 2026-07-11T04:30:00Z (human gates confirmed on prod)
+**Status:** passed
 **Re-verification:** Yes — after gap-closure plans 11-05 (SEC-01 a run-layer gate) and 11-06 (runtime LangSmith master toggle), created to close the SEC-01 (a) BYOK LangSmith leak found by the 2026-07-09 human run of the MANDATORY gates (11-HUMAN-UAT.md, severity blocker).
 
 ## Goal Achievement
