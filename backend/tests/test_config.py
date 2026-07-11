@@ -116,3 +116,34 @@ def test_model_cache_ttl_env_override(monkeypatch):
     from config import Settings
     s = Settings()
     assert s.model_cache_ttl_seconds == 0
+
+
+# ---------------------------------------------------------------------
+# Phase 16 WSRCH-02 / D-04: web_search_depth config + tvly- scrub (RED until 16-02)
+# ---------------------------------------------------------------------
+
+
+def test_web_search_depth_default():
+    """Settings.web_search_depth defaults to 'basic' (D-04). RED — the field does not
+    exist yet (added by plan 16-02 Task 1); accessing it raises AttributeError."""
+    from config import Settings
+    s = Settings()
+    assert s.web_search_depth == "basic"
+
+
+def test_web_search_depth_env_override(monkeypatch):
+    """WEB_SEARCH_DEPTH env var overrides default (owner can raise to 'advanced'
+    without a code change)."""
+    monkeypatch.setenv("WEB_SEARCH_DEPTH", "advanced")
+    from config import Settings
+    s = Settings()
+    assert s.web_search_depth == "advanced"
+
+
+def test_scrub_secrets_redacts_tavily():
+    """scrub_secrets redacts a tvly- prefixed Tavily key to [redacted-key] (Phase 16
+    security). RED — log_scrub only matches sk-or- today, so tvly- passes through."""
+    from services.log_scrub import scrub_secrets
+    out = scrub_secrets("err tvly-ABC123def_-")
+    assert "tvly-" not in out
+    assert "[redacted-key]" in out
