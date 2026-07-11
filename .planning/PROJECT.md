@@ -8,6 +8,16 @@ An agentic RAG application specialized for board games. It combines a pre-seeded
 
 The agent can intelligently search and reason across a structured board game knowledge base — finding rules, comparing mechanics, and recommending games — using the right tool for the job, transparently.
 
+## Current Milestone: v1.3 Web Search & Agent Personas
+
+**Goal:** Restore the web search tool and let users switch the chat agent persona (board-game expert ↔ general assistant), both retaining full tool access.
+
+**Target features:**
+- Fix/restore the web search tool (Tavily Bearer-auth update, ensure the tool surfaces when configured, prod-verify)
+- Predefined agent personas — a curated set including the current expert plus a vanilla general assistant, all tool-enabled
+- Per-thread persona pin + user-level default persona (mirrors the v1.2 model-pin infrastructure)
+- Persona picker UI + settings-page default (mirrors the model picker)
+
 ## Requirements
 
 ### Validated
@@ -88,7 +98,12 @@ The agent can intelligently search and reason across a structured board game kno
 
 ### Active
 
-(None — next milestone not yet scoped. Define via `/gsd:new-milestone`.)
+**v1.3 Web Search & Agent Personas (scoping — REQ-IDs in REQUIREMENTS.md):**
+
+- Web search tool restored and prod-verified (Tavily current auth)
+- Predefined agent personas (expert + general assistant, tool-enabled)
+- Per-thread persona pin + user-level default persona
+- Persona picker UI + settings-page default
 
 ### Out of Scope
 
@@ -180,7 +195,7 @@ This document evolves at phase transitions and milestone boundaries.
 - Pre-existing: `test_record_manager.py` fixture debt; `execute_readonly_query` 42501 SET LOCAL quirk (D-09-A); free-model provider 429s make live smokes flaky (D-999.1-LLM-A).
 - Orphaned capability: `GET /api/models?free_only=true` has no frontend consumer.
 
-**Next milestone:** not yet scoped — run `/gsd:new-milestone`.
+**Next milestone:** v1.3 Web Search & Agent Personas — scoping in progress (requirements → roadmap). Phases 16-17.
 
 ---
-*Last updated: 2026-07-11 after v1.2 milestone*
+*Last updated: 2026-07-11 — v1.3 milestone scoping started*

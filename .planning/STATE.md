@@ -1,17 +1,16 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.2
-milestone_name: User Options & BYOK
-status: Awaiting next milestone
-stopped_at: "v1.2 shipped 2026-07-11 — archived, tagged"
-last_updated: "2026-07-11T04:45:00.000Z"
-last_activity: 2026-07-11 — Milestone v1.2 completed and archived
+milestone: v1.3
+milestone_name: Web Search & Agent Personas
+status: planning
+last_updated: "2026-07-11T05:07:09.384Z"
+last_activity: 2026-07-11
 progress:
-  total_phases: 9
-  completed_phases: 9
-  total_plans: 43
-  completed_plans: 43
-  percent: 100
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
 
 # Project State
@@ -25,10 +24,10 @@ See: .planning/PROJECT.md (updated 2026-07-11 after v1.2 completion)
 
 ## Current Position
 
-Phase: Milestone v1.2 complete (9/9 phases, 43/43 plans, 26/26 requirements)
+Phase: Not started (defining requirements)
 Plan: —
-Status: Awaiting next milestone
-Last activity: 2026-07-11 — Milestone v1.2 completed and archived
+Status: Defining requirements
+Last activity: 2026-07-11 — Milestone v1.3 started
 
 ## Deferred Items
 
