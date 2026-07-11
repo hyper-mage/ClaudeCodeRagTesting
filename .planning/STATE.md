@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: User Options & BYOK
-status: executing
-stopped_at: "15-09 COMPLETE — CR-01 fixed + verified live in prod (approved-with-caveat: free-provider 429)"
-last_updated: "2026-07-10T12:30:05.818Z"
+status: ready_to_plan
+stopped_at: Phase 11 complete (6/6) — ready to discuss Phase 12
+last_updated: 2026-07-11T04:22:52.029Z
 last_activity: 2026-07-10 -- Phase 11 execution started
 progress:
   total_phases: 1
   completed_phases: 1
   total_plans: 10
-  completed_plans: 10
+  completed_plans: 43
   percent: 100
 ---
 
@@ -21,15 +21,15 @@ progress:
 See: .planning/PROJECT.md (updated 2026-05-20 after v1.1 completion)
 
 **Core value:** The agent can intelligently search and reason across a structured board game knowledge base -- finding rules, comparing mechanics, and recommending games -- using the right tool for the job, transparently.
-**Current focus:** Phase 11 — per-request-key-model-resolution-chat-loop-seam
+**Current focus:** Phase 12 — model cache catalog
 
 ## Current Position
 
-Phase: 11 (per-request-key-model-resolution-chat-loop-seam) — EXECUTING
-Plan: 1 of 6
-Status: Executing Phase 11
+Phase: 12
+Plan: Not started
+Status: Ready to plan
 Progress: [██████████] 100%
-Last activity: 2026-07-10 -- Phase 11 execution started
+Last activity: 2026-07-11
 
 ## Performance Metrics
 

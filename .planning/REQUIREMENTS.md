@@ -37,7 +37,7 @@ Requirements for this milestone. Each maps to a roadmap phase (continues numberi
 
 - [x] **DEMO-01**: Owner can enable/disable an owner-key demo fallback via a global flag (default OFF)
 - [x] **DEMO-02**: When demo fallback is active for a user, a clear, non-dismissible "demo mode" banner is shown
-- [ ] **DEMO-03**: When the user has no key and demo is off, chat refuses with a connect-key prompt (fail-closed)
+- [x] **DEMO-03**: When the user has no key and demo is off, chat refuses with a connect-key prompt (fail-closed)
 
 ### Preferences & UI (PREF)
 
@@ -48,10 +48,10 @@ Requirements for this milestone. Each maps to a roadmap phase (continues numberi
 
 Cross-cutting release blockers — secret custody is the milestone's defining risk.
 
-- [ ] **SEC-01**: User OpenRouter keys never appear in LangSmith traces, Sentry events, logs, or SSE error payloads
+- [x] **SEC-01**: User OpenRouter keys never appear in LangSmith traces, Sentry events, logs, or SSE error payloads
 - [x] **SEC-02**: The Text-to-SQL tool cannot read the user-keys table (secret column REVOKE'd from the `authenticated` role + RPC table allowlist)
 - [x] **SEC-03**: Owner-key cost exposure is bounded before demo fallback is enabled in prod (SEC-06 cost guardrail / backlog 999.2 verified with a real trip-test + kill switch)
-- [ ] **SEC-04**: Concurrent requests from different users never share a key or model (per-request client, no cross-user bleed)
+- [x] **SEC-04**: Concurrent requests from different users never share a key or model (per-request client, no cross-user bleed)
 
 ## Future Requirements
 
@@ -107,13 +107,13 @@ Each requirement maps to exactly one phase. Phases continue numbering from v1.1 
 | COST-04 | Phase 14 | Complete |
 | DEMO-01 | Phase 15 | Complete |
 | DEMO-02 | Phase 15 | Complete |
-| DEMO-03 | Phase 11 | Pending |
+| DEMO-03 | Phase 11 | Complete |
 | PREF-01 | Phase 14 | Complete |
 | PREF-02 | Phase 13 | Complete |
-| SEC-01 | Phase 11 | Pending |
+| SEC-01 | Phase 11 | Complete |
 | SEC-02 | Phase 9 | Complete |
 | SEC-03 | Phase 15 | Complete |
-| SEC-04 | Phase 11 | Pending |
+| SEC-04 | Phase 11 | Complete |
 
 **Coverage:**
 - v1.2 requirements: 26 total
