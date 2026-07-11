@@ -52,7 +52,7 @@ Explicitly excluded. Documented to prevent scope creep.
 
 ## Traceability
 
-Which phases cover which requirements. Updated during roadmap creation.
+Which phases cover which requirements. Set during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
@@ -74,4 +74,4 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 ---
 *Requirements defined: 2026-07-11*
-*Last updated: 2026-07-11 after initial definition*
+*Last updated: 2026-07-11 — traceability confirmed at roadmap creation (Phases 16-17)*
