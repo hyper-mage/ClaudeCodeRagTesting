@@ -730,12 +730,20 @@ def execute_tool(
             return json.dumps({"tool": "search_documents", "error": str(e)})
 
     elif fn_name == "query_database":
-        result = execute_sql(user_id=user_id, query=fn_args["sql"])
-        return json.dumps({"tool": "query_database", **result})
+        try:
+            result = execute_sql(user_id=user_id, query=fn_args["sql"])
+            return json.dumps({"tool": "query_database", **result})
+        except Exception as e:
+            logger.error(f"query_database failed: {e}", exc_info=True)
+            return json.dumps({"tool": "query_database", "error": str(e)})
 
     elif fn_name == "web_search":
-        result = search_web(query=fn_args["query"])
-        return json.dumps({"tool": "web_search", **result})
+        try:
+            result = search_web(query=fn_args["query"])
+            return json.dumps({"tool": "web_search", **result})
+        except Exception as e:
+            logger.error(f"web_search failed: {e}", exc_info=True)
+            return json.dumps({"tool": "web_search", "error": str(e)})
 
     elif fn_name == "kb_ls":
         try:
