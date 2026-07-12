@@ -18,7 +18,7 @@ export interface ToolEvent {
   output?: string
   call_id?: string
   subagent?: boolean
-  status: 'running' | 'complete'
+  status: 'running' | 'complete' | 'error'
   subEvents?: SubEvent[]
 }
 
@@ -212,7 +212,10 @@ export function useChat(threadId: string | null) {
                         ...m,
                         toolsUsed: (m.toolsUsed || []).map(t =>
                           t.call_id === parsed.call_id
-                            ? { ...t, status: 'complete' as const, output: parsed.output }
+                            // Map the backend is_error flag (plan 16-02 Task 3) to the failed-state.
+                            // Missing/false is_error → 'complete', so loaded history and successful
+                            // calls (and pre-16-02 payloads) are unaffected.
+                            ? { ...t, status: (parsed.is_error ? 'error' : 'complete') as ToolEvent['status'], output: parsed.output }
                             : t
                         ),
                       }
