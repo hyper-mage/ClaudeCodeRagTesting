@@ -13,7 +13,7 @@
 
 **Milestone Goal:** Restore the agent's web search tool end-to-end (prod-verified) and let users switch the chat agent persona per-thread — board-game expert (default) ↔ general assistant — with a user-level default, all personas retaining full tool access.
 
-- [ ] **Phase 16: Web Search Restoration** — Fix and prod-verify the `web_search` tool (current Tavily auth), with cited sources and graceful failure
+- [x] **Phase 16: Web Search Restoration** — Fix and prod-verify the `web_search` tool (current Tavily auth), with cited sources and graceful failure ✓ 2026-07-12
 - [ ] **Phase 17: Agent Personas** — Predefined per-thread persona pin + user-level default, applied per request with no cross-user/thread bleed
 
 <details>
