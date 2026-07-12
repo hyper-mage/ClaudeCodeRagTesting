@@ -81,12 +81,22 @@ _install_scrub_filter()
 def tool_result_is_error(tool_result: str) -> bool:
     """Pure classifier: does a tool-result JSON string represent a failed tool call?
 
-    Every tool error path serializes an `"error"` key (search_web, execute_tool,
-    explore_kb/analyze_document fallbacks), so a substring check is sufficient and
-    side-effect-free. This is the ONE seam shared by the tool_result SSE emit
-    (drives is_error + status) and the plan 16-01 unit test (WSRCH-04 / D-03).
+    Classifies STRUCTURALLY, not by substring: parse the JSON and return True only
+    when the payload is an object carrying a top-level `"error"` key. The prior
+    substring test (`'"error"' in tool_result`) produced both false negatives
+    (explore_kb's failure fallback serialized no `"error"` key, so a genuinely failed
+    exploration rendered a green check) and false positives (a successful
+    query_database result whose cell value or column alias is literally `error`
+    flipped the card red). Every tool error path serializes a top-level `"error"`
+    key (search_web, execute_tool, explore_kb/analyze_document fallbacks). This is the
+    ONE seam shared by the tool_result SSE emit (drives is_error + status) and the
+    plan 16-01 unit test (WSRCH-04 / D-03).
     """
-    return '"error"' in tool_result
+    try:
+        obj = json.loads(tool_result)
+    except (ValueError, TypeError):
+        return False
+    return isinstance(obj, dict) and "error" in obj
 
 
 def _sse_error(code: str, detail: str) -> dict:
@@ -1171,6 +1181,10 @@ async def send_message(
                                                 "tools_used": [],
                                                 "iterations": 0,
                                                 "budget_exhausted": True,
+                                                # WR-01: carry an explicit top-level "error" key so the
+                                                # structural tool_result_is_error classifier renders the
+                                                # red failed-state card (matching analyze_document's fallback).
+                                                "error": f"Explorer failed: {sub_ev['error']}",
                                             }
                                             continue
                                         # sub_iteration / sub_tool_start / sub_tool_result -> SSE sub_event row
@@ -1194,6 +1208,9 @@ async def send_message(
                                             "tools_used": [],
                                             "iterations": 0,
                                             "budget_exhausted": True,
+                                            # WR-01: a run that finished without emitting a result is also a
+                                            # failed exploration — carry "error" so it renders the red card.
+                                            "error": "Explorer produced no result.",
                                         }
                                     tool_result = json.dumps({"tool": "explore_kb", **final_result_dict})
                                 elif fn_name == "analyze_document":
