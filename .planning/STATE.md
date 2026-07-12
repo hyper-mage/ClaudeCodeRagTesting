@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.3
 milestone_name: Web Search & Agent Personas
-status: ready_to_plan
-stopped_at: Phase 16 complete (4/4) — ready to discuss Phase 17
-last_updated: 2026-07-12T17:40:48.158Z
+status: planning
+stopped_at: Phase 17 context gathered
+last_updated: "2026-07-12T21:26:02.417Z"
 last_activity: 2026-07-12
 progress:
   total_phases: 2
-  completed_phases: 0
+  completed_phases: 1
   total_plans: 4
   completed_plans: 4
-  percent: 0
+  percent: 50
 ---
 
 # Project State
@@ -77,7 +77,7 @@ Items acknowledged and deferred at v1.2 milestone close on 2026-07-11:
 
 ## Session Continuity
 
-Last session: 2026-07-12T00:17:44.554Z
-Stopped at: Completed 16-03-PLAN.md (frontend failed-state render)
-Resume file: None
+Last session: 2026-07-12T21:26:02.408Z
+Stopped at: Phase 17 context gathered
+Resume file: .planning/phases/17-agent-personas/17-CONTEXT.md
 Next: `/gsd:plan-phase 16` to plan Web Search Restoration
