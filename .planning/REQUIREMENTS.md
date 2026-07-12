@@ -10,10 +10,10 @@ Requirements for the v1.3 milestone. Each maps to a roadmap phase.
 
 ### Web Search (WSRCH)
 
-- [ ] **WSRCH-01**: User gets answers grounded in current web information via the agent's `web_search` tool (restored end-to-end)
-- [ ] **WSRCH-02**: The `web_search` tool is exposed to the agent when a search provider is configured, and is cleanly absent / fail-closed when it is not
-- [ ] **WSRCH-03**: The agent cites source URLs from web search results in its response
-- [ ] **WSRCH-04**: Web search failures return a graceful error to the agent (no turn crash) and are logged
+- [x] **WSRCH-01**: User gets answers grounded in current web information via the agent's `web_search` tool (restored end-to-end)
+- [x] **WSRCH-02**: The `web_search` tool is exposed to the agent when a search provider is configured, and is cleanly absent / fail-closed when it is not
+- [x] **WSRCH-03**: The agent cites source URLs from web search results in its response
+- [x] **WSRCH-04**: Web search failures return a graceful error to the agent (no turn crash) and are logged
 
 ### Agent Personas (PERS)
 
@@ -56,10 +56,10 @@ Which phases cover which requirements. Set during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| WSRCH-01 | Phase 16 | Pending |
-| WSRCH-02 | Phase 16 | Pending |
-| WSRCH-03 | Phase 16 | Pending |
-| WSRCH-04 | Phase 16 | Pending |
+| WSRCH-01 | Phase 16 | Complete |
+| WSRCH-02 | Phase 16 | Complete |
+| WSRCH-03 | Phase 16 | Complete |
+| WSRCH-04 | Phase 16 | Complete |
 | PERS-01 | Phase 17 | Pending |
 | PERS-02 | Phase 17 | Pending |
 | PERS-03 | Phase 17 | Pending |

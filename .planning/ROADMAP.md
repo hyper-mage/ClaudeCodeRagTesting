@@ -61,7 +61,7 @@ See [milestones/v1.0-ROADMAP.md](milestones/v1.0-ROADMAP.md)
   5. Web search is verified working against the production search-provider key on the live prod deployment.
 **Plans**: 4 plans (4 waves — sequential: tests → backend → frontend → prod verify)
 - [x] 16-01-PLAN.md — Wave 0 test scaffold: test_web_search.py + test_config.py depth/scrub tests (RED)
-- [ ] 16-02-PLAN.md — Backend restore: Bearer-auth transport + web_search_depth + D-01/D-02 prompts + is_error SSE flag + tvly- scrub
+- [x] 16-02-PLAN.md — Backend restore: Bearer-auth transport + web_search_depth + D-01/D-02 prompts + is_error SSE flag + tvly- scrub
 - [ ] 16-03-PLAN.md — Frontend failed-state card: ToolEvent 'error' status + red ToolCallCard branch (depends on 16-02 SSE flag)
 - [ ] 16-04-PLAN.md — Live prod verify (SC-5): deploy + Fly secret + success/failure smokes (checkpoint, autonomous:false)
 
@@ -94,5 +94,5 @@ Phases execute in numeric order: 16 → 17
 | 15. Options UI Capstone + Demo Gating | v1.2 | 10/10 | Complete | 2026-07-09 |
 | 999.1 Chat Empty-State UX | v1.2 | 3/3 | Complete | 2026-06 |
 | 999.2 Cost Guardrail Burn Script | v1.2 | 2/2 | Complete | 2026-07 |
-| 16. Web Search Restoration | v1.3 | 1/4 | In Progress|  |
+| 16. Web Search Restoration | v1.3 | 2/4 | In Progress|  |
 | 17. Agent Personas | v1.3 | 0/TBD | Not started | - |
