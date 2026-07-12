@@ -100,7 +100,7 @@ The agent can intelligently search and reason across a structured board game kno
 
 **v1.3 Web Search & Agent Personas (scoping — REQ-IDs in REQUIREMENTS.md):**
 
-- Web search tool restored and prod-verified (Tavily current auth)
+- ~~Web search tool restored and prod-verified (Tavily current auth)~~ ✓ Validated in Phase 16 (2026-07-12)
 - Predefined agent personas (expert + general assistant, tool-enabled)
 - Per-thread persona pin + user-level default persona
 - Persona picker UI + settings-page default
@@ -195,7 +195,7 @@ This document evolves at phase transitions and milestone boundaries.
 - Pre-existing: `test_record_manager.py` fixture debt; `execute_readonly_query` 42501 SET LOCAL quirk (D-09-A); free-model provider 429s make live smokes flaky (D-999.1-LLM-A).
 - Orphaned capability: `GET /api/models?free_only=true` has no frontend consumer.
 
-**Next milestone:** v1.3 Web Search & Agent Personas — scoping in progress (requirements → roadmap). Phases 16-17.
+**Current milestone:** v1.3 Web Search & Agent Personas — Phase 16 (Web Search Restoration) complete + prod-verified 2026-07-12 (4 plans; Tavily Bearer-auth transport fixed, env-configurable search depth, D-02 citations, red failed-state tool card, `tvly-` scrub; live smoke on boardgame-rag-prod v36). Phase 17 (Agent Personas) next.
 
 ---
-*Last updated: 2026-07-11 — v1.3 milestone scoping started*
+*Last updated: 2026-07-12 — Phase 16 Web Search Restoration complete*
