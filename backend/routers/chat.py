@@ -78,6 +78,17 @@ def _install_scrub_filter() -> None:
 _install_scrub_filter()
 
 
+def tool_result_is_error(tool_result: str) -> bool:
+    """Pure classifier: does a tool-result JSON string represent a failed tool call?
+
+    Every tool error path serializes an `"error"` key (search_web, execute_tool,
+    explore_kb/analyze_document fallbacks), so a substring check is sufficient and
+    side-effect-free. This is the ONE seam shared by the tool_result SSE emit
+    (drives is_error + status) and the plan 16-01 unit test (WSRCH-04 / D-03).
+    """
+    return '"error"' in tool_result
+
+
 def _sse_error(code: str, detail: str) -> dict:
     """Build a structured SSE error event (D-12 / Example 1).
 
@@ -1271,7 +1282,8 @@ async def send_message(
 
                                 # Update accumulated tool entry with result
                                 tool_output_preview = tool_result[:2000] if len(tool_result) > 2000 else tool_result
-                                tool_entry["status"] = "complete"
+                                _is_error = tool_result_is_error(tool_result)
+                                tool_entry["status"] = "error" if _is_error else "complete"
                                 tool_entry["output"] = tool_output_preview
 
                                 # Persist tool events incrementally
@@ -1288,6 +1300,7 @@ async def send_message(
                                         "tool": fn_name,
                                         "call_id": tc["id"],
                                         "output": tool_output_preview,
+                                        "is_error": _is_error,
                                         **({"subagent": True} if is_subagent else {}),
                                     }),
                                 }

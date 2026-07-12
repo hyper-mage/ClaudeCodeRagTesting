@@ -14,13 +14,19 @@ import re
 # Compiled once at module scope (mirror the FE OR_KEY constant).
 _OR_KEY = re.compile(r"sk-or-[A-Za-z0-9_-]+")
 
+# Phase 16 security: Tavily owner key (`tvly-…`) — redacted alongside sk-or- as
+# defense-in-depth for the exc_info log path (the key rides the Authorization
+# header only, never str(e), but the whole-process _ScrubFilter covers it too).
+_TAVILY_KEY = re.compile(r"tvly-[A-Za-z0-9_-]+")
+
 
 def scrub_secrets(s: str) -> str:
-    """Redact OpenRouter `sk-or-…` keys to `[redacted-key]`.
+    """Redact OpenRouter `sk-or-…` and Tavily `tvly-…` keys to `[redacted-key]`.
 
     Non-str values pass through unchanged so this is safe to apply blindly to
     arbitrary log/SSE fields (mirrors the sentry.ts `scrub` helper).
     """
     if not isinstance(s, str):
         return s
-    return _OR_KEY.sub("[redacted-key]", s)
+    s = _OR_KEY.sub("[redacted-key]", s)
+    return _TAVILY_KEY.sub("[redacted-key]", s)
