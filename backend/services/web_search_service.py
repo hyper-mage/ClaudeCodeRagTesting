@@ -23,12 +23,12 @@ def _search_tavily(query: str, settings) -> dict:
     try:
         response = httpx.post(
             "https://api.tavily.com/search",
+            headers={"Authorization": f"Bearer {settings.web_search_api_key}"},
             json={
-                "api_key": settings.web_search_api_key,
                 "query": query,
                 "max_results": settings.web_search_max_results,
                 "include_answer": True,
-                "search_depth": "basic",
+                "search_depth": settings.web_search_depth,
             },
             timeout=30,
         )

@@ -129,6 +129,7 @@ class Settings(BaseSettings):
     web_search_provider: str = "tavily"
     web_search_api_key: str = ""
     web_search_max_results: int = 5
+    web_search_depth: str = "basic"  # Tavily search depth: "basic"|"advanced"|"fast"|"ultra-fast" (env: WEB_SEARCH_DEPTH)
 
     # Sub-agent
     subagent_system_prompt: str = (
