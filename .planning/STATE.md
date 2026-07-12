@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.3
 milestone_name: Web Search & Agent Personas
 status: executing
-stopped_at: Completed 16-01-PLAN.md (RED scaffold)
-last_updated: "2026-07-12T00:11:20.067Z"
+stopped_at: Completed 16-03-PLAN.md (frontend failed-state render)
+last_updated: "2026-07-12T00:17:44.562Z"
 last_activity: 2026-07-12
 progress:
   total_phases: 2
   completed_phases: 0
   total_plans: 4
-  completed_plans: 2
+  completed_plans: 3
   percent: 0
 ---
 
@@ -26,11 +26,11 @@ See: .planning/PROJECT.md (updated 2026-07-11 after v1.2 completion)
 ## Current Position
 
 Phase: 16 (web-search-restoration) — EXECUTING
-Plan: 3 of 4
+Plan: 4 of 4
 Status: Ready to execute
 Last activity: 2026-07-12
 
-Progress: [█████░░░░░] 50%
+Progress: [████████░░] 75%
 
 ## Accumulated Context
 
@@ -45,6 +45,8 @@ Recent decisions affecting v1.3 work:
 - [Phase 16]: 16-01 is a Wave 0 RED test scaffold: WSRCH-01..04 pinned by failing tests (test_web_search.py + test_config.py); no production code touched — 16-02 turns them GREEN. Requirement traceability stays Pending until 16-02.
 - [Phase ?]: [Phase 16]: 16-02 turned the 16-01 RED baseline GREEN — Tavily is header-only Bearer auth (body api_key deleted), search_depth is env-configurable (WEB_SEARCH_DEPTH), tool_result SSE carries is_error, scrub_secrets redacts tvly-.
 - [Phase ?]: [Phase 16]: local .env SYSTEM_PROMPT override shadows the new citation-guidance default — must be removed from .env/.env.prod for D-01/D-02 guidance to reach the running app (flagged in 16-02 SUMMARY).
+- [Phase 16]: [Phase 16]: 16-03 wired the frontend failed-state — ToolEvent.status gained 'error', the tool_result handler maps backend is_error, and ToolCallCard shows a red AlertTriangle + red border on failure (D-03/WSRCH-04).
+- [Phase 16]: [Phase 16]: used 'as ToolEvent[status]' cast (not the plan's illegal 'as const' on a ternary, TS1355) for the is_error->status mapping; union widening is a two-file atomic pair verified by the full npm run build.
 
 ### Pending Todos
 
@@ -75,7 +77,7 @@ Items acknowledged and deferred at v1.2 milestone close on 2026-07-11:
 
 ## Session Continuity
 
-Last session: 2026-07-12T00:09:54.299Z
-Stopped at: Completed 16-01-PLAN.md (RED scaffold)
+Last session: 2026-07-12T00:17:44.554Z
+Stopped at: Completed 16-03-PLAN.md (frontend failed-state render)
 Resume file: None
 Next: `/gsd:plan-phase 16` to plan Web Search Restoration
