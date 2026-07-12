@@ -94,5 +94,5 @@ Phases execute in numeric order: 16 → 17
 | 15. Options UI Capstone + Demo Gating | v1.2 | 10/10 | Complete | 2026-07-09 |
 | 999.1 Chat Empty-State UX | v1.2 | 3/3 | Complete | 2026-06 |
 | 999.2 Cost Guardrail Burn Script | v1.2 | 2/2 | Complete | 2026-07 |
-| 16. Web Search Restoration | v1.3 | 4/4 | Complete   | 2026-07-12 |
+| 16. Web Search Restoration | v1.3 | 4/4 | Complete    | 2026-07-12 |
 | 17. Agent Personas | v1.3 | 0/TBD | Not started | - |

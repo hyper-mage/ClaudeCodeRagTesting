@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.3
 milestone_name: Web Search & Agent Personas
-status: executing
-stopped_at: Completed 16-03-PLAN.md (frontend failed-state render)
-last_updated: "2026-07-12T00:17:44.562Z"
+status: ready_to_plan
+stopped_at: Phase 16 complete (4/4) — ready to discuss Phase 17
+last_updated: 2026-07-12T17:40:48.158Z
 last_activity: 2026-07-12
 progress:
   total_phases: 2
   completed_phases: 0
   total_plans: 4
-  completed_plans: 3
+  completed_plans: 4
   percent: 0
 ---
 
@@ -21,13 +21,13 @@ progress:
 See: .planning/PROJECT.md (updated 2026-07-11 after v1.2 completion)
 
 **Core value:** The agent can intelligently search and reason across a structured board game knowledge base — finding rules, comparing mechanics, and recommending games — using the right tool for the job, transparently.
-**Current focus:** Phase 16 — web-search-restoration
+**Current focus:** Phase 17 — agent personas
 
 ## Current Position
 
-Phase: 16 (web-search-restoration) — EXECUTING
-Plan: 4 of 4
-Status: Ready to execute
+Phase: 17
+Plan: Not started
+Status: Ready to plan
 Last activity: 2026-07-12
 
 Progress: [████████░░] 75%
