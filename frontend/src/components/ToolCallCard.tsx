@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { FolderOpen, GitBranch, FileText, Search, Globe, Database, Brain, Check, ChevronDown, ChevronUp, Compass } from 'lucide-react'
+import { FolderOpen, GitBranch, FileText, Search, Globe, Database, Brain, Check, ChevronDown, ChevronUp, Compass, AlertTriangle } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import type { SubEvent } from '../hooks/useChat'
 
@@ -9,7 +9,7 @@ interface Props {
   output?: string
   call_id?: string
   subagent?: boolean
-  status: 'running' | 'complete'
+  status: 'running' | 'complete' | 'error'
   subEvents?: SubEvent[]
 }
 
@@ -83,7 +83,14 @@ export default function ToolCallCard({ tool, args_preview, output, subagent, sta
     : tool.startsWith('kb_')
       ? 'text-emerald-400'
       : 'text-gray-400'
-  const borderColor = subagent ? 'border-indigo-700' : 'border-gray-700'
+  // A failed tool result (status === 'error') turns the whole card red at-a-glance — generic by
+  // construction: keyed on status, so any tool that returns {"error": ...} gets the failed state.
+  const borderColor =
+    status === 'error'
+      ? 'border-red-600'
+      : subagent
+        ? 'border-indigo-700'
+        : 'border-gray-700'
 
   // Pair up sub_tool_start + sub_tool_result by call_id; collect iteration markers.
   const subToolStarts = (subEvents || []).filter(s => s.type === 'sub_tool_start')
@@ -119,6 +126,8 @@ export default function ToolCallCard({ tool, args_preview, output, subagent, sta
         <div className="flex items-center gap-1 flex-shrink-0 ml-2">
           {status === 'running' ? (
             <span className="w-3.5 h-3.5 border-2 border-gray-400 border-t-transparent rounded-full animate-spin" />
+          ) : status === 'error' ? (
+            <AlertTriangle className="w-3.5 h-3.5 text-red-500" />
           ) : (
             <Check className="w-3.5 h-3.5 text-gray-500" />
           )}
