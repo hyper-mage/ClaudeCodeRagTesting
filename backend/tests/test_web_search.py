@@ -136,11 +136,17 @@ def test_gating_fail_closed(monkeypatch):
 # WSRCH-03 / D-02 — citation guidance in the system prompt
 # ---------------------------------------------------------------------
 
-def test_system_prompt_citation_guidance():
+def test_system_prompt_citation_guidance(monkeypatch):
     """WSRCH-03 / D-02: system_prompt specifies inline markdown-link citations and a
-    trailing "Sources:" list. RED today — the prompt only says "cite ... with URLs"."""
-    from config import Settings
-    prompt = Settings().system_prompt
+    trailing "Sources:" list. RED today — the prompt only says "cite ... with URLs".
+
+    Isolate from any ambient SYSTEM_PROMPT env override (a local .env may set a minimal
+    prompt) so this pins the shipped config default, not a deployment's runtime prompt.
+    `import config` first so load_dotenv has already populated os.environ before we drop
+    the override; monkeypatch restores it after the test."""
+    import config  # ensures load_dotenv has run before we remove the override
+    monkeypatch.delenv("SYSTEM_PROMPT", raising=False)
+    prompt = config.Settings().system_prompt
     assert "Sources:" in prompt
     assert "inline" in prompt.lower()
 

@@ -399,9 +399,10 @@ WEB_SEARCH_TOOL = {
     "function": {
         "name": "web_search",
         "description": (
-            "Search the web for current information. Use this when the user's uploaded "
-            "documents don't contain the answer, or when the question is about recent "
-            "events, external facts, or topics not covered by the user's documents."
+            "Search the web for current or external information NOT covered by the knowledge "
+            "base — prices, where-to-buy, availability, upcoming expansions, BGG rankings, and "
+            "designer/publisher news. Do NOT use this for game rules or mechanics that live in "
+            "the knowledge base."
         ),
         "parameters": {
             "type": "object",
@@ -628,7 +629,7 @@ TOOL_SELECTION_GUIDE = """## Tool Selection Guide
 - analyze_document: LLM-powered deep analysis of a document
 
 **External** -- Information outside the KB:
-- web_search: Current web information
+- web_search: Current or external info NOT in the KB — prices, where-to-buy, availability, upcoming expansions, BGG rankings, designer/publisher news. Do NOT web-search game rules or mechanics that live in the KB.
 - query_database: Metadata, stats, conversation history (SQL)
 
 **Deep exploration** -- Multi-step KB traversal (use sparingly):
