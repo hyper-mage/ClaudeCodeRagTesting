@@ -1305,8 +1305,16 @@ async def send_message(
                                         assistant_tc_msg, current_messages[-1]
                                     )
 
-                                # Update accumulated tool entry with result
-                                tool_output_preview = tool_result[:2000] if len(tool_result) > 2000 else tool_result
+                                # Update accumulated tool entry with result.
+                                # WR-03: route the preview through the same scrub_secrets
+                                # chokepoint used by _sse_error before it reaches the SSE
+                                # stream (tool_result event) and the persisted tools_used
+                                # array, closing the defense-in-depth gap so any future tool
+                                # whose str(e) embeds a secret is redacted here too. The
+                                # classifier below still inspects the RAW tool_result.
+                                tool_output_preview = scrub_secrets(
+                                    tool_result[:2000] if len(tool_result) > 2000 else tool_result
+                                )
                                 _is_error = tool_result_is_error(tool_result)
                                 tool_entry["status"] = "error" if _is_error else "complete"
                                 tool_entry["output"] = tool_output_preview
