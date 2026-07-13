@@ -45,18 +45,25 @@ async def get_preferences(user_id: str = Depends(get_user_id)):
     row = (
         get_supabase()
         .table("user_preferences")
-        .select("default_model, theme, favorite_models")
+        .select("default_model, theme, favorite_models, default_persona")
         .eq("user_id", user_id)
         .maybe_single()
         .execute()
     )
     if not row or not row.data:
-        return {"default_model": None, "theme": "dark", "favorite_models": []}
+        return {
+            "default_model": None,
+            "theme": "dark",
+            "favorite_models": [],
+            "default_persona": None,
+        }
     return {
         "default_model": row.data.get("default_model"),
         "theme": row.data.get("theme") or "dark",
         # Phase 15 MODEL-08: null-tolerant fallback mirrors the theme guard.
         "favorite_models": row.data.get("favorite_models") or [],
+        # Phase 17 PERS-04: null when unset (resolver falls back to the system default).
+        "default_persona": row.data.get("default_persona"),
     }
 
 
@@ -81,16 +88,23 @@ async def update_preferences(
 
     row = (
         db.table("user_preferences")
-        .select("default_model, theme, favorite_models")
+        .select("default_model, theme, favorite_models, default_persona")
         .eq("user_id", user_id)
         .maybe_single()
         .execute()
     )
     if not row or not row.data:
-        return {"default_model": None, "theme": "dark", "favorite_models": []}
+        return {
+            "default_model": None,
+            "theme": "dark",
+            "favorite_models": [],
+            "default_persona": None,
+        }
     return {
         "default_model": row.data.get("default_model"),
         "theme": row.data.get("theme") or "dark",
         # Phase 15 MODEL-08: null-tolerant fallback mirrors the theme guard.
         "favorite_models": row.data.get("favorite_models") or [],
+        # Phase 17 PERS-04: null when unset (resolver falls back to the system default).
+        "default_persona": row.data.get("default_persona"),
     }

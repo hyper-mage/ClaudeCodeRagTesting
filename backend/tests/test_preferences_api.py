@@ -81,7 +81,13 @@ def test_get_defaults_for_new_user() -> None:
     assert resp.status_code == 200, f"GET failed: {resp.status_code} {resp.text}"
     body = resp.json()
     # Phase 15 MODEL-08: favorite_models joined the wire shape (default []).
-    assert body == {"default_model": None, "theme": "dark", "favorite_models": []}, body
+    # Phase 17 PERS-04: default_persona joined the wire shape (default None).
+    assert body == {
+        "default_model": None,
+        "theme": "dark",
+        "favorite_models": [],
+        "default_persona": None,
+    }, body
 
 
 def test_theme_persist_and_validate() -> None:
