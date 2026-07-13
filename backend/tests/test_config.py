@@ -147,3 +147,42 @@ def test_scrub_secrets_redacts_tavily():
     out = scrub_secrets("err tvly-ABC123def_-")
     assert "tvly-" not in out
     assert "[redacted-key]" in out
+
+
+# ---------------------------------------------------------------------
+# Phase 17 D-02 / D-03 — system_prompt split into operational base + persona voice
+# (RED until 17-04 strips config.system_prompt to the persona-agnostic base).
+# Env-isolated via monkeypatch.delenv("SYSTEM_PROMPT") — mirrors test_web_search's
+# citation-guidance test — so a local .env override cannot mask the shipped default.
+# ---------------------------------------------------------------------
+
+
+def test_system_prompt_operational_base_keeps_citation(monkeypatch):
+    """D-02: the operational base RETAINS the citation guidance ("Sources:" + inline)
+    after the base/voice split — this keeps test_web_search::test_system_prompt_citation
+    _guidance GREEN. Passes today (regression guard); must stay GREEN through 17-04."""
+    import config  # ensures load_dotenv has run before we drop the override
+    monkeypatch.delenv("SYSTEM_PROMPT", raising=False)
+    prompt = config.Settings().system_prompt
+    assert "Sources:" in prompt
+    assert "inline" in prompt.lower()
+
+
+def test_system_prompt_operational_base_drops_kb_first_bias(monkeypatch):
+    """D-03: the KB-first bias ("Prefer the knowledge base") moves OUT of the base and
+    INTO the Expert voice_block — the operational base no longer carries it. RED today
+    (the current bundled system_prompt still contains the bias)."""
+    import config
+    monkeypatch.delenv("SYSTEM_PROMPT", raising=False)
+    prompt = config.Settings().system_prompt
+    assert "Prefer the knowledge base" not in prompt
+
+
+def test_system_prompt_operational_base_drops_opener(monkeypatch):
+    """Pattern A1: the "You are a helpful assistant" opener moves into each persona
+    voice_block (exactly one "You are…" leads the composed prompt) — the base no longer
+    opens with it. RED today (the current base still starts with the opener)."""
+    import config
+    monkeypatch.delenv("SYSTEM_PROMPT", raising=False)
+    prompt = config.Settings().system_prompt
+    assert not prompt.startswith("You are a helpful assistant")
