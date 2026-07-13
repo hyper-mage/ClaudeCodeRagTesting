@@ -4,13 +4,13 @@ milestone: v1.3
 milestone_name: Web Search & Agent Personas
 status: executing
 stopped_at: Completed 17-04-PLAN.md (persona base/voice split + composition)
-last_updated: "2026-07-13T14:45:52.846Z"
+last_updated: "2026-07-13T14:56:05.515Z"
 last_activity: 2026-07-13
 progress:
   total_phases: 2
   completed_phases: 1
   total_plans: 15
-  completed_plans: 8
+  completed_plans: 9
   percent: 50
 ---
 
@@ -26,11 +26,11 @@ See: .planning/PROJECT.md (updated 2026-07-11 after v1.2 completion)
 ## Current Position
 
 Phase: 17 (agent-personas) — EXECUTING
-Plan: 5 of 11
+Plan: 6 of 11
 Status: Ready to execute
 Last activity: 2026-07-13
 
-Progress: [█████░░░░░] 53%
+Progress: [██████░░░░] 60%
 
 ## Accumulated Context
 
@@ -52,6 +52,7 @@ Recent decisions affecting v1.3 work:
 - [Phase 17]: 17-03 authored the Wave 0 persona-picker RED scaffolds — PersonaSelector.test.tsx (4 its, PERS-01 onSelect) + DefaultPersonaSelector.test.tsx (3 its, PERS-04 PUT default_persona); both DELIBERATELY drop the useKeyStatus/useKeyGate mock (persona has no key/cost surface) and assert a keyless pick is never gated; RED via cannot-resolve until 17-09 authors the components.
 - [Phase ?]: [Phase 17]: 17-04 turned the persona composition RED baseline GREEN — settings.system_prompt is now the persona-agnostic operational base (D-02); opener (A1) + KB-first bias (D-03) moved into per-persona voice_blocks in services/persona_service.py; stream_chat_completion gained persona_voice and composes voice->base->tool_guide (Pitfall 2). PERS-02/03 composition-core GREEN; end-to-end closure awaits 17-06 resolver + 17-11 validation.
 - [Phase ?]: [Phase 17]: Pitfall 6 confirmed live — SYSTEM_PROMPT (and KEY_ENCRYPTION_SECRET) are set in .env and shadow code defaults; operational-base unit tests delenv SYSTEM_PROMPT so they pass, but the running app needs SYSTEM_PROMPT removed from .env/.env.prod at deploy.
+- [Phase ?]: [Phase 17]: 17-05 authored the persona DATA CONTRACT — PersonaResponse (id/label/is_default, voice_block withheld A5), ThreadResponse.persona (Pitfall 1), ThreadModelUpdate->ThreadUpdate + persona (exclude_unset partial PATCH), default_persona on both preferences models, and the additive-nullable migration 035 FILE (threads.persona + user_preferences.default_persona; no backfill/constraint/FK/DEFAULT/RLS, D-08/D-10). Migration authored NOT applied (17-08 owns db push). PERS-01/04/05 stay Pending until 17-06/17-07 wire endpoints, 17-08 applies, 17-09 ships pickers.
 
 ### Pending Todos
 
@@ -82,7 +83,7 @@ Items acknowledged and deferred at v1.2 milestone close on 2026-07-11:
 
 ## Session Continuity
 
-Last session: 2026-07-13T14:43:19.655Z
+Last session: 2026-07-13T14:55:37.019Z
 Stopped at: Completed 17-04-PLAN.md (persona base/voice split + composition)
 Resume file: None
 Next: Execute 17-03-PLAN.md (continue Phase 17 agent-personas)

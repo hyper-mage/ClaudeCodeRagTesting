@@ -80,7 +80,7 @@ See [milestones/v1.0-ROADMAP.md](milestones/v1.0-ROADMAP.md)
 - [x] 17-02-PLAN.md — Wave 0 RED: backend personas-API/thread-PATCH/preferences test scaffolds
 - [x] 17-03-PLAN.md — Wave 0 RED: frontend persona picker test scaffolds
 - [x] 17-04-PLAN.md — Prompt composition core: operational base + 2-persona voice registry + compose
-- [ ] 17-05-PLAN.md — Schemas (PersonaResponse + persona fields) + migration 035 file
+- [x] 17-05-PLAN.md — Schemas (PersonaResponse + persona fields) + migration 035 file
 - [ ] 17-06-PLAN.md — GET /api/personas router + per-turn persona resolver in chat.py
 - [ ] 17-07-PLAN.md — PATCH persona (exclude_unset) + preferences default_persona
 - [ ] 17-08-PLAN.md — [BLOCKING] apply migration 035 to dev + remove SYSTEM_PROMPT env-shadow
@@ -106,4 +106,4 @@ Phases execute in numeric order: 16 → 17
 | 999.1 Chat Empty-State UX | v1.2 | 3/3 | Complete | 2026-06 |
 | 999.2 Cost Guardrail Burn Script | v1.2 | 2/2 | Complete | 2026-07 |
 | 16. Web Search Restoration | v1.3 | 4/4 | Complete    | 2026-07-12 |
-| 17. Agent Personas | v1.3 | 4/11 | In Progress|  |
+| 17. Agent Personas | v1.3 | 5/11 | In Progress|  |
