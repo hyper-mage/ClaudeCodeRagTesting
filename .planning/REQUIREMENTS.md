@@ -17,10 +17,10 @@ Requirements for the v1.3 milestone. Each maps to a roadmap phase.
 
 ### Agent Personas (PERS)
 
-- [ ] **PERS-01**: User can select an agent persona for a thread from a predefined set via a chat-UI picker (mirrors the model picker)
+- [x] **PERS-01**: User can select an agent persona for a thread from a predefined set via a chat-UI picker (mirrors the model picker)
 - [ ] **PERS-02**: A "General Assistant" persona is available that behaves as a vanilla model while retaining full tool access
 - [ ] **PERS-03**: The board-game-expert persona is preserved as the default persona
-- [ ] **PERS-04**: User can set their default persona (applied to new threads) on the settings/account page
+- [x] **PERS-04**: User can set their default persona (applied to new threads) on the settings/account page
 - [ ] **PERS-05**: A thread's persona selection persists across sessions and is restored on return
 - [ ] **PERS-06**: The selected persona's system prompt is resolved and applied per chat request (no cross-user/thread bleed)
 
@@ -60,10 +60,10 @@ Which phases cover which requirements. Set during roadmap creation.
 | WSRCH-02 | Phase 16 | Complete |
 | WSRCH-03 | Phase 16 | Complete |
 | WSRCH-04 | Phase 16 | Complete |
-| PERS-01 | Phase 17 | Pending |
+| PERS-01 | Phase 17 | Complete |
 | PERS-02 | Phase 17 | Pending |
 | PERS-03 | Phase 17 | Pending |
-| PERS-04 | Phase 17 | Pending |
+| PERS-04 | Phase 17 | Complete |
 | PERS-05 | Phase 17 | Pending |
 | PERS-06 | Phase 17 | Pending |
 
