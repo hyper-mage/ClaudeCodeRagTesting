@@ -4,6 +4,7 @@ import ChatInput from './ChatInput'
 import ErrorMessageBubble from './ErrorMessageBubble'
 import DeprecationNotice from './DeprecationNotice'
 import ModelSelector, { type ModelResponse } from './ModelSelector'
+import PersonaSelector, { type PersonaOption } from './PersonaSelector'
 import { useAuth } from '../contexts/AuthContext'
 import { useKeyStatus } from '../hooks/useKeyStatus'
 // Single source of truth for the message shape (incl. usage + errorType) — Plan 02 hook contract.
@@ -22,6 +23,12 @@ interface Props {
   onThreadModelChange: (modelId: string | null) => void
   /** Optional pre-fetched catalog forwarded to the per-thread ModelSelector (avoids a duplicate fetch). */
   models?: ModelResponse[]
+  /** The active thread's pinned persona id, or null when it follows the user's default (PERS-05). */
+  threadPersona: string | null
+  /** Called with the chosen persona id (PATCH path). No key gate — persona carries no cost (PERS-01). */
+  onThreadPersonaChange: (personaId: string) => void
+  /** Optional pre-fetched persona catalog (GET /api/personas) forwarded to PersonaSelector (D-07). */
+  personas?: PersonaOption[]
   /** True after a mode:"demo" done event was observed on this thread (useChat latch, D-10). */
   lastTurnWasDemo?: boolean
   /** [Use demo] recovery on the 403 bubble (D-11): retries the last user turn with use_demo:true. */
@@ -33,6 +40,7 @@ const THREAD_SELECTOR_COPY = {
   heading: 'Model for this chat',
   useDefault: 'Use my default model',
   defaultSubState: 'Default model',
+  personaHeading: 'Persona',
 } as const
 
 // Board-game example prompts surfaced as tappable empty-state chips. Each one
@@ -57,6 +65,9 @@ export default function ChatContainer({
   threadModel,
   onThreadModelChange,
   models,
+  threadPersona,
+  onThreadPersonaChange,
+  personas,
   lastTurnWasDemo = false,
   onUseDemo,
 }: Props) {
@@ -103,6 +114,20 @@ export default function ChatContainer({
               placeholder={THREAD_SELECTOR_COPY.defaultSubState}
               extraOption={{ label: THREAD_SELECTOR_COPY.useDefault, value: null }}
               models={models}
+            />
+          </div>
+          {/* Per-thread persona pin (PERS-01/PERS-05). Sibling of the ModelSelector in the SAME
+              shrink-0 header row. No key gate — persona carries no cost, so the parent's handler is
+              passed straight through (a keyless user can pick). Catalog comes from GET /api/personas
+              via the `personas` prop (never hardcoded, D-07). */}
+          <span className="shrink-0 text-xs font-semibold text-gray-600 dark:text-gray-400">
+            {THREAD_SELECTOR_COPY.personaHeading}
+          </span>
+          <div className="max-w-xs flex-1">
+            <PersonaSelector
+              value={threadPersona}
+              onSelect={onThreadPersonaChange}
+              personas={personas}
             />
           </div>
           {/* Per-thread running total (COST-04). Right-aligned in the SAME h-12 row via ml-auto

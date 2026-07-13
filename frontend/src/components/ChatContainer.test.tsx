@@ -86,6 +86,8 @@ describe('ChatContainer empty-state (D-02)', () => {
         activeThreadId={null}
         threadModel={null}
         onThreadModelChange={vi.fn()}
+        threadPersona={null}
+        onThreadPersonaChange={vi.fn()}
       />
     )
 
@@ -110,6 +112,8 @@ describe('ChatContainer empty-state (D-02)', () => {
         activeThreadId={null}
         threadModel={null}
         onThreadModelChange={vi.fn()}
+        threadPersona={null}
+        onThreadPersonaChange={vi.fn()}
       />
     )
 
@@ -129,6 +133,8 @@ describe('ChatContainer empty-state (D-02)', () => {
         activeThreadId={null}
         threadModel={null}
         onThreadModelChange={vi.fn()}
+        threadPersona={null}
+        onThreadPersonaChange={vi.fn()}
       />,
       { isAnon: true }
     )
@@ -149,6 +155,8 @@ describe('ChatContainer empty-state (D-02)', () => {
         activeThreadId={null}
         threadModel={null}
         onThreadModelChange={vi.fn()}
+        threadPersona={null}
+        onThreadPersonaChange={vi.fn()}
       />,
       { isAnon: false }
     )
@@ -169,6 +177,8 @@ describe('ChatContainer empty-state (D-02)', () => {
         activeThreadId="t1"
         threadModel={null}
         onThreadModelChange={vi.fn()}
+        threadPersona={null}
+        onThreadPersonaChange={vi.fn()}
       />
     )
 
@@ -197,6 +207,8 @@ describe('ChatContainer per-thread model header (MODEL-06 / D-05)', () => {
         activeThreadId="t1"
         threadModel={null}
         onThreadModelChange={vi.fn()}
+        threadPersona={null}
+        onThreadPersonaChange={vi.fn()}
         models={MODELS}
       />
     )
@@ -216,6 +228,8 @@ describe('ChatContainer per-thread model header (MODEL-06 / D-05)', () => {
         activeThreadId={null}
         threadModel={null}
         onThreadModelChange={vi.fn()}
+        threadPersona={null}
+        onThreadPersonaChange={vi.fn()}
         models={MODELS}
       />
     )
@@ -237,6 +251,8 @@ describe('ChatContainer per-thread model header (MODEL-06 / D-05)', () => {
         activeThreadId="t1"
         threadModel={null}
         onThreadModelChange={onThreadModelChange}
+        threadPersona={null}
+        onThreadPersonaChange={vi.fn()}
         models={MODELS}
       />
     )
@@ -260,6 +276,8 @@ describe('ChatContainer per-thread model header (MODEL-06 / D-05)', () => {
         activeThreadId="t1"
         threadModel="anthropic/claude"
         onThreadModelChange={onThreadModelChange}
+        threadPersona={null}
+        onThreadPersonaChange={vi.fn()}
         models={MODELS}
       />
     )
@@ -283,6 +301,8 @@ describe('ChatContainer per-thread model header (MODEL-06 / D-05)', () => {
         activeThreadId="t1"
         threadModel={null}
         onThreadModelChange={vi.fn()}
+        threadPersona={null}
+        onThreadPersonaChange={vi.fn()}
         models={MODELS}
       />
     )
@@ -313,6 +333,8 @@ function renderContainer(props: Partial<ComponentProps<typeof ChatContainer>> = 
       activeThreadId={null}
       threadModel={null}
       onThreadModelChange={vi.fn()}
+      threadPersona={null}
+      onThreadPersonaChange={vi.fn()}
       {...props}
     />
   )
