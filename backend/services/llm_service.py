@@ -67,6 +67,7 @@ def stream_chat_completion(
     scope_hint: dict | None = None,
     api_key: str | None = None,
     model: str | None = None,
+    persona_voice: str | None = None,
     trace: bool = True,
 ) -> Generator[dict, None, None]:
     """Stream a chat completion with optional tool definitions.
@@ -83,13 +84,20 @@ def stream_chat_completion(
     `api_key`/`model`/`trace`: per-request resolution (SEC-04 / D-10). `api_key` and
         `model` fall through to the owner `settings` values when None; `trace=False`
         skips LangSmith wrapping for user-key calls.
+    `persona_voice`: the resolved per-persona VOICE block (Phase 17, D-01/D-04). When set
+        it is composed FIRST, before the operational base (Pitfall 2 — exactly one
+        "You are…" opener leads); None → base-only (back-compat for sub-agent callers that
+        do not pass a persona). `tool_guide` is still appended after the base for EVERY
+        persona (D-04 — persona never gates tool access).
     """
     settings = get_settings()
     client = get_llm_client(api_key=api_key, trace=trace)
 
-    system_content = settings.system_prompt
+    system_content = settings.system_prompt          # operational BASE (D-02)
+    if persona_voice:                                 # None → base-only (back-compat)
+        system_content = persona_voice + "\n\n" + system_content   # voice FIRST (Pitfall 2)
     if tool_guide:
-        system_content += "\n\n" + tool_guide
+        system_content += "\n\n" + tool_guide         # unchanged (D-04) — appended for ALL personas
 
     # Source routing guidance (D-01, D-02) -- a hint, not a filter (Pitfall 4).
     if source_hint:
