@@ -4,13 +4,13 @@ milestone: v1.3
 milestone_name: Web Search & Agent Personas
 status: executing
 stopped_at: Completed 17-09-PLAN.md (persona picker components)
-last_updated: "2026-07-13T21:59:26.608Z"
+last_updated: "2026-07-13T22:15:27.561Z"
 last_activity: 2026-07-13
 progress:
   total_phases: 2
   completed_phases: 1
   total_plans: 15
-  completed_plans: 13
+  completed_plans: 14
   percent: 50
 ---
 
@@ -26,11 +26,11 @@ See: .planning/PROJECT.md (updated 2026-07-11 after v1.2 completion)
 ## Current Position
 
 Phase: 17 (agent-personas) — EXECUTING
-Plan: 10 of 11
+Plan: 11 of 11
 Status: Ready to execute
 Last activity: 2026-07-13
 
-Progress: [█████████░] 87%
+Progress: [█████████░] 93%
 
 ## Accumulated Context
 
@@ -56,6 +56,7 @@ Recent decisions affecting v1.3 work:
 - [Phase ?]: [Phase 17]: 17-06 shipped the persona READ+RESOLUTION seam — auth-gated GET /api/personas (catalog code-constant, voice_block withheld A5) registered in main.py; chat.py gained the non-cached _resolve_persona sibling (D-09 thread-pin>user-default>Expert, D-10 validate-to-default, 42P01-tolerant) wired once per turn into stream_chat_completion(persona_voice=...). Model/key 4-tuple untouched (Pitfall 8); tools persona-independent (D-04). 17-01 resolver (6) + 17-02 personas_api (3) RED scaffolds GREEN. PERS-01/03/06 backend core live but stay Pending — 17-09 picker + 17-11 validation close them.
 - [Phase ?]: [Phase 17]: 17-07 wired persona WRITE+PERSISTENCE — PATCH /api/threads/{id} now body.model_dump(exclude_unset=True) so persona/model never clobber (IDOR + explicit-null-clear intact); PUT/GET /api/preferences thread default_persona through both selects + all 4 return dicts (null for new users). 17-02 thread-persona-patch + prefs default_persona RED scaffolds GREEN. PERS-01/04/05 stay Pending (pickers=17-09, migration apply=17-08).
 - [Phase 17]: 17-09 shipped the two gate-free persona pickers GREEN — PersonaSelector (chat header; onSelect(id), parent owns the PATCH) and DefaultPersonaSelector (settings; self-PUT /api/preferences {default_persona}). Both render the parent-supplied GET /api/personas catalog (never hardcoded, D-07), carry NO key gate (a keyless user can pick/set a persona, PERS-01/PERS-04), add no per-message badge (picker-only, D-12), and are fresh components (not a ModelSelector clone). 17-03 RED scaffolds GREEN (7/7).
+- [Phase ?]: [Phase 17]: 17-10 wired the persona pickers into the running app (last implementation wave) — ChatPage fetches GET /api/personas once + owns an optimistic no-key-gate handleThreadPersonaChange (PATCH /api/threads/{id} {persona}, passed DIRECTLY not via useKeyGate) + Thread.persona seeded from the thread read on reopen (PERS-05); ChatContainer renders PersonaSelector beside ModelSelector (Sigma cost intact); SettingsPage renders DefaultPersonaSelector seeded from GET /api/preferences.default_persona. PERS-01/04/05 now live end-to-end; 17-11 is human UAT. FE build+133 tests green; required-prop addition to ChatContainer forced a Rule-1 test-props compile fix; 5 pre-existing lint errors confirmed baseline via git stash, deferred.
 
 ### Pending Todos
 
@@ -86,7 +87,7 @@ Items acknowledged and deferred at v1.2 milestone close on 2026-07-11:
 
 ## Session Continuity
 
-Last session: 2026-07-13T21:59:26.601Z
+Last session: 2026-07-13T22:14:53.130Z
 Stopped at: Completed 17-09-PLAN.md (persona picker components)
 Resume file: None
 Next: Execute 17-03-PLAN.md (continue Phase 17 agent-personas)
