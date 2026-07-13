@@ -4,7 +4,7 @@ milestone: v1.3
 milestone_name: Web Search & Agent Personas
 status: executing
 stopped_at: Completed 17-06-PLAN.md (persona read + resolution seam)
-last_updated: "2026-07-13T15:12:04.338Z"
+last_updated: "2026-07-13T19:04:53.695Z"
 last_activity: 2026-07-13
 progress:
   total_phases: 2
@@ -26,7 +26,7 @@ See: .planning/PROJECT.md (updated 2026-07-11 after v1.2 completion)
 ## Current Position
 
 Phase: 17 (agent-personas) — EXECUTING
-Plan: 7 of 11
+Plan: 8 of 11
 Status: Ready to execute
 Last activity: 2026-07-13
 
@@ -54,6 +54,7 @@ Recent decisions affecting v1.3 work:
 - [Phase ?]: [Phase 17]: Pitfall 6 confirmed live — SYSTEM_PROMPT (and KEY_ENCRYPTION_SECRET) are set in .env and shadow code defaults; operational-base unit tests delenv SYSTEM_PROMPT so they pass, but the running app needs SYSTEM_PROMPT removed from .env/.env.prod at deploy.
 - [Phase ?]: [Phase 17]: 17-05 authored the persona DATA CONTRACT — PersonaResponse (id/label/is_default, voice_block withheld A5), ThreadResponse.persona (Pitfall 1), ThreadModelUpdate->ThreadUpdate + persona (exclude_unset partial PATCH), default_persona on both preferences models, and the additive-nullable migration 035 FILE (threads.persona + user_preferences.default_persona; no backfill/constraint/FK/DEFAULT/RLS, D-08/D-10). Migration authored NOT applied (17-08 owns db push). PERS-01/04/05 stay Pending until 17-06/17-07 wire endpoints, 17-08 applies, 17-09 ships pickers.
 - [Phase ?]: [Phase 17]: 17-06 shipped the persona READ+RESOLUTION seam — auth-gated GET /api/personas (catalog code-constant, voice_block withheld A5) registered in main.py; chat.py gained the non-cached _resolve_persona sibling (D-09 thread-pin>user-default>Expert, D-10 validate-to-default, 42P01-tolerant) wired once per turn into stream_chat_completion(persona_voice=...). Model/key 4-tuple untouched (Pitfall 8); tools persona-independent (D-04). 17-01 resolver (6) + 17-02 personas_api (3) RED scaffolds GREEN. PERS-01/03/06 backend core live but stay Pending — 17-09 picker + 17-11 validation close them.
+- [Phase ?]: [Phase 17]: 17-07 wired persona WRITE+PERSISTENCE — PATCH /api/threads/{id} now body.model_dump(exclude_unset=True) so persona/model never clobber (IDOR + explicit-null-clear intact); PUT/GET /api/preferences thread default_persona through both selects + all 4 return dicts (null for new users). 17-02 thread-persona-patch + prefs default_persona RED scaffolds GREEN. PERS-01/04/05 stay Pending (pickers=17-09, migration apply=17-08).
 
 ### Pending Todos
 
@@ -84,7 +85,7 @@ Items acknowledged and deferred at v1.2 milestone close on 2026-07-11:
 
 ## Session Continuity
 
-Last session: 2026-07-13T15:12:04.332Z
+Last session: 2026-07-13T19:04:23.173Z
 Stopped at: Completed 17-06-PLAN.md (persona read + resolution seam)
 Resume file: None
 Next: Execute 17-03-PLAN.md (continue Phase 17 agent-personas)
