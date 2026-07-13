@@ -76,7 +76,7 @@ See [milestones/v1.0-ROADMAP.md](milestones/v1.0-ROADMAP.md)
   4. A thread's persona selection persists across sessions and is restored when the user reopens the thread.
   5. The selected persona's system prompt is resolved and applied per chat request with no cross-user or cross-thread bleed under concurrent BYOK turns.
 **Plans**: 11 plans (6 waves)
-- [ ] 17-01-PLAN.md — Wave 0 RED: backend resolver/prompt/config test scaffolds
+- [x] 17-01-PLAN.md — Wave 0 RED: backend resolver/prompt/config test scaffolds
 - [ ] 17-02-PLAN.md — Wave 0 RED: backend personas-API/thread-PATCH/preferences test scaffolds
 - [ ] 17-03-PLAN.md — Wave 0 RED: frontend persona picker test scaffolds
 - [ ] 17-04-PLAN.md — Prompt composition core: operational base + 2-persona voice registry + compose
@@ -106,4 +106,4 @@ Phases execute in numeric order: 16 → 17
 | 999.1 Chat Empty-State UX | v1.2 | 3/3 | Complete | 2026-06 |
 | 999.2 Cost Guardrail Burn Script | v1.2 | 2/2 | Complete | 2026-07 |
 | 16. Web Search Restoration | v1.3 | 4/4 | Complete    | 2026-07-12 |
-| 17. Agent Personas | v1.3 | 0/11 | Planned | - |
+| 17. Agent Personas | v1.3 | 1/11 | In Progress|  |
