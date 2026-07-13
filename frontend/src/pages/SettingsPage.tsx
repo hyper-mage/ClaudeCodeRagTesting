@@ -2,8 +2,10 @@ import { useEffect, useState } from 'react'
 import { AlertTriangle } from 'lucide-react'
 import ConfirmDialog from '../components/ConfirmDialog'
 import DefaultModelSelector from '../components/DefaultModelSelector'
+import DefaultPersonaSelector from '../components/DefaultPersonaSelector'
 import ThemeToggle from '../components/ThemeToggle'
 import type { ModelResponse } from '../components/ModelSelector'
+import type { PersonaOption } from '../components/PersonaSelector'
 import { useKeyStatus, notifyKeyStatusChanged } from '../hooks/useKeyStatus'
 import { apiFetch } from '../lib/api'
 import { startOpenRouterConnect } from '../lib/pkce'
@@ -30,6 +32,10 @@ export default function SettingsPage() {
   // mount fetches. The Theme toggle self-PUTs and needs no local state here.
   const [defaultModel, setDefaultModel] = useState<string | null>(null)
   const [models, setModels] = useState<ModelResponse[] | undefined>(undefined)
+  // Default-persona control (PERS-04): the current default + the shared persona catalog, seeded by
+  // the same silent-on-failure, array-guarded mount fetches used for the default-model control.
+  const [defaultPersona, setDefaultPersona] = useState<string | null>(null)
+  const [personas, setPersonas] = useState<PersonaOption[] | undefined>(undefined)
 
   // One-time catalog fetch (silent on failure). Only set when the payload is actually an array so a
   // malformed response can never poison `models` (ModelSelector's rows.map would crash otherwise).
@@ -43,14 +49,28 @@ export default function SettingsPage() {
     return () => { cancelled = true }
   }, [])
 
-  // Seed the current default model from preferences (best-effort; a failed GET leaves it null and
-  // DefaultModelSelector shows its placeholder). Theme reconcile stays in ChatPage (global concern).
+  // One-time persona catalog fetch (silent on failure, array-guarded — mirrors the /api/models
+  // fetch above). The list is never hardcoded (D-07); DefaultPersonaSelector renders `personas ?? []`.
+  useEffect(() => {
+    let cancelled = false
+    apiFetch('/api/personas')
+      .then((data: unknown) => {
+        if (!cancelled && Array.isArray(data)) setPersonas(data as PersonaOption[])
+      })
+      .catch(() => {})
+    return () => { cancelled = true }
+  }, [])
+
+  // Seed the current default model + default persona from preferences (best-effort; a failed GET
+  // leaves them null and each selector shows its placeholder). Theme reconcile stays in ChatPage
+  // (global concern).
   useEffect(() => {
     let cancelled = false
     apiFetch('/api/preferences')
-      .then((prefs: { default_model?: string | null } | null) => {
+      .then((prefs: { default_model?: string | null; default_persona?: string | null } | null) => {
         if (cancelled || !prefs) return
         if (prefs.default_model !== undefined) setDefaultModel(prefs.default_model ?? null)
+        if (prefs.default_persona !== undefined) setDefaultPersona(prefs.default_persona ?? null)
       })
       .catch(() => {})
     return () => { cancelled = true }
@@ -168,6 +188,14 @@ export default function SettingsPage() {
             heading + helper, so the page must NOT add a duplicate heading. */}
         <div className="mt-6">
           <DefaultModelSelector value={defaultModel} onChange={setDefaultModel} models={models} />
+        </div>
+
+        {/* Default persona section (PERS-04). DefaultPersonaSelector supplies its own LOCKED
+            heading + helper and self-PUTs /api/preferences {default_persona} (no key gate — a
+            keyless user can set a default persona), so the page adds no duplicate heading. The
+            catalog comes from the /api/personas fetch (never hardcoded, D-07). */}
+        <div className="mt-6">
+          <DefaultPersonaSelector value={defaultPersona} onChange={setDefaultPersona} personas={personas} />
         </div>
 
         {/* Theme section (D-06): heading row + the self-contained ThemeToggle. */}
