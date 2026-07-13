@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.3
 milestone_name: Web Search & Agent Personas
 status: executing
-stopped_at: Completed 17-01-PLAN.md (persona RED baseline)
-last_updated: "2026-07-13T14:08:53.250Z"
+stopped_at: Completed 17-02-PLAN.md (persona API RED baseline)
+last_updated: "2026-07-13T14:22:25.878Z"
 last_activity: 2026-07-13
 progress:
   total_phases: 2
   completed_phases: 1
   total_plans: 15
-  completed_plans: 5
-  percent: 33
+  completed_plans: 6
+  percent: 40
 ---
 
 # Project State
@@ -26,11 +26,11 @@ See: .planning/PROJECT.md (updated 2026-07-11 after v1.2 completion)
 ## Current Position
 
 Phase: 17 (agent-personas) — EXECUTING
-Plan: 2 of 11
+Plan: 3 of 11
 Status: Ready to execute
 Last activity: 2026-07-13
 
-Progress: [███░░░░░░░] 33%
+Progress: [████░░░░░░] 40%
 
 ## Accumulated Context
 
@@ -48,6 +48,7 @@ Recent decisions affecting v1.3 work:
 - [Phase 16]: [Phase 16]: 16-03 wired the frontend failed-state — ToolEvent.status gained 'error', the tool_result handler maps backend is_error, and ToolCallCard shows a red AlertTriangle + red border on failure (D-03/WSRCH-04).
 - [Phase 16]: [Phase 16]: used 'as ToolEvent[status]' cast (not the plan's illegal 'as const' on a ternary, TS1355) for the is_error->status mapping; union widening is a two-file atomic pair verified by the full npm run build.
 - [Phase 17]: 17-01 is the Wave 0 persona RED baseline — 15 failing tests pin PERS-03/06, D-10, D-09 tier order, 42P01 tolerance, the D-01/D-02/D-03/D-04 base+voice composition, and PERS-02/D-04 tools-independence; zero production code touched (17-04/17-06 turn GREEN). Traceability stays Pending until then.
+- [Phase 17]: 17-02 is the Wave 0 persona API RED baseline: 11 tests (9 RED) pin the auth-gated GET /api/personas catalog with voice_block withheld (A5/T-17-06), PATCH /api/threads persona with id+user_id IDOR re-check (T-17-04) + no-clobber-model (T-17-05), and PUT/GET /api/preferences default_persona roundtrip (PERS-04); zero production code touched, PERS-01/04/05 traceability stays Pending until 17-06/17-07 turn GREEN
 
 ### Pending Todos
 
@@ -78,7 +79,7 @@ Items acknowledged and deferred at v1.2 milestone close on 2026-07-11:
 
 ## Session Continuity
 
-Last session: 2026-07-13T14:08:53.243Z
-Stopped at: Completed 17-01-PLAN.md (persona RED baseline)
+Last session: 2026-07-13T14:22:25.872Z
+Stopped at: Completed 17-02-PLAN.md (persona API RED baseline)
 Resume file: None
-Next: `/gsd:plan-phase 16` to plan Web Search Restoration
+Next: Execute 17-03-PLAN.md (continue Phase 17 agent-personas)
