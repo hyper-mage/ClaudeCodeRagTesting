@@ -31,6 +31,11 @@ class ThreadResponse(BaseModel):
     created_at: datetime | None = None
     updated_at: datetime | None = None
     model: str | None = None  # Phase 13 — per-thread model pin (rides every thread read; null = default tier, D-05)
+    # Phase 17 (PERS-05) — per-thread persona pin. MUST be declared here or FastAPI's
+    # response_model STRIPS it on every thread read even though select('*') returns the
+    # column (Pitfall 1 — same failure mode documented on the `usage` field below). null =
+    # system default persona via the resolver tier chain (D-08/D-10).
+    persona: str | None = None
 
 
 class ThreadWithMessages(ThreadResponse):
@@ -51,6 +56,10 @@ class PreferencesResponse(BaseModel):
     # Phase 15 MODEL-08 (D-05) — the user's starred model ids. Always present on
     # the wire (default []); default_factory avoids a shared mutable default.
     favorite_models: list[str] = Field(default_factory=list)
+    # Phase 17 (PERS-04) — the user's default persona id. null when unset (resolves
+    # to the system default via the resolver tier chain, D-08); mirrors how
+    # default_model rides this response.
+    default_persona: str | None = None
 
 
 class PreferencesUpdate(BaseModel):
@@ -68,17 +77,40 @@ class PreferencesUpdate(BaseModel):
     # None default keeps exclude_unset partial-upsert semantics (a theme-only PUT
     # must NOT carry favorite_models); max_length=200 bounds abuse (Open Q3).
     favorite_models: list[str] | None = Field(default=None, max_length=200)
+    # Phase 17 (PERS-04) — the user's default persona id. None default preserves
+    # exclude_unset partial-upsert (a theme-only PUT must NOT carry default_persona,
+    # which would clobber it), mirroring favorite_models above.
+    default_persona: str | None = None
 
 
-class ThreadModelUpdate(BaseModel):
-    """PATCH /api/threads/{id} body — set or clear the per-thread model pin (MODEL-06).
+class ThreadUpdate(BaseModel):
+    """PATCH /api/threads/{id} body — partial update of the per-thread model AND persona pins.
 
-    null is a DELIBERATE, explicit value (clears the pin back to the default tier,
-    D-05). The PATCH endpoint writes model explicitly — it does NOT use
-    exclude_unset (RESEARCH Pattern 3 caution), so {model: null} round-trips as a
-    real clear rather than being skipped.
+    Both fields default to None so the endpoint's model_dump(exclude_unset=True)
+    (adopted in 17-07) sends ONLY the keys the client actually provided — a
+    persona-only body must NOT carry model (which would clobber the model pin), and a
+    model-only body must NOT carry persona. An explicitly-sent null is still a
+    DELIBERATE clear (clears the pin back to the default tier, D-05/D-10) because
+    exclude_unset keeps explicitly-set keys even when their value is None.
+
+    (Formerly ThreadModelUpdate — renamed + persona added in 17-05; the PATCH
+    endpoint moves from an explicit {"model": body.model} write to exclude_unset in
+    17-07.)
     """
     model: str | None = None
+    persona: str | None = None
+
+
+class PersonaResponse(BaseModel):
+    """One persona-catalog entry served by GET /api/personas (PERS-01 / D-07).
+
+    voice_block is DELIBERATELY ABSENT (A5): the persona's prompt text stays
+    server-side and must never cross to the client, so the serializer can only ship
+    the picker-facing id/label/is_default. Only these three fields are declared.
+    """
+    id: str
+    label: str
+    is_default: bool
 
 
 class MessageCreate(BaseModel):

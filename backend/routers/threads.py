@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from auth import get_user_id
 from database import get_supabase
-from models.schemas import ThreadCreate, ThreadResponse, ThreadWithMessages, MessageResponse, ThreadModelUpdate
+from models.schemas import ThreadCreate, ThreadResponse, ThreadWithMessages, MessageResponse, ThreadUpdate
 
 router = APIRouter(prefix="/api/threads", tags=["threads"])
 
@@ -57,7 +57,7 @@ async def get_thread(thread_id: str, user_id: str = Depends(get_user_id)):
 
 @router.patch("/{thread_id}", response_model=ThreadResponse)
 async def update_thread_model(
-    thread_id: str, body: ThreadModelUpdate, user_id: str = Depends(get_user_id)
+    thread_id: str, body: ThreadUpdate, user_id: str = Depends(get_user_id)
 ):
     """Set or clear the per-thread model pin (MODEL-06).
 
