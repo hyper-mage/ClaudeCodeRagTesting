@@ -56,15 +56,19 @@ async def get_thread(thread_id: str, user_id: str = Depends(get_user_id)):
 
 
 @router.patch("/{thread_id}", response_model=ThreadResponse)
-async def update_thread_model(
+async def update_thread(
     thread_id: str, body: ThreadUpdate, user_id: str = Depends(get_user_id)
 ):
-    """Set or clear the per-thread model pin (MODEL-06).
+    """Partial-write the per-thread model AND/OR persona pins (MODEL-06 / PERS-01 / PERS-05).
 
     Re-checks ownership server-side (.eq id + user_id → 404 on a non-owned
-    thread, IDOR mitigation T-13-IDOR) before writing. body.model is written
-    EXPLICITLY so {model: null} clears the column back to the default tier (D-05)
-    — this is the inverse of the preferences PUT: NO exclude_unset here.
+    thread, IDOR mitigation T-13-IDOR / T-17-04) before writing. The update
+    payload is an exclude_unset model_dump, so ONLY the keys the client
+    actually sent are written: a persona-only PATCH cannot clobber the model pin
+    and a model-only PATCH cannot clobber the persona (T-17-05, no-clobber). An
+    EXPLICIT null is still a deliberate clear ({model: null} clears the pin back
+    to the default tier, D-05/D-10) because exclude_unset keeps explicitly-set
+    keys even when their value is None.
     """
     db = get_supabase()
     owned = (
@@ -78,14 +82,15 @@ async def update_thread_model(
     if not owned.data:
         raise HTTPException(status_code=404, detail="Thread not found")
 
+    patch = body.model_dump(exclude_unset=True)
     updated = (
         db.table("threads")
-        .update({"model": body.model})
+        .update(patch)
         .eq("id", thread_id)
         .eq("user_id", user_id)
         .execute()
     )
-    # supabase-py returns the updated rows in .data; the row carries the new model.
+    # supabase-py returns the updated rows in .data; the row carries the new model/persona.
     return updated.data[0]
 
 
