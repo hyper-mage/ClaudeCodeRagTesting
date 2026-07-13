@@ -530,21 +530,23 @@ function onSelect(personaId: string) {
 
 **These A-tags map to real forks the planner or `/gsd-discuss-phase` should confirm — none block planning, all have a clear recommended default.**
 
-## Open Questions
+## Open Questions (RESOLVED)
+
+All three have a clear recommended default that the plans implement — none leave an implementation fork undecided.
 
 1. **Chat-header persona picker: offer an explicit "use my default" row, or just the 2 personas?**
    - What we know: the model picker offers a `extraOption` "Use my default model" (clears the pin to null). Persona has only 2 options and a system default.
    - What's unclear: with 2 personas, a 3rd "follow default" row may confuse more than help.
-   - Recommendation: **Just list the 2 personas**; selecting one pins it. New-thread default resolution (server-side) already covers the "no pin" case. Revisit only if UX feedback wants an explicit "follow default."
+   - RESOLVED: **Just list the 2 personas**; selecting one pins it. New-thread default resolution (server-side) already covers the "no pin" case. Revisit only if UX feedback wants an explicit "follow default." → implemented by plan 17-09.
 
 2. **Registry location: `services/persona_service.py` vs. inline constant in `chat.py`?**
    - What we know: `chat.py` already holds tool schemas + `TOOL_SELECTION_GUIDE`; `models.py` delegates to `model_catalog_service.py`.
-   - Recommendation: **`services/persona_service.py`** — both the resolver (chat.py) and the endpoint (personas.py) import it; avoids coupling the endpoint to the chat router.
+   - RESOLVED: **`services/persona_service.py`** — both the resolver (chat.py) and the endpoint (personas.py) import it; avoids coupling the endpoint to the chat router. → implemented by plan 17-04.
 
 3. **Does the General Assistant voice need explicit "you may still search the board-game KB" language?**
    - What we know: tools stay available (D-04); the base governs *how* tools are cited.
    - What's unclear: whether the General voice should mention the KB at all.
-   - Recommendation: keep the General voice board-game-agnostic (D-06) but non-prohibitive ("use tools when helpful"); do NOT forbid KB tools. Exact wording is Claude's discretion.
+   - RESOLVED: keep the General voice board-game-agnostic (D-06) but non-prohibitive ("use tools when helpful"); do NOT forbid KB tools. Exact wording is Claude's discretion. → implemented by plan 17-04/1.
 
 ## Environment Availability
 
