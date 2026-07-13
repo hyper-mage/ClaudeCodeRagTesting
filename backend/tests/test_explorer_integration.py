@@ -43,7 +43,8 @@ def _make_explore_tool_call_streams():
     call_count = 0
 
     def _stream(messages, tools=None, tool_guide=None, source_hint=None,
-                scope_hint=None, api_key=None, model=None, trace=True):
+                scope_hint=None, api_key=None, model=None, trace=True,
+                persona_voice=None):
         nonlocal call_count
         call_count += 1
         # Budget tracking in chat.py expects a system_content event first.

@@ -953,6 +953,9 @@ async def send_message(
             api_key, model, mode, is_user_key = _resolve_key_and_model(
                 db, user_id, thread.data, body
             )
+            # Per-turn persona voice — SAME non-cached per-request scope as the key/model
+            # resolve above (PERS-06 no-bleed). tools/tool_guide stay persona-independent (D-04).
+            persona_voice = _resolve_persona(db, user_id, thread.data, body)
         except Exception as e:
             # Mirrors the worker's generic error branch (same SSE shape); no
             # assistant row exists yet, so there is nothing to mark.
@@ -1137,6 +1140,7 @@ async def send_message(
                         api_key=api_key,
                         model=model,
                         trace=(not is_user_key),
+                        persona_voice=persona_voice,
                     ):
                         if event["type"] == "system_content":
                             # Budget bookkeeping before LLM sees the messages.
