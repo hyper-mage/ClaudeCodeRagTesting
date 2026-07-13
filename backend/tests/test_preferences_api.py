@@ -283,3 +283,143 @@ def test_preferences_put_echo_includes_favorites() -> None:
     assert resp.json()["favorite_models"] == _FAVES, (
         f"PUT echo dropped favorite_models: {resp.json()}"
     )
+
+
+# ----- Phase 17 PERS-04 (Wave 0 RED): default_persona roundtrip + no-clobber -----
+#
+# default_persona is a plain-TEXT user default riding the SAME partial-upsert
+# (exclude_unset) mechanics as default_model/favorite_models. These clone the
+# favorite_models block; they FAIL RED until 17-07 threads default_persona through
+# the GET/PUT select strings + return dicts and adds it to PreferencesUpdate/Response.
+# Every test name contains "persona" so `pytest -k persona` selects EXACTLY these four.
+
+
+def test_preferences_get_returns_default_persona_none_for_new_user() -> None:
+    """PERS-04: a user with NO preferences row resolves default_persona to None
+    (the picker falls back to the system default when unset)."""
+    from fastapi.testclient import TestClient
+
+    from auth import get_user_id
+    from main import app
+
+    db = _mock_db_with_pref_row(None)  # no row exists
+
+    app.dependency_overrides[get_user_id] = lambda: _USER
+    try:
+        with patch("routers.preferences.get_supabase", return_value=db):
+            resp = TestClient(app).get("/api/preferences")
+    finally:
+        app.dependency_overrides.clear()
+
+    assert resp.status_code == 200, f"GET failed: {resp.status_code} {resp.text}"
+    body = resp.json()
+    assert "default_persona" in body, f"new-user GET missing default_persona key: {body}"
+    assert body["default_persona"] is None, body
+
+
+def test_preferences_put_default_persona_roundtrip() -> None:
+    """PERS-04: PUT {default_persona} upserts a payload carrying default_persona +
+    user_id + updated_at; the read-back GET returns default_persona verbatim."""
+    from fastapi.testclient import TestClient
+
+    from auth import get_user_id
+    from main import app
+
+    stored = {
+        "user_id": _USER,
+        "default_model": None,
+        "theme": "dark",
+        "favorite_models": [],
+        "default_persona": "general_assistant",
+    }
+    db = _mock_db_with_pref_row(stored)
+
+    app.dependency_overrides[get_user_id] = lambda: _USER
+    try:
+        with patch("routers.preferences.get_supabase", return_value=db):
+            client = TestClient(app)
+            put = client.put(
+                "/api/preferences", json={"default_persona": "general_assistant"}
+            )
+            assert put.status_code == 200, f"PUT failed: {put.status_code} {put.text}"
+            payload = _upsert_payload(db)
+            assert "default_persona" in payload, (
+                f"PUT did not persist default_persona: {payload}"
+            )
+            assert payload["default_persona"] == "general_assistant"
+            assert payload["user_id"] == _USER
+            assert "updated_at" in payload
+            get = client.get("/api/preferences")
+            assert get.status_code == 200, f"GET failed: {get.status_code} {get.text}"
+            assert "default_persona" in get.json(), (
+                f"GET read-back missing default_persona: {get.json()}"
+            )
+            assert get.json()["default_persona"] == "general_assistant"
+    finally:
+        app.dependency_overrides.clear()
+
+
+def test_preferences_put_theme_only_preserves_default_persona() -> None:
+    """Pitfall 12 (theme→persona direction): a theme-only PUT's upsert payload must
+    NOT carry default_persona (exclude_unset keeps the stored persona default intact),
+    mirroring test_preferences_put_theme_only_preserves_favorites."""
+    from fastapi.testclient import TestClient
+
+    from auth import get_user_id
+    from main import app
+
+    stored = {
+        "user_id": _USER,
+        "default_model": None,
+        "theme": "light",
+        "favorite_models": [],
+        "default_persona": "general_assistant",
+    }
+    db = _mock_db_with_pref_row(stored)
+
+    app.dependency_overrides[get_user_id] = lambda: _USER
+    try:
+        with patch("routers.preferences.get_supabase", return_value=db):
+            resp = TestClient(app).put("/api/preferences", json={"theme": "light"})
+    finally:
+        app.dependency_overrides.clear()
+
+    assert resp.status_code == 200, f"PUT failed: {resp.status_code} {resp.text}"
+    payload = _upsert_payload(db)
+    assert "default_persona" not in payload, (
+        f"theme-only PUT clobbered default_persona: {payload}"
+    )
+
+
+def test_preferences_put_default_persona_only_no_clobber() -> None:
+    """Pitfall 12 (persona→siblings direction): a default_persona-only PUT's upsert
+    payload must NOT carry default_model or theme (those would clobber the stored row)."""
+    from fastapi.testclient import TestClient
+
+    from auth import get_user_id
+    from main import app
+
+    stored = {
+        "user_id": _USER,
+        "default_model": None,
+        "theme": "dark",
+        "favorite_models": [],
+        "default_persona": "general_assistant",
+    }
+    db = _mock_db_with_pref_row(stored)
+
+    app.dependency_overrides[get_user_id] = lambda: _USER
+    try:
+        with patch("routers.preferences.get_supabase", return_value=db):
+            resp = TestClient(app).put(
+                "/api/preferences", json={"default_persona": "general_assistant"}
+            )
+    finally:
+        app.dependency_overrides.clear()
+
+    assert resp.status_code == 200, f"PUT failed: {resp.status_code} {resp.text}"
+    payload = _upsert_payload(db)
+    assert "default_model" not in payload, (
+        f"persona-only PUT clobbered default_model: {payload}"
+    )
+    assert "theme" not in payload, f"persona-only PUT clobbered theme: {payload}"
