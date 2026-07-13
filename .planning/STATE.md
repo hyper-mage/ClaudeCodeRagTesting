@@ -3,8 +3,8 @@ gsd_state_version: 1.0
 milestone: v1.3
 milestone_name: Web Search & Agent Personas
 status: executing
-stopped_at: Completed 17-03-PLAN.md (persona picker RED scaffolds)
-last_updated: "2026-07-13T14:32:22.414Z"
+stopped_at: Completed 17-04-PLAN.md (persona base/voice split + composition)
+last_updated: "2026-07-13T14:43:58.677Z"
 last_activity: 2026-07-13
 progress:
   total_phases: 2
@@ -26,7 +26,7 @@ See: .planning/PROJECT.md (updated 2026-07-11 after v1.2 completion)
 ## Current Position
 
 Phase: 17 (agent-personas) — EXECUTING
-Plan: 4 of 11
+Plan: 5 of 11
 Status: Ready to execute
 Last activity: 2026-07-13
 
@@ -50,6 +50,8 @@ Recent decisions affecting v1.3 work:
 - [Phase 17]: 17-01 is the Wave 0 persona RED baseline — 15 failing tests pin PERS-03/06, D-10, D-09 tier order, 42P01 tolerance, the D-01/D-02/D-03/D-04 base+voice composition, and PERS-02/D-04 tools-independence; zero production code touched (17-04/17-06 turn GREEN). Traceability stays Pending until then.
 - [Phase 17]: 17-02 is the Wave 0 persona API RED baseline: 11 tests (9 RED) pin the auth-gated GET /api/personas catalog with voice_block withheld (A5/T-17-06), PATCH /api/threads persona with id+user_id IDOR re-check (T-17-04) + no-clobber-model (T-17-05), and PUT/GET /api/preferences default_persona roundtrip (PERS-04); zero production code touched, PERS-01/04/05 traceability stays Pending until 17-06/17-07 turn GREEN
 - [Phase 17]: 17-03 authored the Wave 0 persona-picker RED scaffolds — PersonaSelector.test.tsx (4 its, PERS-01 onSelect) + DefaultPersonaSelector.test.tsx (3 its, PERS-04 PUT default_persona); both DELIBERATELY drop the useKeyStatus/useKeyGate mock (persona has no key/cost surface) and assert a keyless pick is never gated; RED via cannot-resolve until 17-09 authors the components.
+- [Phase ?]: [Phase 17]: 17-04 turned the persona composition RED baseline GREEN — settings.system_prompt is now the persona-agnostic operational base (D-02); opener (A1) + KB-first bias (D-03) moved into per-persona voice_blocks in services/persona_service.py; stream_chat_completion gained persona_voice and composes voice->base->tool_guide (Pitfall 2). PERS-02/03 composition-core GREEN; end-to-end closure awaits 17-06 resolver + 17-11 validation.
+- [Phase ?]: [Phase 17]: Pitfall 6 confirmed live — SYSTEM_PROMPT (and KEY_ENCRYPTION_SECRET) are set in .env and shadow code defaults; operational-base unit tests delenv SYSTEM_PROMPT so they pass, but the running app needs SYSTEM_PROMPT removed from .env/.env.prod at deploy.
 
 ### Pending Todos
 
@@ -80,7 +82,7 @@ Items acknowledged and deferred at v1.2 milestone close on 2026-07-11:
 
 ## Session Continuity
 
-Last session: 2026-07-13T14:32:22.406Z
-Stopped at: Completed 17-03-PLAN.md (persona picker RED scaffolds)
+Last session: 2026-07-13T14:43:19.655Z
+Stopped at: Completed 17-04-PLAN.md (persona base/voice split + composition)
 Resume file: None
 Next: Execute 17-03-PLAN.md (continue Phase 17 agent-personas)
