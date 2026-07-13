@@ -92,11 +92,17 @@ class Settings(BaseSettings):
     llm_base_url: str = "https://openrouter.ai/api/v1"
     llm_api_key: str = ""
     llm_model: str = ""
+    # Phase 17 (D-02): system_prompt is now the PERSONA-AGNOSTIC operational base — only
+    # rules that hold for every persona (citation format, tool-error handling, markdown
+    # tables, analyze_document-by-name). The "You are a helpful assistant" opener (A1) and
+    # the KB-first source bias (D-03) moved OUT into the per-persona voice_blocks
+    # (services/persona_service.py); the Board-Game Expert voice carries the KB-first bias,
+    # the General Assistant does not. Composition (voice → base → tool_guide) happens in
+    # llm_service.stream_chat_completion.
+    # Pitfall 6: any SYSTEM_PROMPT value in .env/.env.prod SHADOWS this default via
+    # pydantic-settings — it MUST be removed from those files at deploy or the refactored
+    # base never reaches the running app.
     system_prompt: str = (
-        "You are a helpful assistant with access to tools. Answer questions clearly and concisely. "
-        "Prefer the knowledge base for game rules and mechanics; use web_search only for current or "
-        "external facts the knowledge base cannot answer (prices, availability, upcoming expansions, "
-        "BGG rankings, designer/publisher news). "
         "When you use web search results, cite each source as an inline markdown link at the point the "
         "fact is used (e.g. [BGG](https://boardgamegeek.com/...)), and end your answer with a short "
         "\"Sources:\" list of the links you relied on. "
