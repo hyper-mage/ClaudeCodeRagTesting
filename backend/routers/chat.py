@@ -11,6 +11,7 @@ from database import get_supabase
 from config import get_settings
 from models.schemas import MessageCreate
 from services.llm_service import stream_chat_completion
+from services.persona_service import resolve_persona_id, get_persona_voice
 from services.sql_service import get_queryable_schema, execute_sql
 from services.web_search_service import search_web
 from services.kb_tools_service import kb_ls, kb_tree, kb_read, kb_grep, kb_glob
@@ -169,6 +170,59 @@ def _safe_user_default_model(db, user_id: str) -> str | None:
     except Exception as e:  # APIError 42P01 (relation does not exist) pre-P13
         logger.debug(f"user_preferences not available (pre-P13): {scrub_secrets(str(e))}")
         return None
+
+
+def _safe_thread_persona(thread_row: dict | None) -> str | None:
+    """Read thread.persona off the EXISTING SELECT * row (Phase 17, sibling of _safe_thread_model).
+
+    The `persona` column does not exist until migration 035 is applied — reading it
+    off the already-fetched row is an absent-KEY read (None), NOT a DB query (no 42703).
+    """
+    return thread_row.get("persona") if thread_row else None
+
+
+def _safe_user_default_persona(db, user_id: str) -> str | None:
+    """Read user_preferences.default_persona, tolerating the absent P17 column/table.
+
+    Clone of _safe_user_default_model but selecting `default_persona`. The column
+    does not exist until migration 035 is applied → the query may raise (PostgREST
+    APIError, Postgres 42P01 relation-does-not-exist). Swallow it and fall through to
+    the next persona tier (D-09). ZERO P17 schema created here.
+    """
+    try:
+        r = (
+            db.table("user_preferences")
+            .select("default_persona")
+            .eq("user_id", user_id)
+            .maybe_single()
+            .execute()
+        )
+        return r.data.get("default_persona") if r and r.data else None
+    except Exception as e:  # APIError 42P01 (relation does not exist) pre-migration-035
+        logger.debug(f"user_preferences.default_persona not available (pre-P17): {scrub_secrets(str(e))}")
+        return None
+
+
+def _resolve_persona(db, user_id: str, thread_row: dict | None, body) -> str:
+    """Per-request persona VOICE — sibling of _resolve_key_and_model (D-09/D-10/PERS-06).
+
+    NOT @lru_cache'd (Pitfall 4 no-bleed) — a plain module function called ONCE per
+    turn inside event_generator, so one thread/user's pinned persona can never bleed
+    into another's turn. Only the per-user *pinned id* is read fresh; PERSONAS itself
+    is a module constant (identical for all users, fine).
+
+    Three-tier resolution (D-09), each tier tolerant of the absent migration-035 schema:
+        body.persona? → thread_row.persona? → user_preferences.default_persona?
+    The resolved id is then validated by resolve_persona_id (D-10 — an unknown/stale/
+    crafted id collapses to the system default, never raises) before the voice lookup,
+    so only a registry voice_block string reaches the LLM system message (T-17-16).
+    """
+    pinned = (
+        getattr(body, "persona", None)              # optional future per-message override (A4)
+        or _safe_thread_persona(thread_row)         # per-thread pin — column may not exist yet
+        or _safe_user_default_persona(db, user_id)  # user default — table/column may not exist yet
+    )
+    return get_persona_voice(resolve_persona_id(pinned))   # D-10 validate → default; then voice
 
 
 def _demo_model_for(db, model: str, settings) -> str:
