@@ -5,6 +5,7 @@ import MobileTopBar from '../components/MobileTopBar'
 import MobileDrawer from '../components/MobileDrawer'
 import { IconNavRow } from '../components/IconSidebar'
 import type { ModelResponse } from '../components/ModelSelector'
+import type { PersonaOption } from '../components/PersonaSelector'
 import { apiFetch } from '../lib/api'
 import { applyStoredTheme } from '../lib/themeBootstrap'
 import { useChat } from '../hooks/useChat'
@@ -19,6 +20,8 @@ interface Thread {
   updated_at: string
   // The thread's pinned model id, or null when the thread follows the user's default (D-05).
   model: string | null
+  // The thread's pinned persona id, or null when the thread follows the user's default (PERS-05).
+  persona: string | null
 }
 
 export default function ChatPage() {
@@ -28,6 +31,9 @@ export default function ChatPage() {
   // The shared model catalog (so the per-thread selector resolves names without firing its own
   // /api/models fetch). Hydrates from the one-time mount fetch below.
   const [models, setModels] = useState<ModelResponse[] | undefined>(undefined)
+  // The shared persona catalog (fed to the header PersonaSelector). Hydrates from the one-time
+  // /api/personas mount fetch below — never hardcoded (D-07).
+  const [personas, setPersonas] = useState<PersonaOption[] | undefined>(undefined)
   const hamburgerRef = useRef<HTMLButtonElement>(null)
   const closeDrawer = () => setIsDrawerOpen(false)
   const openDrawer = () => setIsDrawerOpen(true)
@@ -74,6 +80,19 @@ export default function ChatPage() {
     return () => { cancelled = true }
   }, [])
 
+  // One-time persona catalog fetch (silent on failure). Array-guarded before setState so a
+  // malformed/unexpected response can never poison `personas` (PersonaSelector renders `personas ??
+  // []`, but the guard keeps the type honest and mirrors the /api/models fetch above).
+  useEffect(() => {
+    let cancelled = false
+    apiFetch('/api/personas')
+      .then((data: unknown) => {
+        if (!cancelled && Array.isArray(data)) setPersonas(data as PersonaOption[])
+      })
+      .catch(() => {})
+    return () => { cancelled = true }
+  }, [])
+
   // Post-login theme reconcile (Pitfall 6 / D-04). GET /api/preferences once on mount: if the
   // server theme differs from the current (localStorage-derived) class, the server wins — write
   // localStorage + re-apply (a one-frame snap is acceptable per D-02). The default-model hydrate
@@ -114,6 +133,30 @@ export default function ChatPage() {
       } catch (err) {
         Sentry.captureException(err)
         showToast("Couldn't update the model for this chat. Try again.", 'error')
+      }
+    },
+    [activeThreadId, showToast]
+  )
+
+  // Per-thread persona change (PERS-01/PERS-05). PATCH /api/threads/{id} {persona} pins the persona
+  // for this chat; the thread read on reopen re-seeds the picker. Optimistically mirror the new
+  // value into local state so the header trigger updates immediately (the PATCH echo is
+  // authoritative on reload). Unlike the model path there is NO key gate — persona carries no
+  // key/cost surface, so this handler is passed DIRECTLY to the picker (a keyless user can pick).
+  const handleThreadPersonaChange = useCallback(
+    async (personaId: string) => {
+      if (!activeThreadId) return
+      setThreads(prev =>
+        prev.map(t => (t.id === activeThreadId ? { ...t, persona: personaId } : t))
+      )
+      try {
+        await apiFetch(`/api/threads/${activeThreadId}`, {
+          method: 'PATCH',
+          body: JSON.stringify({ persona: personaId }),
+        })
+      } catch (err) {
+        Sentry.captureException(err)
+        showToast("Couldn't update the persona for this chat. Try again.", 'error')
       }
     },
     [activeThreadId, showToast]
@@ -212,6 +255,9 @@ export default function ChatPage() {
         threadModel={activeThread?.model ?? null}
         onThreadModelChange={guardedSelect}
         models={models}
+        threadPersona={activeThread?.persona ?? null}
+        onThreadPersonaChange={handleThreadPersonaChange}
+        personas={personas}
         lastTurnWasDemo={lastTurnWasDemo}
         onUseDemo={retryWithDemo}
       />
