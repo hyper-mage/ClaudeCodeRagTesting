@@ -34,6 +34,10 @@ export default function ChatPage() {
   // The shared persona catalog (fed to the header PersonaSelector). Hydrates from the one-time
   // /api/personas mount fetch below — never hardcoded (D-07).
   const [personas, setPersonas] = useState<PersonaOption[] | undefined>(undefined)
+  // `userDefaultPersona` is the user's default persona id (from GET /api/preferences.default_persona),
+  // or null. It mirrors the backend resolver's user-default tier for DISPLAY ONLY — it feeds the
+  // header picker's shown value (Gap 1) and NEVER triggers a write (display-only constraint, D-12).
+  const [userDefaultPersona, setUserDefaultPersona] = useState<string | null>(null)
   const hamburgerRef = useRef<HTMLButtonElement>(null)
   const closeDrawer = () => setIsDrawerOpen(false)
   const openDrawer = () => setIsDrawerOpen(true)
@@ -101,7 +105,7 @@ export default function ChatPage() {
   useEffect(() => {
     let cancelled = false
     apiFetch('/api/preferences')
-      .then((prefs: { theme?: string | null } | null) => {
+      .then((prefs: { theme?: string | null; default_persona?: string | null } | null) => {
         if (cancelled || !prefs) return
         const serverTheme = prefs.theme === 'dark' || prefs.theme === 'light' ? prefs.theme : null
         if (serverTheme) {
@@ -111,6 +115,9 @@ export default function ChatPage() {
             applyStoredTheme() // server wins; re-paint the root class from the just-written value
           }
         }
+        // Capture the user default persona for DISPLAY only (Gap 1). Best-effort like the theme
+        // reconcile above — never written back, never routed through handleThreadPersonaChange.
+        setUserDefaultPersona(prefs.default_persona ?? null)
       })
       .catch(() => {})
     return () => { cancelled = true }
@@ -255,7 +262,7 @@ export default function ChatPage() {
         threadModel={activeThread?.model ?? null}
         onThreadModelChange={guardedSelect}
         models={models}
-        threadPersona={activeThread?.persona ?? null}
+        threadPersona={activeThread?.persona ?? userDefaultPersona ?? personas?.find(p => p.is_default)?.id ?? null}
         onThreadPersonaChange={handleThreadPersonaChange}
         personas={personas}
         lastTurnWasDemo={lastTurnWasDemo}
