@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { renderHook, act, waitFor } from '@testing-library/react'
 import { ProvidersWrapper, mockSSEResponse } from '../test/utils'
-import { useChat } from './useChat'
+import { useChat, INTERRUPTED_CONTENT } from './useChat'
 import { apiStream, apiFetch } from '../lib/api'
 
 // Mock the I/O boundary — no real backend, no network.
@@ -338,6 +338,37 @@ describe('useChat demo signal + demo retry (15-07 D-10/D-11)', () => {
     })
 
     expect(mockedApiStream).not.toHaveBeenCalled()
+  })
+
+  // Gap 2 / 17-13: a PERSISTED '[Response interrupted]' assistant row (backend stamp) must be
+  // recoverable via retryLastUserMessage — the SAME send path, no second implementation.
+  it('Interrupted: retryLastUserMessage strips the interrupted assistant row and re-sends the last user turn', async () => {
+    const { result } = renderHook(() => useChat('t1'), { wrapper: ProvidersWrapper })
+
+    // Seed a persisted interrupted turn: the user message + the backend interrupted sentinel row.
+    act(() => {
+      result.current.setMessages([
+        { id: 'u1', role: 'user', content: 'Q' },
+        { id: 'a1', role: 'assistant', content: INTERRUPTED_CONTENT },
+      ])
+    })
+
+    await act(async () => {
+      result.current.retryLastUserMessage()
+      await Promise.resolve()
+    })
+
+    // (a) The retry re-sent the LAST user message via the existing retry:true endpoint.
+    await waitFor(() => expect(mockedApiStream).toHaveBeenCalledTimes(1))
+    const [url, init] = mockedApiStream.mock.calls[0]
+    expect(url).toContain('/api/threads/t1/messages?retry=true')
+    const body = JSON.parse((init as RequestInit).body as string)
+    expect(body).toMatchObject({ content: 'Q' })
+
+    // (b) The interrupted assistant row was stripped the moment the new attempt started.
+    await waitFor(() =>
+      expect(result.current.messages.some(m => m.content === INTERRUPTED_CONTENT)).toBe(false)
+    )
   })
 
   it('Demo 8: retryWithDemo is a no-op while a stream is in flight', async () => {

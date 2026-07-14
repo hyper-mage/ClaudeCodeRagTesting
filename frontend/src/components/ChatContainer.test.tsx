@@ -4,7 +4,7 @@ import userEvent from '@testing-library/user-event'
 import type { ComponentProps } from 'react'
 import { renderWithProviders, makeAuthMock, makeApiMock, resetMockAuth } from '../test/utils'
 import { apiFetch } from '../lib/api'
-import type { Message } from '../hooks/useChat'
+import { INTERRUPTED_CONTENT, type Message } from '../hooks/useChat'
 import ChatContainer from './ChatContainer'
 
 // ChatContainer calls useAuth() for isAnon — mock the module so renderWithProviders'
@@ -435,5 +435,52 @@ describe('ChatContainer [Use demo] wiring (D-11)', () => {
     })
 
     expect(screen.queryByRole('button', { name: 'Use demo' })).not.toBeInTheDocument()
+  })
+})
+
+describe('ChatContainer interrupted-turn Retry (Gap 2)', () => {
+  beforeEach(() => {
+    resetMockAuth()
+    mockApiFetch.mockReset()
+    mockApiFetch.mockResolvedValue(MODELS)
+  })
+
+  // A PERSISTED interrupted turn: the last user message + the backend-stamped assistant sentinel row
+  // (role='assistant', content='[Response interrupted]'), sourced from the shared INTERRUPTED_CONTENT.
+  const interruptedThread: Message[] = [
+    { id: 'u1', role: 'user', content: 'How do you win Azul?' },
+    { id: 'a1', role: 'assistant', content: INTERRUPTED_CONTENT },
+  ]
+
+  it('it A: renders an alert Retry card for the interrupted turn, not a plain sentinel bubble', () => {
+    renderContainer({ messages: interruptedThread, activeThreadId: 't1', models: MODELS })
+
+    // The recovery card is a role="alert" container carrying a Retry control.
+    const alert = screen.getByRole('alert')
+    expect(alert).toBeInTheDocument()
+    expect(within(alert).getByRole('button', { name: /retry/i })).toBeInTheDocument()
+    // The raw sentinel is NOT surfaced as a plain MessageBubble body.
+    expect(screen.queryByText(INTERRUPTED_CONTENT)).not.toBeInTheDocument()
+  })
+
+  it('it B: clicking Retry calls onRetry exactly once', async () => {
+    const user = userEvent.setup()
+    const onRetry = vi.fn()
+    renderContainer({ messages: interruptedThread, activeThreadId: 't1', models: MODELS, onRetry })
+
+    await user.click(screen.getByRole('button', { name: /retry/i }))
+
+    expect(onRetry).toHaveBeenCalledTimes(1)
+  })
+
+  it('it C: the Retry button is disabled while a fresh attempt is streaming (no double-submit)', () => {
+    renderContainer({
+      messages: interruptedThread,
+      activeThreadId: 't1',
+      models: MODELS,
+      isStreaming: true,
+    })
+
+    expect(screen.getByRole('button', { name: /retry/i })).toBeDisabled()
   })
 })
