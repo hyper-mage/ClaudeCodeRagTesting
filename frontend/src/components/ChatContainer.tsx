@@ -9,7 +9,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { useKeyStatus } from '../hooks/useKeyStatus'
 // Single source of truth for the message shape (incl. usage + errorType) — Plan 02 hook contract.
 // INTERRUPTED_CONTENT is the persisted interrupted-turn sentinel (Gap 2 / 17-13) — imported as the
-// single source of truth so the render branch never re-hardcodes the '[Response interrupted]' literal.
+// single source of truth so the render branch never re-hardcodes the interrupted-turn literal.
 import { INTERRUPTED_CONTENT, type Message } from '../hooks/useChat'
 
 interface Props {
@@ -185,9 +185,10 @@ export default function ChatContainer({
           ) : msg.role === 'notice' ? (
             <DeprecationNotice key={msg.id} content={msg.content} />
           ) : msg.role === 'assistant' && msg.content === INTERRUPTED_CONTENT ? (
-            // Gap 2 (17-13): a PERSISTED '[Response interrupted]' assistant row (backend stamp,
-            // chat.py) renders a one-click recovery card mirroring ErrorMessageBubble's generic
-            // variant — a role="alert" red-wash bubble with a single Retry button wired to the
+            // Gap 2 (17-13): a PERSISTED interrupted assistant row (content === INTERRUPTED_CONTENT,
+            // backend stamp in chat.py) renders a one-click recovery card mirroring
+            // ErrorMessageBubble's generic variant — a role="alert" red-wash bubble with a single
+            // Retry button wired to the
             // existing onRetry (retryLastUserMessage), which strips this row and re-sends the last
             // user turn via the retry:true send path. No new send implementation is introduced.
             <div key={msg.id} className="flex justify-start mb-4">
