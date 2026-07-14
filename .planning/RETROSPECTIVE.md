@@ -144,6 +144,50 @@
 
 ---
 
+## Milestone: v1.3 — Web Search & Agent Personas
+
+**Shipped:** 2026-07-14
+**Phases:** 2 (16, 17) | **Plans:** 17 | **Tasks:** 41
+**Timeline:** 2026-07-11 → 2026-07-14 (~4 days) | **Commits:** 89
+
+### What Was Built
+- Restored `web_search` — Tavily header-only Bearer auth (body `api_key` deleted), env-configurable `web_search_depth`, inline-markdown + `Sources:` citations, `tvly-` log scrub; prod-verified live on `boardgame-rag-prod` (success + failure smokes)
+- Failed-tool UX — `ToolEvent.status` / `ToolCallCard` `'error'` member, backend `is_error` SSE flag → red `AlertTriangle` + border
+- Persona prompt composition — split `settings.system_prompt` into a persona-agnostic operational BASE + a 2-entry per-persona VOICE registry (`persona_service.py`), composed voice-first in `stream_chat_completion`
+- Per-turn persona resolver — auth-gated `GET /api/personas` (voice_block withheld), non-cached `_resolve_persona` (thread pin → user default → system default, validate-to-default, 42P01-tolerant), model/key resolver untouched
+- Persistence — additive-nullable migration 035, `exclude_unset` PATCH (no persona/model clobber, IDOR re-check), `default_persona` preference roundtrip, header restored on reopen
+- Gate-free pickers wired live — `PersonaSelector` (chat header, shows effective active persona) + `DefaultPersonaSelector` (settings); plus a one-click Retry card on interrupted turns (gap-closure 17-13)
+
+### What Worked
+- **TDD RED-baseline waves** — every phase opened with a Wave 0 that pinned the contract in failing tests (16-01; 17-01/02/03) before any production code; GREEN plans then had an unambiguous target. Zero contract churn between RED and GREEN.
+- **Resolver kept separate from the key/model 4-tuple** — cloning the v1.2 model-pin pattern into a *sibling* `_resolve_persona` (not extending the key/model resolver) meant zero risk to the prod-verified BYOK seam (Pitfall 8 avoided by design).
+- **Additive-nullable migration, declared before wiring** — migration 035 authored in the schema plan (17-05), applied in a dedicated blocking plan (17-08); no backfill/FK/RLS meant a trivially reversible, no-downtime column add.
+- **Gap-closure plans inside the phase** — the 17-11 UAT found the picker never displayed the active persona and interrupted turns had no recovery; both became numbered plans (17-12, 17-13) with their own specs rather than ad-hoc patches.
+
+### What Was Inefficient
+- **UAT surfaced two env/infra gaps late** — concurrency starvation (D-17-CONC-A) and the model-switch retry error (D-17-MODCAT-A) only appeared in human UAT test 5/6; both were env-classified and deferred rather than fixed in-milestone. The concurrency issue is pre-existing (sync OpenAI client on the asyncio loop) but persona UAT was the first to trip it.
+- **SYSTEM_PROMPT env-shadow pitfall recurred** — the operational-base default is shadowed by a `SYSTEM_PROMPT` set in `.env`/`.env.prod`; unit tests `delenv` it, but the running app needed it removed at deploy (flagged in 16-02, again in 17-04). A config default silently overridden by env is a standing trap.
+- **First UAT pass missed a visible acceptance criterion** — persona voice changed correctly (PERS-06) but the picker showed a blank label, blocking SC-1/3/4 sign-off; a display-only resolver mirror (17-12) was needed after the fact. The picker's *display* value wasn't specified alongside its *write* path.
+
+### Patterns Established
+- **Voice-first prompt composition** — `voice → operational base → tool guide`; personas differ by a small voice block, base stays persona-agnostic, tools stay persona-independent (D-04)
+- **Catalog endpoint that withholds the sensitive field** — `GET /api/personas` returns `{id, label, is_default}` with `voice_block` withheld (A5), same shape the picker renders
+- **Display-only resolver mirror on the client** — the header picker computes `thread pin ?? user default ?? system default` to *show* the active persona without firing a write (17-12), mirroring the backend tier chain
+- **`exclude_unset` partial PATCH for multi-field rows** — persona and model share the threads PATCH; `body.model_dump(exclude_unset=True)` guarantees neither clobbers the other
+
+### Key Lessons
+1. Specify a picker's **display** value, not just its write path — a control that sets state correctly but shows nothing still fails visual UAT (cost: gap-closure 17-12).
+2. Config defaults that an env var can shadow are a standing deploy trap — the `SYSTEM_PROMPT` shadow bit two phases running; either stop reading the env override or assert its absence at boot.
+3. Clone a proven resolver as a **sibling**, not an extension, when the original guards a security invariant — persona resolution never touched the BYOK key/model seam.
+4. Human UAT remains the only thing that surfaces concurrency/infra behavior — both deferred debug sessions were invisible to unit tests and only appeared under real interactive load.
+
+### Cost Observations
+- Model mix: primarily Opus (gsd agents inherit)
+- Sessions: ~8-12 across 4 days
+- Notable: 89 commits, +10.4k LOC (incl. planning docs) in ~4 days — fastest milestone yet, riding heavy reuse of the v1.2 model-pin infra; free-model 429s still intermittently slowed live smokes
+
+---
+
 ## Cross-Milestone Trends
 
 ### Process Evolution
@@ -153,6 +197,7 @@
 | v1.0 | 21 | 7 (incl. 03.1) | Baseline — gsd workflow + decimal gap closure |
 | v1.1 | 28 | 9 (incl. 06.1) | Deploy milestone — interactive resume for human-driven work; UAT-driven gap-fix loop |
 | v1.2 | 43 | 9 (incl. 999.1/999.2) | Security milestone — invariant-level live gates, human-gated plans (`autonomous: false`), backlog phases run the full chain |
+| v1.3 | 17 | 2 (16-17) | Feature milestone — heavy reuse of v1.2 model-pin infra; TDD RED-baseline waves per phase; gap-closure plans for UAT display/recovery gaps |
 
 ### Cumulative Quality
 
@@ -161,6 +206,7 @@
 | v1.0 | 39/39 (100%) | 0 orphans, 0 broken | 1/7 compliant |
 | v1.1 | 23/23 (100%) | 0 orphans, 0 broken (live E2E) | 0/9 compliant — tech debt |
 | v1.2 | 26/26 (100%) | 6/6 flows wired, 1 orphaned endpoint (informational) | 8/9 compliant — Phase 13 PARTIAL |
+| v1.3 | 10/10 (100%) | web-search prod smoke + persona human UAT (5/6; 2 env gaps deferred) | not assessed at close — no v1.3 VALIDATION.md |
 
 ### Top Lessons (Verified Across Milestones)
 

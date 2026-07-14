@@ -1,5 +1,25 @@
 # Milestones
 
+## v1.3 Web Search & Agent Personas (Shipped: 2026-07-14)
+
+**Phases completed:** 2 phases (16-17), 17 plans, 41 tasks
+**Stats:** 89 commits (v1.2..v1.3), 91 files +10,438/−101, 2026-07-11 → 2026-07-14
+
+**Delivered:** The agent's web search tool is restored end-to-end and prod-verified, and users can switch the chat agent's persona per-thread (board-game expert ↔ general assistant) with a user-level default — every persona keeping full tool access, resolved per request with no cross-user/thread bleed.
+
+**Key accomplishments:**
+
+- **Web search restored + prod-verified** — `_search_tavily` now uses header-only `Authorization: Bearer` auth (body `api_key` deleted) with an env-configurable `web_search_depth`; the system prompt encodes inline-markdown + trailing-`Sources:` citations; `tvly-` keys are scrubbed from logs. Verified live on `boardgame-rag-prod` against the owner's real Tavily key — success smoke returned a cited web-grounded answer, failure smoke (temp invalid key) showed the red failed-state card + graceful best-effort answer with no crash (WSRCH-01..04).
+- **Failed-tool UX** — `ToolEvent.status` / `ToolCallCard` gained an `'error'` member; the `tool_result` SSE handler maps the backend `is_error` flag to a red `AlertTriangle` + red border, so any tool returning `{"error": ...}` is unmistakable at a glance (D-03/WSRCH-04).
+- **Persona prompt composition** — split the monolithic `settings.system_prompt` into a persona-agnostic operational BASE plus a 2-entry per-persona VOICE registry (new `persona_service.py`), composed voice-first in `stream_chat_completion`. Board-game expert stays the default; General Assistant is a vanilla voice — both retain full tool access (persona-independent tools, D-04) (PERS-02/03).
+- **Per-turn resolution seam, no bleed** — auth-gated `GET /api/personas` catalog (voice_block withheld, A5) + a non-cached `_resolve_persona` that resolves the voice once per turn (thread pin → user default → system default, D-09; validate-to-default, D-10; 42P01-tolerant) and threads it into the completion, leaving the model/key resolver untouched (Pitfall 8) (PERS-06).
+- **Persistence** — additive-nullable migration 035 (`threads.persona` + `user_preferences.default_persona`, no backfill/FK/RLS); `exclude_unset` PATCH so persona/model never clobber each other (IDOR re-check intact); `default_persona` roundtrip in preferences; header picker restored from the thread read on reopen (PERS-04/05).
+- **Gate-free persona pickers, wired live** — `PersonaSelector` (chat header) + `DefaultPersonaSelector` (settings) render a server-fetched catalog with NO key/cost gate (keyless users can pick); the header picker displays the effective active persona mirroring the backend resolver chain (gap-closure 17-12); plus a one-click Retry card on persisted `[Response interrupted]` turns (gap-closure 17-13) (PERS-01).
+
+**Known deferred items at close:** 2 diagnosed debug sessions, both env-classified from Phase 17 UAT — `concurrent-turns-no-output` (D-17-CONC-A: pre-existing sync-OpenAI-client-on-asyncio-loop starvation under a single uvicorn worker; fix = `asyncio.to_thread` offload or `AsyncOpenAI`; not persona scope) and `retry-model-switch-fails` (D-17-MODCAT-A: `ModelSelector` offers non-tool/unfunded models → switching then retrying an always-tools turn errors; optional catalog filter). Both non-blocking; see STATE.md Deferred Items.
+
+---
+
 ## v1.2 User Options & BYOK (Shipped: 2026-07-11)
 
 **Phases completed:** 9 phases (9-15 + backlog 999.1, 999.2), 43 plans, ~150 tasks

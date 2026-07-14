@@ -2,10 +2,10 @@
 gsd_state_version: 1.0
 milestone: v1.3
 milestone_name: Web Search & Agent Personas
-status: milestone_complete
-stopped_at: Milestone complete (Phase 17 was final phase)
-last_updated: 2026-07-14T16:01:28.645Z
-last_activity: 2026-07-14
+status: Awaiting next milestone
+stopped_at: Completed 17-13-PLAN.md (Gap 2 Retry affordance — VERIFICATION Gap 2 closed)
+last_updated: "2026-07-14T19:04:47.663Z"
+last_activity: 2026-07-14 — Milestone v1.3 completed and archived
 progress:
   total_phases: 2
   completed_phases: 2
@@ -18,47 +18,23 @@ progress:
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-07-11 after v1.2 completion)
+See: .planning/PROJECT.md (updated 2026-07-14 after v1.3 completion)
 
 **Core value:** The agent can intelligently search and reason across a structured board game knowledge base — finding rules, comparing mechanics, and recommending games — using the right tool for the job, transparently.
-**Current focus:** Milestone complete
+**Current focus:** Planning next milestone (v1.3 shipped 2026-07-14)
 
 ## Current Position
 
-Phase: 17
-Plan: Not started
-Status: Milestone complete
-Last activity: 2026-07-14
-
-Progress: [██████████] 100%
+Phase: Milestone v1.3 complete
+Plan: —
+Status: Awaiting next milestone
+Last activity: 2026-07-14 — Milestone v1.3 completed and archived
 
 ## Accumulated Context
 
 ### Decisions
 
-v1.2 decisions promoted to PROJECT.md Key Decisions table at milestone close (2026-07-11). Full log there.
-
-Recent decisions affecting v1.3 work:
-
-- [v1.3 roadmap]: Phase 16 is a fix + prod-verify of the existing `web_search` tool (not greenfield) — likely Tavily Bearer-auth vs `api_key`-in-body and/or unset key.
-- [v1.3 roadmap]: Phase 17 personas reuse the v1.2 model-pin infra — `user_preferences` default + per-thread column (migration 032 pattern), the per-request resolution seam in `chat.py`/`llm_service.stream_chat_completion`, and the `ModelSelector`/`DefaultModelSelector` UI. Predefined personas only.
-- [Phase 16]: 16-01 is a Wave 0 RED test scaffold: WSRCH-01..04 pinned by failing tests (test_web_search.py + test_config.py); no production code touched — 16-02 turns them GREEN. Requirement traceability stays Pending until 16-02.
-- [Phase ?]: [Phase 16]: 16-02 turned the 16-01 RED baseline GREEN — Tavily is header-only Bearer auth (body api_key deleted), search_depth is env-configurable (WEB_SEARCH_DEPTH), tool_result SSE carries is_error, scrub_secrets redacts tvly-.
-- [Phase ?]: [Phase 16]: local .env SYSTEM_PROMPT override shadows the new citation-guidance default — must be removed from .env/.env.prod for D-01/D-02 guidance to reach the running app (flagged in 16-02 SUMMARY).
-- [Phase 16]: [Phase 16]: 16-03 wired the frontend failed-state — ToolEvent.status gained 'error', the tool_result handler maps backend is_error, and ToolCallCard shows a red AlertTriangle + red border on failure (D-03/WSRCH-04).
-- [Phase 16]: [Phase 16]: used 'as ToolEvent[status]' cast (not the plan's illegal 'as const' on a ternary, TS1355) for the is_error->status mapping; union widening is a two-file atomic pair verified by the full npm run build.
-- [Phase 17]: 17-01 is the Wave 0 persona RED baseline — 15 failing tests pin PERS-03/06, D-10, D-09 tier order, 42P01 tolerance, the D-01/D-02/D-03/D-04 base+voice composition, and PERS-02/D-04 tools-independence; zero production code touched (17-04/17-06 turn GREEN). Traceability stays Pending until then.
-- [Phase 17]: 17-02 is the Wave 0 persona API RED baseline: 11 tests (9 RED) pin the auth-gated GET /api/personas catalog with voice_block withheld (A5/T-17-06), PATCH /api/threads persona with id+user_id IDOR re-check (T-17-04) + no-clobber-model (T-17-05), and PUT/GET /api/preferences default_persona roundtrip (PERS-04); zero production code touched, PERS-01/04/05 traceability stays Pending until 17-06/17-07 turn GREEN
-- [Phase 17]: 17-03 authored the Wave 0 persona-picker RED scaffolds — PersonaSelector.test.tsx (4 its, PERS-01 onSelect) + DefaultPersonaSelector.test.tsx (3 its, PERS-04 PUT default_persona); both DELIBERATELY drop the useKeyStatus/useKeyGate mock (persona has no key/cost surface) and assert a keyless pick is never gated; RED via cannot-resolve until 17-09 authors the components.
-- [Phase ?]: [Phase 17]: 17-04 turned the persona composition RED baseline GREEN — settings.system_prompt is now the persona-agnostic operational base (D-02); opener (A1) + KB-first bias (D-03) moved into per-persona voice_blocks in services/persona_service.py; stream_chat_completion gained persona_voice and composes voice->base->tool_guide (Pitfall 2). PERS-02/03 composition-core GREEN; end-to-end closure awaits 17-06 resolver + 17-11 validation.
-- [Phase ?]: [Phase 17]: Pitfall 6 confirmed live — SYSTEM_PROMPT (and KEY_ENCRYPTION_SECRET) are set in .env and shadow code defaults; operational-base unit tests delenv SYSTEM_PROMPT so they pass, but the running app needs SYSTEM_PROMPT removed from .env/.env.prod at deploy.
-- [Phase ?]: [Phase 17]: 17-05 authored the persona DATA CONTRACT — PersonaResponse (id/label/is_default, voice_block withheld A5), ThreadResponse.persona (Pitfall 1), ThreadModelUpdate->ThreadUpdate + persona (exclude_unset partial PATCH), default_persona on both preferences models, and the additive-nullable migration 035 FILE (threads.persona + user_preferences.default_persona; no backfill/constraint/FK/DEFAULT/RLS, D-08/D-10). Migration authored NOT applied (17-08 owns db push). PERS-01/04/05 stay Pending until 17-06/17-07 wire endpoints, 17-08 applies, 17-09 ships pickers.
-- [Phase ?]: [Phase 17]: 17-06 shipped the persona READ+RESOLUTION seam — auth-gated GET /api/personas (catalog code-constant, voice_block withheld A5) registered in main.py; chat.py gained the non-cached _resolve_persona sibling (D-09 thread-pin>user-default>Expert, D-10 validate-to-default, 42P01-tolerant) wired once per turn into stream_chat_completion(persona_voice=...). Model/key 4-tuple untouched (Pitfall 8); tools persona-independent (D-04). 17-01 resolver (6) + 17-02 personas_api (3) RED scaffolds GREEN. PERS-01/03/06 backend core live but stay Pending — 17-09 picker + 17-11 validation close them.
-- [Phase ?]: [Phase 17]: 17-07 wired persona WRITE+PERSISTENCE — PATCH /api/threads/{id} now body.model_dump(exclude_unset=True) so persona/model never clobber (IDOR + explicit-null-clear intact); PUT/GET /api/preferences thread default_persona through both selects + all 4 return dicts (null for new users). 17-02 thread-persona-patch + prefs default_persona RED scaffolds GREEN. PERS-01/04/05 stay Pending (pickers=17-09, migration apply=17-08).
-- [Phase 17]: 17-09 shipped the two gate-free persona pickers GREEN — PersonaSelector (chat header; onSelect(id), parent owns the PATCH) and DefaultPersonaSelector (settings; self-PUT /api/preferences {default_persona}). Both render the parent-supplied GET /api/personas catalog (never hardcoded, D-07), carry NO key gate (a keyless user can pick/set a persona, PERS-01/PERS-04), add no per-message badge (picker-only, D-12), and are fresh components (not a ModelSelector clone). 17-03 RED scaffolds GREEN (7/7).
-- [Phase ?]: [Phase 17]: 17-10 wired the persona pickers into the running app (last implementation wave) — ChatPage fetches GET /api/personas once + owns an optimistic no-key-gate handleThreadPersonaChange (PATCH /api/threads/{id} {persona}, passed DIRECTLY not via useKeyGate) + Thread.persona seeded from the thread read on reopen (PERS-05); ChatContainer renders PersonaSelector beside ModelSelector (Sigma cost intact); SettingsPage renders DefaultPersonaSelector seeded from GET /api/preferences.default_persona. PERS-01/04/05 now live end-to-end; 17-11 is human UAT. FE build+133 tests green; required-prop addition to ChatContainer forced a Rule-1 test-props compile fix; 5 pre-existing lint errors confirmed baseline via git stash, deferred.
-- [Phase 17]: 17-12 (gap-closure) closed VERIFICATION Gap 1 — the chat-header picker now DISPLAYS the effective active persona. ChatPage captures default_persona from the existing GET /api/preferences fetch into userDefaultPersona state and passes `activeThread?.persona ?? userDefaultPersona ?? personas?.find(p => p.is_default)?.id ?? null` to ChatContainer, mirroring the backend resolver tier chain (thread pin → user default → system default). LOCKED display-only: no auto-PATCH added; handleThreadPersonaChange stays the sole persona write path (T-17-32 mitigated). New ChatPage.test.tsx spec pins SC-1/SC-3/SC-4 + a no-PATCH-on-display assertion. FE build + 137 vitest (133 prior + 4 new) green. Gap 2 (Retry affordance) still pending. SC-2 tool-call + SC-4 reload + cross-user bleed still need the 17-11 UAT re-run.
-- [Phase 17]: 17-13 (gap-closure) closed VERIFICATION Gap 2 — persisted interrupted assistant turns ('[Response interrupted]') now show a one-click Retry card. useChat exports INTERRUPTED_CONTENT (single source of truth) and retryLastUserMessage strips the interrupted assistant row before resubmitting the last user message via the existing retry:true send path (no second send impl, T-17-34 mitigated); ChatContainer renders a role='alert' recovery card mirroring ErrorMessageBubble's generic variant (Retry disabled while streaming, T-17-35). Hook spec added to existing useChat.test.tsx (plan named a new .ts; the .tsx already covers the hook). FE build + 141 vitest (137 prior + 4 new) green. Both VERIFICATION gaps (Gap 1 picker display 17-12, Gap 2 Retry 17-13) now closed — 17-11 UAT re-run is next.
+v1.2 and v1.3 decisions promoted to PROJECT.md Key Decisions table at milestone close (v1.3: 2026-07-14). Full log in PROJECT.md and the v1.3 milestone archive (`milestones/v1.3-ROADMAP.md`).
 
 ### Pending Todos
 
@@ -72,7 +48,9 @@ None yet.
 
 ## Deferred Items
 
-Items acknowledged and deferred at v1.2 milestone close on 2026-07-11:
+At v1.3 milestone close (2026-07-14) the 2 open debug sessions were re-acknowledged and deferred: `concurrent-turns-no-output` (D-17-CONC-A) and `retry-model-switch-fails` (D-17-MODCAT-A) — both env-classified, non-blocking, listed in the table below.
+
+Items acknowledged and deferred at v1.2 milestone close on 2026-07-11 (carried forward):
 
 | Category | Item | Status |
 |----------|------|--------|
@@ -91,7 +69,11 @@ Items acknowledged and deferred at v1.2 milestone close on 2026-07-11:
 
 ## Session Continuity
 
-Last session: 2026-07-14T02:48:42.702Z
-Stopped at: Completed 17-13-PLAN.md (Gap 2 Retry affordance — VERIFICATION Gap 2 closed)
+Last session: 2026-07-14 — v1.3 milestone completed and archived
+Stopped at: Milestone v1.3 Web Search & Agent Personas closed (archives + git tag v1.3)
 Resume file: None
-Next: Re-run the 17-11 UAT (SC-1/SC-3/SC-4 picker display, SC-2 tool call under General Assistant, cross-user bleed, and a live interrupted-turn Retry click) — both gap-closure fixes (17-12 picker display, 17-13 Retry) are now shipped
+Next: Start the next milestone with /gsd:new-milestone
+
+## Operator Next Steps
+
+- Start the next milestone with /gsd-new-milestone

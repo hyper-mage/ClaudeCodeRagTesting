@@ -2,21 +2,15 @@
 
 ## What This Is
 
-An agentic RAG application specialized for board games. It combines a pre-seeded default knowledge base of popular board games with user-uploaded private collections, providing intelligent chat that can search, compare, and recommend across the entire library. The agent uses Claude Code-inspired tooling (ls, tree, grep, glob, read) with transparent tool calls to navigate a hierarchical folder-based knowledge base stored in Supabase. Users bring their own OpenRouter key via one-click OAuth (BYOK) and chat on any model they choose, with per-message cost visibility; a flag-gated, cost-bounded owner-key demo fallback keeps the public demo alive for keyless visitors.
+An agentic RAG application specialized for board games. It combines a pre-seeded default knowledge base of popular board games with user-uploaded private collections, providing intelligent chat that can search, compare, and recommend across the entire library. The agent uses Claude Code-inspired tooling (ls, tree, grep, glob, read) with transparent tool calls to navigate a hierarchical folder-based knowledge base stored in Supabase. Users bring their own OpenRouter key via one-click OAuth (BYOK) and chat on any model they choose, with per-message cost visibility; a flag-gated, cost-bounded owner-key demo fallback keeps the public demo alive for keyless visitors. The agent can also reach current information via web search, and users can switch its persona per thread — board-game expert or general assistant — while it keeps full tool access.
 
 ## Core Value
 
 The agent can intelligently search and reason across a structured board game knowledge base — finding rules, comparing mechanics, and recommending games — using the right tool for the job, transparently.
 
-## Current Milestone: v1.3 Web Search & Agent Personas
+## Current Milestone: Between milestones (v1.3 shipped 2026-07-14)
 
-**Goal:** Restore the web search tool and let users switch the chat agent persona (board-game expert ↔ general assistant), both retaining full tool access.
-
-**Target features:**
-- Fix/restore the web search tool (Tavily Bearer-auth update, ensure the tool surfaces when configured, prod-verify)
-- Predefined agent personas — a curated set including the current expert plus a vanilla general assistant, all tool-enabled
-- Per-thread persona pin + user-level default persona (mirrors the v1.2 model-pin infrastructure)
-- Persona picker UI + settings-page default (mirrors the model picker)
+v1.3 Web Search & Agent Personas shipped — see **Current State** below. Next milestone not yet scoped; run `/gsd:new-milestone` to define it.
 
 ## Requirements
 
@@ -96,14 +90,23 @@ The agent can intelligently search and reason across a structured board game kno
 - ✓ Owner-key demo fallback: global flag default-OFF, $0 structural cost bound live-trip-tested, non-dismissible banner — v1.2 (Phases 15/999.2)
 - ✓ Chat empty-state prompts + auto-create-thread-on-send — v1.2 (Phase 999.1)
 
+**v1.3 Web Search & Agent Personas (shipped 2026-07-14 — 10/10 requirements):**
+
+- ✓ Web search tool restored end-to-end + prod-verified — Tavily Bearer auth, env-configurable depth, cited sources, fail-closed, graceful failure card — v1.3 (Phase 16, WSRCH-01..04)
+- ✓ Predefined agent personas — board-game expert (default) + General Assistant vanilla voice, both full-tool-access; operational-base + per-persona voice registry composed per turn — v1.3 (Phase 17, PERS-02/03)
+- ✓ Per-thread persona pin + user-level default persona, resolved per request with no cross-user/thread bleed (thread pin → user default → system default) — v1.3 (Phase 17, PERS-05/06)
+- ✓ Persona picker UI (chat header) + settings-page default, gate-free (keyless users can pick), header shows effective active persona — v1.3 (Phase 17, PERS-01/04)
+
 ### Active
 
-**v1.3 Web Search & Agent Personas (scoping — REQ-IDs in REQUIREMENTS.md):**
+_No active milestone. Next milestone not yet scoped — run `/gsd:new-milestone`._
 
-- ~~Web search tool restored and prod-verified (Tavily current auth)~~ ✓ Validated in Phase 16 (2026-07-12)
-- Predefined agent personas (expert + general assistant, tool-enabled)
-- Per-thread persona pin + user-level default persona
-- Persona picker UI + settings-page default
+**Deferred to a future milestone (tracked, from v1.3 REQUIREMENTS):**
+
+- Multiple/switchable web search providers beyond Tavily (WSRCH-F1)
+- User-facing per-thread web-search toggle (WSRCH-F2)
+- User-editable custom persona prompts (PERS-F1)
+- Per-persona tool allowlists (PERS-F2)
 
 ### Out of Scope
 
@@ -161,6 +164,10 @@ The agent can intelligently search and reason across a structured board game kno
 | LangSmith gate at the run layer + runtime master toggle | Client-wrap-only gating leaked BYOK turns via the endpoint `@traceable`; `tracing_context` + `app_settings.langsmith_enabled` (suppress-only) close every flag state | ✓ v1.2 Phase 11 (prod-verified zero-run) |
 | Per-request uncached key/model resolution | Module-level cache risks cross-user bleed; fresh resolver + fresh client per call | ✓ v1.2 Phase 11 |
 | Plain-TEXT default_model, no FK to model_cache | A deprecated-but-pinned slug must persist so the at-send fallback notice can fire | ✓ v1.2 Phase 13 |
+| Tavily header-only Bearer auth (no body api_key) | Tavily's current API rejects the body `api_key`; Bearer header is the supported transport | ✓ v1.3 Phase 16 |
+| Operational-base + per-persona voice registry (not free-text prompts) | Predefined personas avoid a prompt-injection review surface; base stays persona-agnostic, voice composed per turn | ✓ v1.3 Phase 17 (PERS-F1 deferred) |
+| Personas reuse v1.2 model-pin infra, resolver kept separate | Thread-column + user-default pin pattern (migration 035) already proven; a sibling `_resolve_persona` avoids touching the key/model 4-tuple (Pitfall 8) | ✓ v1.3 Phase 17 |
+| All personas retain full tool access | Per-persona tool allowlisting deferred (PERS-F2); v1.3 personas differ by voice only | ✓ v1.3 Phase 17 |
 
 ## Evolution
 
@@ -182,20 +189,18 @@ This document evolves at phase transitions and milestone boundaries.
 ---
 ## Current State
 
-**Shipped:** v1.2 User Options & BYOK (2026-07-11) — 9 phases (9-15 + 999.1/999.2), 43 plans, 26/26 requirements satisfied. Milestone audit passed at close (sole blocker — SEC-01 live human gates — cleared on prod 2026-07-11). Users connect their own OpenRouter key via one-click OAuth PKCE, pick any model per thread from a cached searchable catalog, and see per-message/per-thread cost; keys are encrypted at rest with prod-verified zero-leak custody, and a flag-gated, cost-bounded owner-key demo fallback keeps the public demo alive. See [milestones/v1.2-ROADMAP.md](milestones/v1.2-ROADMAP.md).
+**Shipped:** v1.3 Web Search & Agent Personas (2026-07-14) — 2 phases (16-17), 17 plans, 10/10 requirements satisfied. The agent's `web_search` tool is restored (Tavily Bearer auth, env-configurable depth, cited sources, red failed-state card) and prod-verified live on `boardgame-rag-prod`; users switch the chat agent's persona per-thread (board-game expert ↔ General Assistant, both full-tool-access) with a user-level default, resolved per request with no cross-user/thread bleed. See [milestones/v1.3-ROADMAP.md](milestones/v1.3-ROADMAP.md).
 
-**Prior:** v1.1 Portfolio Deployment (2026-05-20) — 9 phases, 28 plans, 23/23 requirements; live at **https://boardgame-rag-prod.pages.dev** (Fly.io + Cloudflare Pages + dedicated prod Supabase). See [milestones/v1.1-ROADMAP.md](milestones/v1.1-ROADMAP.md). · v1.0 KB Navigation & Agentic RAG (2026-04-23) — 7 phases, 21 plans, 39/39 requirements. See [milestones/v1.0-ROADMAP.md](milestones/v1.0-ROADMAP.md).
+**Prior:** v1.2 User Options & BYOK (2026-07-11) — 9 phases (9-15 + 999.1/999.2), 43 plans, 26/26 requirements; one-click OpenRouter OAuth BYOK, per-thread model pick, per-message cost, encrypted zero-leak key custody, gated owner-key demo. See [milestones/v1.2-ROADMAP.md](milestones/v1.2-ROADMAP.md). · v1.1 Portfolio Deployment (2026-05-20) — live at **https://boardgame-rag-prod.pages.dev** (Fly.io + Cloudflare Pages + dedicated prod Supabase). See [milestones/v1.1-ROADMAP.md](milestones/v1.1-ROADMAP.md). · v1.0 KB Navigation & Agentic RAG (2026-04-23) — 7 phases, 21 plans. See [milestones/v1.0-ROADMAP.md](milestones/v1.0-ROADMAP.md).
 
-**Tech stack:** React 19 + Vite 6 + Tailwind 4 frontend (vitest + Testing Library); Python 3.11 + FastAPI backend (278 tests passing); Supabase (Postgres + pgvector + Auth + Storage + Realtime, migrations through 034); OpenRouter LLM (BYOK + owner demo key); Docling parsing; Sentry + LangSmith (run-layer gated) + UptimeRobot observability.
+**Tech stack:** React 19 + Vite 6 + Tailwind 4 frontend (vitest + Testing Library, 141 tests); Python 3.11 + FastAPI backend; Supabase (Postgres + pgvector + Auth + Storage + Realtime, migrations through 035); OpenRouter LLM (BYOK + owner demo key); Tavily web search; Docling parsing; Sentry + LangSmith (run-layer gated) + UptimeRobot observability.
 
 **Known tech debt carried into next milestone:**
-- 2 non-blocking Phase 11 UAT scenarios (live 402-vs-429 SSE codes; prod SQL-flip smoke of the LangSmith toggle).
-- Audit warnings W-1..W-6: dead-pin notice accumulates + not SSE-emitted (Phase 13); stale demo banner until thread switch (Phase 15); FE/BE scrub regex breadth mismatch + `budget_service` logger not directly filtered (Phase 11); no post-turn balance refresh (Phase 14).
-- Phase 13 Nyquist PARTIAL — run `/gsd:validate-phase 13`; v1.1 phases 1, 3, 6, 6.1, 7, 8 also unvalidated.
-- Pre-existing: `test_record_manager.py` fixture debt; `execute_readonly_query` 42501 SET LOCAL quirk (D-09-A); free-model provider 429s make live smokes flaky (D-999.1-LLM-A).
-- Orphaned capability: `GET /api/models?free_only=true` has no frontend consumer.
+- **D-17-CONC-A** (open debug session — concurrency) — chat hot path uses a sync OpenAI client iterated on the asyncio loop under a single uvicorn worker; a 2nd concurrent turn starves → `[Response interrupted]`. Fix: `asyncio.to_thread` offload or `AsyncOpenAI`, and/or multi-worker. Pre-existing; surfaced by Phase 17 UAT.
+- **D-17-MODCAT-A** (open debug session) — `ModelSelector` offers non-tool/unfunded models; switching then retrying an always-tools turn errors. Optional: filter catalog to tool-capable models.
+- Carried from v1.2: 2 non-blocking Phase 11 UAT scenarios (402-vs-429 SSE codes; prod SQL-flip smoke of the LangSmith toggle); audit warnings W-1..W-6; Phase 13 Nyquist PARTIAL + v1.1 phases 1/3/6/6.1/7/8 unvalidated; `test_record_manager.py` fixture debt; `execute_readonly_query` 42501 quirk; free-model 429 smoke flakiness; orphaned `GET /api/models?free_only=true`.
 
-**Current milestone:** v1.3 Web Search & Agent Personas — Phase 16 (Web Search Restoration) complete + prod-verified 2026-07-12 (4 plans; Tavily Bearer-auth transport fixed, env-configurable search depth, D-02 citations, red failed-state tool card, `tvly-` scrub; live smoke on boardgame-rag-prod v36). Phase 17 (Agent Personas) next.
+**Current milestone:** none active — v1.3 shipped 2026-07-14. Run `/gsd:new-milestone` to scope the next.
 
 ---
-*Last updated: 2026-07-12 — Phase 16 Web Search Restoration complete*
+*Last updated: 2026-07-14 — v1.3 Web Search & Agent Personas milestone complete*
