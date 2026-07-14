@@ -75,7 +75,7 @@ See [milestones/v1.0-ROADMAP.md](milestones/v1.0-ROADMAP.md)
   3. User can set a default persona on the settings/account page, and new threads start with that default.
   4. A thread's persona selection persists across sessions and is restored when the user reopens the thread.
   5. The selected persona's system prompt is resolved and applied per chat request with no cross-user or cross-thread bleed under concurrent BYOK turns.
-**Plans**: 11 plans (6 waves)
+**Plans**: 11 plans (6 waves) + 2 gap-closure plans (Wave 7, parallel — from 17-VERIFICATION.md)
 - [x] 17-01-PLAN.md — Wave 0 RED: backend resolver/prompt/config test scaffolds
 - [x] 17-02-PLAN.md — Wave 0 RED: backend personas-API/thread-PATCH/preferences test scaffolds
 - [x] 17-03-PLAN.md — Wave 0 RED: frontend persona picker test scaffolds
@@ -87,6 +87,8 @@ See [milestones/v1.0-ROADMAP.md](milestones/v1.0-ROADMAP.md)
 - [x] 17-09-PLAN.md — PersonaSelector + DefaultPersonaSelector components
 - [x] 17-10-PLAN.md — Wire pickers into ChatPage/ChatContainer/SettingsPage
 - [x] 17-11-PLAN.md — End-to-end persona UI verification (checkpoint)
+- [ ] 17-12-PLAN.md — [gap-closure] Chat picker displays the effective active persona, display-only (SC-1/3/4; PERS-01/03/04/05)
+- [ ] 17-13-PLAN.md — [gap-closure] Retry affordance on interrupted/failed assistant turns (bundled UX enhancement; no PERS requirement)
 **UI hint**: yes
 
 ## Progress
@@ -106,4 +108,4 @@ Phases execute in numeric order: 16 → 17
 | 999.1 Chat Empty-State UX | v1.2 | 3/3 | Complete | 2026-06 |
 | 999.2 Cost Guardrail Burn Script | v1.2 | 2/2 | Complete | 2026-07 |
 | 16. Web Search Restoration | v1.3 | 4/4 | Complete    | 2026-07-12 |
-| 17. Agent Personas | v1.3 | 11/11 | Complete   | 2026-07-14 |
+| 17. Agent Personas | v1.3 | 11/13 | Gap-closure | 2026-07-14 |
