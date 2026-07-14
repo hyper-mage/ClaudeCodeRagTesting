@@ -48,6 +48,12 @@ export interface Message {
   errorType?: 'no_api_key' | 'payment_required' | 'forbidden' | 'model_unavailable'
 }
 
+// Single source of truth for the PERSISTED interrupted-turn sentinel. The backend stamps an
+// assistant row's content with exactly this string when a stream is cut short (chat.py L1586).
+// On reload that row is a plain role==='assistant' message — ChatContainer keys the Gap-2 Retry
+// card off this constant and retryLastUserMessage strips it, so the literal is never hardcoded twice.
+export const INTERRUPTED_CONTENT = '[Response interrupted]'
+
 export function useChat(threadId: string | null) {
   const [messages, setMessages] = useState<Message[]>([])
   const [isStreaming, setIsStreaming] = useState(false)
@@ -366,13 +372,19 @@ export function useChat(threadId: string | null) {
 
   // Re-send the most recent user message after a failure. Disabled while a fresh
   // attempt is mid-stream (UI-SPEC § Surface 2 Retry behavior, locked by D-07).
-  // Strips any role==='error' bubbles before retrying so the failed turn
-  // disappears from the thread the moment the new attempt starts.
+  // Strips any role==='error' bubbles AND a persisted interrupted assistant row
+  // (content===INTERRUPTED_CONTENT, Gap 2 / 17-13) before retrying so the failed/interrupted
+  // turn disappears from the thread the moment the new attempt starts. The backend already
+  // deletes the most-recent assistant row on retry — this makes the FE match immediately.
   const retryLastUserMessage = useCallback(() => {
     if (isStreaming) return
     const lastUser = [...messages].reverse().find(m => m.role === 'user')
     if (!lastUser) return
-    setMessages(prev => prev.filter(m => m.role !== 'error'))
+    setMessages(prev =>
+      prev.filter(
+        m => m.role !== 'error' && !(m.role === 'assistant' && m.content === INTERRUPTED_CONTENT)
+      )
+    )
     // WR-05: pass the current thread explicitly so retry targets it deterministically (matching
     // the explicit-threadId send path) rather than relying solely on the closured threadId.
     void sendMessage(lastUser.content, { retry: true, threadId: threadId ?? undefined })
