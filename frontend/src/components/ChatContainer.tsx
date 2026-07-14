@@ -1,4 +1,4 @@
-import { Info } from 'lucide-react'
+import { Info, AlertCircle, RotateCw } from 'lucide-react'
 import MessageBubble from './MessageBubble'
 import ChatInput from './ChatInput'
 import ErrorMessageBubble from './ErrorMessageBubble'
@@ -8,7 +8,9 @@ import PersonaSelector, { type PersonaOption } from './PersonaSelector'
 import { useAuth } from '../contexts/AuthContext'
 import { useKeyStatus } from '../hooks/useKeyStatus'
 // Single source of truth for the message shape (incl. usage + errorType) — Plan 02 hook contract.
-import type { Message } from '../hooks/useChat'
+// INTERRUPTED_CONTENT is the persisted interrupted-turn sentinel (Gap 2 / 17-13) — imported as the
+// single source of truth so the render branch never re-hardcodes the '[Response interrupted]' literal.
+import { INTERRUPTED_CONTENT, type Message } from '../hooks/useChat'
 
 interface Props {
   messages: Message[]
@@ -182,6 +184,34 @@ export default function ChatContainer({
             />
           ) : msg.role === 'notice' ? (
             <DeprecationNotice key={msg.id} content={msg.content} />
+          ) : msg.role === 'assistant' && msg.content === INTERRUPTED_CONTENT ? (
+            // Gap 2 (17-13): a PERSISTED '[Response interrupted]' assistant row (backend stamp,
+            // chat.py) renders a one-click recovery card mirroring ErrorMessageBubble's generic
+            // variant — a role="alert" red-wash bubble with a single Retry button wired to the
+            // existing onRetry (retryLastUserMessage), which strips this row and re-sends the last
+            // user turn via the retry:true send path. No new send implementation is introduced.
+            <div key={msg.id} className="flex justify-start mb-4">
+              <div
+                role="alert"
+                className="max-w-[85%] md:max-w-[70%] px-4 py-3 rounded-lg bg-red-950/40 border border-red-700 text-gray-100"
+              >
+                <div className="flex items-start gap-2">
+                  <AlertCircle size={16} className="text-red-400 mt-0.5 shrink-0" />
+                  <p className="text-sm leading-[1.5]">This response was interrupted.</p>
+                </div>
+                <div className="mt-2">
+                  <button
+                    type="button"
+                    onClick={onRetry}
+                    disabled={isStreaming}
+                    className="inline-flex items-center gap-1 px-3 py-2.5 md:py-1.5 rounded text-sm font-semibold bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <RotateCw size={14} />
+                    Retry
+                  </button>
+                </div>
+              </div>
+            </div>
           ) : (
             <MessageBubble
               key={msg.id}
