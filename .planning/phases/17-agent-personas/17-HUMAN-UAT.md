@@ -1,9 +1,9 @@
 ---
-status: complete
+status: diagnosed
 phase: 17-agent-personas
 source: [17-VERIFICATION.md]
 started: 2026-07-14T09:05:00Z
-updated: 2026-07-14T10:30:00Z
+updated: 2026-07-14T10:45:00Z
 ---
 
 ## Current Test
@@ -54,17 +54,35 @@ gaps: 2
 ## Gaps
 
 - truth: "Two concurrent users/threads with different personas each get their own persona voice with no cross-bleed, and both turns complete."
-  status: failed
+  status: diagnosed
   reason: "User reported: concurrent two-chat setup is very laggy; running turns together breaks with an error+retry; after several attempts both ran tool calls but produced no output (timed out/errored). No wrong-persona-voice leak was observed — both turns simply failed to complete, so persona no-bleed is unconfirmed rather than falsified."
   severity: major
   test: 5
-  artifacts: []
-  missing: []
+  classification: "ENVIRONMENT (primary) + PRE-EXISTING CODE defect (amplifier) — NOT a Phase-17 persona defect. Persona per-request isolation was confirmed correct (fresh OpenAI() per call, local persona_voice, no shared buffer)."
+  root_cause: "Free-tier ':free' OpenRouter chat model caps ~1 concurrent request/key, so the 2nd simultaneous stream is 429/5xx (primary visible error). Amplified by a pre-existing backend defect: the chat hot path iterates a BLOCKING synchronous OpenAI client directly on the asyncio event loop (no asyncio.to_thread) under a single uvicorn worker — turn A blocks the loop while waiting on the slow free model's first token, starving turn B into lag + APITimeoutError -> [Response interrupted]. Already tracked (CONCERNS.md single-process limit; STATE.md deferred D-999.1-LLM-A). The subagent paths (chat.py:1216/1291) already offload correctly; the main token stream (chat.py:1134) never did."
+  artifacts:
+    - path: "backend/services/llm_service.py"
+      issue: "sync `from openai import OpenAI` + blocking sync generator `stream_chat_completion` (no AsyncOpenAI, no await)"
+    - path: "backend/routers/chat.py:1134"
+      issue: "main token stream iterated on the event loop with no asyncio.to_thread offload (unlike subagent branches 1216/1291)"
+    - path: "Dockerfile"
+      issue: "single uvicorn worker (no --workers) — one event loop, no parallelism to mask blocking"
+    - path: ".env (LLM_MODEL)"
+      issue: "free-tier ':free' OpenRouter chat model with ~1 concurrent-request cap"
+  missing:
+    - "ENV: point LLM_MODEL at a paid/credited, tool-capable OpenRouter (or OpenAI) model with real concurrency for the concurrency test"
+    - "CODE (pre-existing, cross-cutting — arguably its own backend-concurrency task, NOT persona scope): offload the chat hot path off the event loop (asyncio.to_thread + queue.Queue mirroring the subagent paths, OR switch to AsyncOpenAI + async for) and/or run uvicorn with multiple workers"
+  debug_session: .planning/debug/concurrent-turns-no-output.md
 
 - truth: "After switching the chat model, clicking Retry on an interrupted/failed turn successfully re-sends and produces a fresh answer (Gap 2 scope: 'fails e.g. model switch mid-turn')."
-  status: failed
+  status: diagnosed
   reason: "User reported: same-model Retry works, but Retry AFTER switching the model does not succeed. Core interrupt→Retry passed; the model-switch retry path is the gap."
   severity: major
   test: 6
+  classification: "ENVIRONMENT (model availability) — NOT a CODE defect. The retry mechanism satisfies Gap 2 ('re-send under the new model')."
+  root_cause: "The interrupt→Retry path is model-agnostic and correct: the FE send body carries no model (useChat.ts:170); the server resolves body.model(none) -> freshly-reloaded thread_row.model -> user_default -> settings (chat.py:301-306), and retry differs from a normal send only by deleting the last assistant row + skipping the user-insert (chat.py:895-923). Model switch DOES persist to the thread via PATCH before retry, so retry uses exactly the new model. The agent loop ALWAYS sends tools (chat.py:1136), so a switched-to model with no tool endpoint / unfunded / keyless returns 400/402/404/500 -> model_unavailable. Same-model retry works because that model is proven tool-capable + funded; an arbitrary switched-to model may not be. Race ruled out (a non-persisted switch would make retry SUCCEED on the old model)."
   artifacts: []
-  missing: []
+  missing:
+    - "ENV: re-test model-switch retry using a known tool-capable, funded model (e.g. openai/gpt-4o-mini, anthropic/claude-sonnet-4.5) — expected to close the gap with no code change"
+    - "OPTIONAL product hardening (not required): filter the ModelSelector catalog to tool-capable models, and/or confirm the existing `model_unavailable` bubble ('Pick a different model') renders on the retried turn"
+  debug_session: .planning/debug/retry-model-switch-fails.md
