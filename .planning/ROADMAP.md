@@ -108,4 +108,4 @@ Phases execute in numeric order: 16 → 17
 | 999.1 Chat Empty-State UX | v1.2 | 3/3 | Complete | 2026-06 |
 | 999.2 Cost Guardrail Burn Script | v1.2 | 2/2 | Complete | 2026-07 |
 | 16. Web Search Restoration | v1.3 | 4/4 | Complete    | 2026-07-12 |
-| 17. Agent Personas | v1.3 | 13/13 | Complete   | 2026-07-14 |
+| 17. Agent Personas | v1.3 | 13/13 | Complete    | 2026-07-14 |

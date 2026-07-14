@@ -1,9 +1,12 @@
 ---
 phase: 17-agent-personas
-verified: 2026-07-14T09:05:00Z
-status: human_needed
-score: "gap-closure 2/2 closed (9 must-haves code-verified, build+142 tests green); 5/5 ROADMAP SCs need human UAT sign-off"
-overrides_applied: 0
+verified: 2026-07-14T10:50:00Z
+status: passed
+score: "personas verified — human UAT 5/6 pass; SC-1..4 + Gap-2 core Retry confirmed live; SC-5 no-bleed code-verified (concurrency test blocked by env, not a persona defect). 2 UAT items env/pre-existing, deferred to backlog."
+overrides_applied: 1
+acknowledged_gaps:
+  - "UAT test 5 (SC-5 concurrent no-bleed): concurrent turns fail before completing — root cause is a free-tier :free model concurrency cap (env) + a PRE-EXISTING blocking-sync-client-on-event-loop backend defect (D-17-CONC-A), not a Phase-17 persona defect. Persona per-request isolation is code-verified (no shared state). Deferred to backlog per user decision 2026-07-14. Re-confirm live no-bleed on a paid tool-capable model."
+  - "UAT test 6 (model-switch Retry): retry logic is correct + model-agnostic; the switched-to model simply can't serve an always-tools turn (env). Optional catalog-filtering hardening deferred to backlog (D-17-MODCAT-A). Core interrupt→Retry (same model) passed."
 re_verification:
   previous_status: gaps_found
   previous_score: 1/5 (human UAT)

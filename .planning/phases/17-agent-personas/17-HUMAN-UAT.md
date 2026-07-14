@@ -1,9 +1,10 @@
 ---
-status: diagnosed
+status: complete
 phase: 17-agent-personas
 source: [17-VERIFICATION.md]
 started: 2026-07-14T09:05:00Z
-updated: 2026-07-14T10:45:00Z
+updated: 2026-07-14T10:50:00Z
+resolution: "5/6 pass. Both gaps diagnosed as ENVIRONMENT/pre-existing (not persona defects) and DEFERRED to backlog per user decision 2026-07-14: D-17-CONC-A (backend event-loop concurrency) + D-17-MODCAT-A (model catalog hardening). Phase 17 marked complete."
 ---
 
 ## Current Test

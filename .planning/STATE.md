@@ -2,9 +2,9 @@
 gsd_state_version: 1.0
 milestone: v1.3
 milestone_name: Web Search & Agent Personas
-status: executing
-stopped_at: Completed 17-13-PLAN.md (Gap 2 Retry affordance — VERIFICATION Gap 2 closed)
-last_updated: "2026-07-14T02:48:42.712Z"
+status: milestone_complete
+stopped_at: Milestone complete (Phase 17 was final phase)
+last_updated: 2026-07-14T16:01:28.645Z
 last_activity: 2026-07-14
 progress:
   total_phases: 2
@@ -21,14 +21,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-07-11 after v1.2 completion)
 
 **Core value:** The agent can intelligently search and reason across a structured board game knowledge base — finding rules, comparing mechanics, and recommending games — using the right tool for the job, transparently.
-**Current focus:** Phase 17 — agent-personas
+**Current focus:** Milestone complete
 
 ## Current Position
 
-Phase: 17 (agent-personas) — gap-closure COMPLETE
-Plan: 13 of 13
-Status: All 13 plans executed; both VERIFICATION gaps closed (Gap 1 picker display 17-12, Gap 2 Retry 17-13). Awaiting 17-11 UAT re-run.
-Last activity: 2026-07-14 -- 17-13 executed (interrupted-turn Retry affordance)
+Phase: 17
+Plan: Not started
+Status: Milestone complete
+Last activity: 2026-07-14
 
 Progress: [██████████] 100%
 
@@ -86,6 +86,8 @@ Items acknowledged and deferred at v1.2 milestone close on 2026-07-11:
 | test_debt | test_record_manager.py missing `user_id` fixture (pre-v1.1) | open |
 | ops | Free-model provider 429s make live smokes flaky (D-999.1-LLM-A) | open |
 | ops | execute_readonly_query 42501 SET LOCAL role quirk (D-09-A) | open |
+| tech_debt | Chat hot path blocks the event loop under concurrency (D-17-CONC-A) — `stream_chat_completion` uses a sync OpenAI client iterated directly on the asyncio loop (chat.py:1134; llm_service.py) under a single uvicorn worker, so a 2nd concurrent turn starves→lags→APITimeoutError→[Response interrupted]. Fix: offload via asyncio.to_thread+queue (mirror subagent paths chat.py:1216/1291) or AsyncOpenAI, and/or multi-worker. Pre-existing (CONCERNS.md); surfaced by Phase 17 UAT test 5. Not persona scope. | open |
+| ux_hardening | ModelSelector offers the full catalog incl. non-tool/unfunded models → switching to one makes an always-tools turn error (Phase 17 UAT test 6; D-17-MODCAT-A). Optional: filter catalog to tool-capable models and/or confirm the `model_unavailable` bubble renders on a retried turn. | open |
 
 ## Session Continuity
 
