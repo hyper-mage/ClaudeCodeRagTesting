@@ -169,7 +169,7 @@ export default function ChatContainer({
             </div>
           </div>
         )}
-        {messages.map(msg =>
+        {messages.map((msg, i) =>
           msg.role === 'error' ? (
             // errorType set → typed recovery variant (D-09); undefined → generic Retry path.
             // demoEligible rides the live flag (D-11): [Use demo] renders on the forbidden (403)
@@ -184,13 +184,21 @@ export default function ChatContainer({
             />
           ) : msg.role === 'notice' ? (
             <DeprecationNotice key={msg.id} content={msg.content} />
-          ) : msg.role === 'assistant' && msg.content === INTERRUPTED_CONTENT ? (
+          ) : msg.role === 'assistant'
+              && msg.content === INTERRUPTED_CONTENT
+              && i === messages.length - 1 ? (
             // Gap 2 (17-13): a PERSISTED interrupted assistant row (content === INTERRUPTED_CONTENT,
             // backend stamp in chat.py) renders a one-click recovery card mirroring
             // ErrorMessageBubble's generic variant — a role="alert" red-wash bubble with a single
             // Retry button wired to the
             // existing onRetry (retryLastUserMessage), which strips this row and re-sends the last
             // user turn via the retry:true send path. No new send implementation is introduced.
+            // CR-01 (data-loss BLOCKER, 17-REVIEW): the card is gated to the TERMINAL row only
+            // (i === messages.length - 1). retryLastUserMessage always targets the LAST user turn and
+            // the backend deletes the most-recent assistant row, so a Retry on a NON-terminal
+            // interrupted row (e.g. [userA, interruptedA, userB, goodB]) would regenerate the wrong
+            // turn and destroy `goodB`. Non-terminal interrupted rows fall through to MessageBubble
+            // (plain interrupted text, no actionable Retry button).
             <div key={msg.id} className="flex justify-start mb-4">
               <div
                 role="alert"

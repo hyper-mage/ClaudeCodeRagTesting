@@ -483,4 +483,28 @@ describe('ChatContainer interrupted-turn Retry (Gap 2)', () => {
 
     expect(screen.getByRole('button', { name: /retry/i })).toBeDisabled()
   })
+
+  // CR-01 regression (data-loss BLOCKER): the Retry card is position-agnostic in its ACTION
+  // (retryLastUserMessage always targets the LAST user turn; the backend deletes the most-recent
+  // assistant row), so it must only render on the TERMINAL interrupted row. A NON-terminal
+  // interrupted row followed by a later good turn must NOT show a Retry card — clicking it would
+  // regenerate the wrong turn and destroy the later good response.
+  const nonTerminalInterrupted: Message[] = [
+    { id: 'u1', role: 'user', content: 'How do you win Azul?' },
+    { id: 'a1', role: 'assistant', content: INTERRUPTED_CONTENT },
+    { id: 'u2', role: 'user', content: 'Recommend a 2-player game' },
+    { id: 'a2', role: 'assistant', content: 'Try Patchwork or 7 Wonders Duel.' },
+  ]
+
+  it('it D: a NON-terminal interrupted row renders NO Retry card (falls through to a plain bubble)', () => {
+    renderContainer({ messages: nonTerminalInterrupted, activeThreadId: 't1', models: MODELS })
+
+    // No recovery card: no role="alert" container and no Retry control anywhere in the thread.
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /retry/i })).not.toBeInTheDocument()
+    // The interrupted row falls through to MessageBubble, so its sentinel text is rendered plainly.
+    expect(screen.getByText(INTERRUPTED_CONTENT)).toBeInTheDocument()
+    // The later good response is still present (never at risk of the data-loss retry path).
+    expect(screen.getByText('Try Patchwork or 7 Wonders Duel.')).toBeInTheDocument()
+  })
 })
