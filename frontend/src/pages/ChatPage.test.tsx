@@ -40,19 +40,31 @@ function streamReply() {
   return mockSSEResponse(['data: {"text":"Hi there"}', 'data: {"message_id":"m1"}'])
 }
 
+// The two-row persona catalog as served by GET /api/personas (voice_block withheld server-side, A5).
+// board_game_expert is the is_default system default (label "Board-Game Expert").
+const PERSONA_CATALOG = [
+  { id: 'board_game_expert', label: 'Board-Game Expert', is_default: true },
+  { id: 'general_assistant', label: 'General Assistant', is_default: false },
+]
+
 // Route apiFetch by (path, options). GET /api/threads → list; POST /api/threads → created
-// thread; GET /api/threads/{id} → that thread's messages.
+// thread; GET /api/threads/{id} → that thread's messages; GET /api/personas → catalog;
+// GET /api/preferences → { theme, default_persona } (configurable for the picker-display specs).
 function routeApiFetch(
   config: {
     threadsList?: () => unknown
     createThread?: () => unknown
     threadMessages?: Record<string, unknown>
+    personas?: () => unknown
+    preferences?: () => unknown
   } = {}
 ) {
   const {
     threadsList = () => [],
     createThread = () => ({ id: 't-new', title: null, created_at: '', updated_at: '' }),
     threadMessages = {},
+    personas = () => PERSONA_CATALOG,
+    preferences = () => ({ theme: null, default_persona: null }),
   } = config
 
   mockedApiFetch.mockImplementation(async (path: string, options?: RequestInit) => {
@@ -60,6 +72,8 @@ function routeApiFetch(
       if (options?.method === 'POST') return createThread()
       return threadsList()
     }
+    if (path === '/api/personas') return personas()
+    if (path === '/api/preferences') return preferences()
     const m = path.match(/^\/api\/threads\/([^/]+)$/)
     if (m) {
       return threadMessages[m[1]] ?? { messages: [] }
@@ -341,5 +355,71 @@ describe('ChatPage auto-create-on-send (D-01 / D-03 / D-04)', () => {
       releaseReader?.()
       await Promise.resolve()
     })
+  })
+})
+
+describe('ChatPage persona picker display fallback (Gap 1 / SC-1,3,4)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    resetMockAuth()
+    mockedApiStream.mockResolvedValue(streamReply())
+  })
+
+  // Seed one thread with the given pin, render, and click the sidebar title to activate it —
+  // the header row (and thus the persona picker) only renders when activeThreadId !== null.
+  async function activateThreadWith(opts: {
+    persona: string | null
+    default_persona: string | null
+  }) {
+    const user = userEvent.setup()
+    routeApiFetch({
+      threadsList: () => [
+        { id: 't1', title: 'Thread 1', created_at: '', updated_at: '', model: null, persona: opts.persona },
+      ],
+      preferences: () => ({ theme: null, default_persona: opts.default_persona }),
+    })
+    renderChatPage()
+    // Desktop sidebar copy is index 0 (the drawer copy is index 1) — mirror Test 8.
+    const titleEls = await screen.findAllByText('Thread 1')
+    await user.click(titleEls[0])
+  }
+
+  it('SC-1: unpinned thread with no user default shows the system default (Board-Game Expert), not the placeholder', async () => {
+    await activateThreadWith({ persona: null, default_persona: null })
+
+    // The picker trigger resolves NULL → user default (none) → system is_default row.
+    expect(await screen.findByRole('button', { name: 'Board-Game Expert' })).toBeInTheDocument()
+    // The blank-placeholder symptom is gone.
+    expect(screen.queryByRole('button', { name: 'Select a persona' })).toBeNull()
+  })
+
+  it('SC-3: unpinned thread with a user default shows that chosen default (General Assistant)', async () => {
+    await activateThreadWith({ persona: null, default_persona: 'general_assistant' })
+
+    // NULL pin → user default (general_assistant) wins over the system default.
+    expect(await screen.findByRole('button', { name: 'General Assistant' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Select a persona' })).toBeNull()
+  })
+
+  it('SC-4: a pinned thread persona is displayed (survives the thread read)', async () => {
+    await activateThreadWith({ persona: 'general_assistant', default_persona: null })
+
+    // The pin takes precedence over both defaults and is visible on the trigger.
+    expect(await screen.findByRole('button', { name: 'General Assistant' })).toBeInTheDocument()
+  })
+
+  it('DISPLAY-ONLY: rendering the resolved default for an unpinned thread fires no PATCH (no auto-persist)', async () => {
+    await activateThreadWith({ persona: null, default_persona: null })
+
+    // Wait until the resolved default is actually shown (fetches settled).
+    expect(await screen.findByRole('button', { name: 'Board-Game Expert' })).toBeInTheDocument()
+
+    // No PATCH /api/threads/{id} was fired — the display fallback never persists the default.
+    const patchCall = mockedApiFetch.mock.calls.find(
+      ([p, o]) =>
+        /^\/api\/threads\/[^/]+$/.test(p as string) &&
+        (o as RequestInit | undefined)?.method === 'PATCH'
+    )
+    expect(patchCall).toBeUndefined()
   })
 })
