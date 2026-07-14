@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.3
 milestone_name: Web Search & Agent Personas
 status: executing
-stopped_at: Completed 17-12-PLAN.md (persona picker display fix — Gap 1 closed)
-last_updated: "2026-07-14T02:30:35Z"
-last_activity: 2026-07-14 -- Phase 17 gap-closure 17-12 executed (picker display-only fix)
+stopped_at: Completed 17-13-PLAN.md (Gap 2 Retry affordance — VERIFICATION Gap 2 closed)
+last_updated: "2026-07-14T02:48:42.712Z"
+last_activity: 2026-07-14
 progress:
   total_phases: 2
-  completed_phases: 1
+  completed_phases: 2
   total_plans: 17
-  completed_plans: 15
-  percent: 50
+  completed_plans: 17
+  percent: 100
 ---
 
 # Project State
@@ -25,12 +25,12 @@ See: .planning/PROJECT.md (updated 2026-07-11 after v1.2 completion)
 
 ## Current Position
 
-Phase: 17 (agent-personas) — EXECUTING
-Plan: 12 of 13
-Status: Executing Phase 17 (gap-closure — Gap 1 picker display closed; Gap 2 Retry pending)
-Last activity: 2026-07-14 -- 17-12 executed (display-only persona picker fix)
+Phase: 17 (agent-personas) — gap-closure COMPLETE
+Plan: 13 of 13
+Status: All 13 plans executed; both VERIFICATION gaps closed (Gap 1 picker display 17-12, Gap 2 Retry 17-13). Awaiting 17-11 UAT re-run.
+Last activity: 2026-07-14 -- 17-13 executed (interrupted-turn Retry affordance)
 
-Progress: [█████████░] 93%
+Progress: [██████████] 100%
 
 ## Accumulated Context
 
@@ -58,6 +58,7 @@ Recent decisions affecting v1.3 work:
 - [Phase 17]: 17-09 shipped the two gate-free persona pickers GREEN — PersonaSelector (chat header; onSelect(id), parent owns the PATCH) and DefaultPersonaSelector (settings; self-PUT /api/preferences {default_persona}). Both render the parent-supplied GET /api/personas catalog (never hardcoded, D-07), carry NO key gate (a keyless user can pick/set a persona, PERS-01/PERS-04), add no per-message badge (picker-only, D-12), and are fresh components (not a ModelSelector clone). 17-03 RED scaffolds GREEN (7/7).
 - [Phase ?]: [Phase 17]: 17-10 wired the persona pickers into the running app (last implementation wave) — ChatPage fetches GET /api/personas once + owns an optimistic no-key-gate handleThreadPersonaChange (PATCH /api/threads/{id} {persona}, passed DIRECTLY not via useKeyGate) + Thread.persona seeded from the thread read on reopen (PERS-05); ChatContainer renders PersonaSelector beside ModelSelector (Sigma cost intact); SettingsPage renders DefaultPersonaSelector seeded from GET /api/preferences.default_persona. PERS-01/04/05 now live end-to-end; 17-11 is human UAT. FE build+133 tests green; required-prop addition to ChatContainer forced a Rule-1 test-props compile fix; 5 pre-existing lint errors confirmed baseline via git stash, deferred.
 - [Phase 17]: 17-12 (gap-closure) closed VERIFICATION Gap 1 — the chat-header picker now DISPLAYS the effective active persona. ChatPage captures default_persona from the existing GET /api/preferences fetch into userDefaultPersona state and passes `activeThread?.persona ?? userDefaultPersona ?? personas?.find(p => p.is_default)?.id ?? null` to ChatContainer, mirroring the backend resolver tier chain (thread pin → user default → system default). LOCKED display-only: no auto-PATCH added; handleThreadPersonaChange stays the sole persona write path (T-17-32 mitigated). New ChatPage.test.tsx spec pins SC-1/SC-3/SC-4 + a no-PATCH-on-display assertion. FE build + 137 vitest (133 prior + 4 new) green. Gap 2 (Retry affordance) still pending. SC-2 tool-call + SC-4 reload + cross-user bleed still need the 17-11 UAT re-run.
+- [Phase 17]: 17-13 (gap-closure) closed VERIFICATION Gap 2 — persisted interrupted assistant turns ('[Response interrupted]') now show a one-click Retry card. useChat exports INTERRUPTED_CONTENT (single source of truth) and retryLastUserMessage strips the interrupted assistant row before resubmitting the last user message via the existing retry:true send path (no second send impl, T-17-34 mitigated); ChatContainer renders a role='alert' recovery card mirroring ErrorMessageBubble's generic variant (Retry disabled while streaming, T-17-35). Hook spec added to existing useChat.test.tsx (plan named a new .ts; the .tsx already covers the hook). FE build + 141 vitest (137 prior + 4 new) green. Both VERIFICATION gaps (Gap 1 picker display 17-12, Gap 2 Retry 17-13) now closed — 17-11 UAT re-run is next.
 
 ### Pending Todos
 
@@ -88,7 +89,7 @@ Items acknowledged and deferred at v1.2 milestone close on 2026-07-11:
 
 ## Session Continuity
 
-Last session: 2026-07-14T02:30:35Z
-Stopped at: Completed 17-12-PLAN.md (Gap 1 picker display fix)
+Last session: 2026-07-14T02:48:42.702Z
+Stopped at: Completed 17-13-PLAN.md (Gap 2 Retry affordance — VERIFICATION Gap 2 closed)
 Resume file: None
-Next: Execute 17-13 (Gap 2 — Retry affordance), then re-run the 17-11 UAT (SC-1/SC-3/SC-4 picker display, SC-2 tool call, cross-user bleed)
+Next: Re-run the 17-11 UAT (SC-1/SC-3/SC-4 picker display, SC-2 tool call under General Assistant, cross-user bleed, and a live interrupted-turn Retry click) — both gap-closure fixes (17-12 picker display, 17-13 Retry) are now shipped

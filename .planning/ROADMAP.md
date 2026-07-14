@@ -88,7 +88,7 @@ See [milestones/v1.0-ROADMAP.md](milestones/v1.0-ROADMAP.md)
 - [x] 17-10-PLAN.md — Wire pickers into ChatPage/ChatContainer/SettingsPage
 - [x] 17-11-PLAN.md — End-to-end persona UI verification (checkpoint)
 - [x] 17-12-PLAN.md — [gap-closure] Chat picker displays the effective active persona, display-only (SC-1/3/4; PERS-01/03/04/05)
-- [ ] 17-13-PLAN.md — [gap-closure] Retry affordance on interrupted/failed assistant turns (bundled UX enhancement; no PERS requirement)
+- [x] 17-13-PLAN.md — [gap-closure] Retry affordance on interrupted/failed assistant turns (bundled UX enhancement; no PERS requirement)
 **UI hint**: yes
 
 ## Progress
@@ -108,4 +108,4 @@ Phases execute in numeric order: 16 → 17
 | 999.1 Chat Empty-State UX | v1.2 | 3/3 | Complete | 2026-06 |
 | 999.2 Cost Guardrail Burn Script | v1.2 | 2/2 | Complete | 2026-07 |
 | 16. Web Search Restoration | v1.3 | 4/4 | Complete    | 2026-07-12 |
-| 17. Agent Personas | v1.3 | 12/13 | In Progress|  |
+| 17. Agent Personas | v1.3 | 13/13 | Complete   | 2026-07-14 |
