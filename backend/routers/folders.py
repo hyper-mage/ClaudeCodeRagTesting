@@ -72,7 +72,7 @@ def _ensure_owned_private(folder: dict, user_id: str) -> None:
 
 
 @router.get("")
-async def list_folders(user_id: str = Depends(get_user_id)):
+def list_folders(user_id: str = Depends(get_user_id)):
     """List user-private folders + all public folders (flat list)."""
     db = get_supabase()
     result = (
@@ -86,7 +86,7 @@ async def list_folders(user_id: str = Depends(get_user_id)):
 
 
 @router.post("")
-async def create_folder(
+def create_folder(
     body: FolderCreate,
     user_id: str = Depends(get_user_id),
 ):
@@ -133,7 +133,7 @@ async def create_folder(
 
 
 @router.get("/{folder_id}/contents")
-async def get_folder_contents(
+def get_folder_contents(
     folder_id: str,
     user_id: str = Depends(get_user_id),
 ):
@@ -174,7 +174,7 @@ def _replace_path_prefix(old_path: str, new_prefix_old: str, new_prefix_new: str
 
 
 @router.patch("/{folder_id}")
-async def rename_folder(
+def rename_folder(
     folder_id: str,
     body: FolderRename,
     user_id: str = Depends(get_user_id),
@@ -225,7 +225,7 @@ async def rename_folder(
 
 
 @router.patch("/{folder_id}/move")
-async def move_folder(
+def move_folder(
     folder_id: str,
     body: FolderMove,
     user_id: str = Depends(get_user_id),
@@ -283,7 +283,7 @@ async def move_folder(
 
 
 @router.delete("/{folder_id}", status_code=204)
-async def delete_folder(
+def delete_folder(
     folder_id: str,
     user_id: str = Depends(get_user_id),
 ):

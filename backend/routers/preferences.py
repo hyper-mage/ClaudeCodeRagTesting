@@ -35,7 +35,7 @@ router = APIRouter(prefix="/api/preferences", tags=["preferences"])
 
 
 @router.get("", response_model=PreferencesResponse)
-async def get_preferences(user_id: str = Depends(get_user_id)):
+def get_preferences(user_id: str = Depends(get_user_id)):
     """Return the calling user's default_model + theme.
 
     A brand-new user with no row resolves to the safe defaults
@@ -68,7 +68,7 @@ async def get_preferences(user_id: str = Depends(get_user_id)):
 
 
 @router.put("", response_model=PreferencesResponse)
-async def update_preferences(
+def update_preferences(
     body: PreferencesUpdate, user_id: str = Depends(get_user_id)
 ):
     """Partial-upsert the user's preferences (RESEARCH Pattern 2).

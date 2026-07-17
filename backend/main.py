@@ -2,6 +2,7 @@ import logging
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import JSONResponse
 from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
@@ -60,6 +61,16 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Compress the fat JSON GETs (models, threads+messages, documents, folders). minimum_size
+# skips tiny bodies. Starlette's GZipMiddleware streams via ContentEncodingMiddleware and
+# leaves already-streaming responses that don't buffer alone; the chat SSE route
+# (POST /api/threads/{id}/messages, EventSourceResponse) must still stream INCREMENTALLY.
+# If a live smoke ever shows batched (non-incremental) SSE delivery under GZip, replace
+# this with a GZipMiddleware subclass that bypasses http scopes where
+# scope["path"].endswith("/messages") and scope["method"] == "POST" (delegate straight to
+# self.app) — see the plan's documented fallback.
+app.add_middleware(GZipMiddleware, minimum_size=1000)
 
 app.include_router(threads.router)
 app.include_router(chat.router)

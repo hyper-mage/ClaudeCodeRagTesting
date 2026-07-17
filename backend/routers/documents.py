@@ -101,7 +101,7 @@ async def upload_document(
 
 
 @router.get("")
-async def list_documents(user_id: str = Depends(get_user_id)):
+def list_documents(user_id: str = Depends(get_user_id)):
     db = get_supabase()
     result = (
         db.table("documents")
@@ -114,7 +114,7 @@ async def list_documents(user_id: str = Depends(get_user_id)):
 
 
 @router.get("/{doc_id}")
-async def get_document(doc_id: str, user_id: str = Depends(get_user_id)):
+def get_document(doc_id: str, user_id: str = Depends(get_user_id)):
     db = get_supabase()
     result = (
         db.table("documents")
@@ -130,7 +130,7 @@ async def get_document(doc_id: str, user_id: str = Depends(get_user_id)):
 
 
 @router.delete("/{doc_id}", status_code=204)
-async def delete_document(doc_id: str, user_id: str = Depends(get_user_id)):
+def delete_document(doc_id: str, user_id: str = Depends(get_user_id)):
     db = get_supabase()
 
     # Get document
@@ -227,7 +227,7 @@ def _ensure_target_folder_writable(db, folder_id: str | None, user_id: str) -> N
 
 
 @router.patch("/{doc_id}")
-async def rename_document(
+def rename_document(
     doc_id: str,
     body: DocumentRename,
     user_id: str = Depends(get_user_id),
@@ -247,7 +247,7 @@ async def rename_document(
 
 
 @router.patch("/{doc_id}/move")
-async def move_document(
+def move_document(
     doc_id: str,
     body: DocumentMove,
     user_id: str = Depends(get_user_id),
@@ -270,7 +270,7 @@ async def move_document(
 
 
 @router.post("/bulk-delete")
-async def bulk_delete_documents(
+def bulk_delete_documents(
     body: BulkIds,
     user_id: str = Depends(get_user_id),
 ):
@@ -298,7 +298,7 @@ async def bulk_delete_documents(
 
 
 @router.post("/bulk-move")
-async def bulk_move_documents(
+def bulk_move_documents(
     body: BulkMove,
     user_id: str = Depends(get_user_id),
 ):
