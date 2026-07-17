@@ -5,8 +5,9 @@ run the assertion FAILS: FastAPI's response_model strips any field not declared 
 MessageResponse even though the DB select('*') returns it (Pitfall 1). Goes GREEN
 once Task 2 adds `usage: dict | None = None` to MessageResponse.
 
-Mirrors the MagicMock `_table` side_effect style from test_usage_capture.py and the
-TestClient + dependency_overrides pattern from test_keys_status.py.
+get_thread issues ONE embedded select (`*, messages(*)`), so the mock returns a single
+thread row carrying an embedded `messages` array. Uses the TestClient +
+dependency_overrides pattern from test_keys_status.py.
 """
 from unittest.mock import MagicMock, patch
 
@@ -15,37 +16,32 @@ _USER_ID = "11111111-1111-1111-1111-111111111111"
 
 
 def _thread_db():
-    """A MagicMock supabase client wired for threads.get_thread:
+    """A MagicMock supabase client wired for the collapsed threads.get_thread:
 
-    - threads.select('*').eq().eq().maybe_single().execute() → a thread row
-    - messages.select('*').eq().eq().order().execute() → rows, the assistant
-      carrying a `usage` dict (cost + tokens).
+    threads.select('*, messages(*)').eq().eq().order(...).maybe_single().execute()
+    → a single thread row with an EMBEDDED `messages` array (PostgREST resource
+    embedding). The assistant row carries a `usage` dict (cost + tokens).
     """
     db = MagicMock()
-
-    def _table(name: str):
-        tbl = MagicMock()
-        if name == "threads":
-            res = MagicMock()
-            res.data = {"id": "t1", "user_id": _USER_ID, "title": "x", "model": None}
-            tbl.select.return_value.eq.return_value.eq.return_value.maybe_single.return_value.execute.return_value = res
-        elif name == "messages":
-            res = MagicMock()
-            res.data = [
-                {
-                    "id": "m1", "thread_id": "t1", "role": "user",
-                    "content": "hi", "created_at": "2026-06-25T00:00:00+00:00",
-                },
-                {
-                    "id": "m2", "thread_id": "t1", "role": "assistant",
-                    "content": "hello", "created_at": "2026-06-25T00:00:01+00:00",
-                    "usage": {"cost": 0.0021, "total_tokens": 1200},
-                },
-            ]
-            tbl.select.return_value.eq.return_value.eq.return_value.order.return_value.execute.return_value = res
-        return tbl
-
-    db.table.side_effect = _table
+    res = MagicMock()
+    res.data = {
+        "id": "t1", "user_id": _USER_ID, "title": "x", "model": None,
+        "messages": [
+            {
+                "id": "m1", "thread_id": "t1", "role": "user",
+                "content": "hi", "created_at": "2026-06-25T00:00:00+00:00",
+            },
+            {
+                "id": "m2", "thread_id": "t1", "role": "assistant",
+                "content": "hello", "created_at": "2026-06-25T00:00:01+00:00",
+                "usage": {"cost": 0.0021, "total_tokens": 1200},
+            },
+        ],
+    }
+    (
+        db.table.return_value.select.return_value.eq.return_value.eq.return_value
+        .order.return_value.maybe_single.return_value.execute.return_value
+    ) = res
     return db
 
 

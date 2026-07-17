@@ -1,22 +1,21 @@
-"""Wave 0 (Plan 17-02) RED scaffolds for PATCH /api/threads/{id} {persona} — PERS-01 / PERS-05.
+"""Regression coverage for PATCH /api/threads/{id} {persona} — PERS-01 / PERS-05.
 
-Clones test_thread_model_patch.py's _mock_db(owned) helper and patch targets. Written
-BEFORE the PATCH endpoint accepts a persona field: today it hardcodes {"model": body.model}
-(threads.py:81-89) against a ThreadModelUpdate body that has NO persona field, so a
-persona-only PATCH is silently coerced to {"model": None}. These FAIL RED until 17-07
-switches the endpoint to body.model_dump(exclude_unset=True) over a ThreadUpdate body
-(model? + persona?), keeping the ownership re-check (.eq id + user_id) verbatim.
+The endpoint writes body.model_dump(exclude_unset=True) over a ThreadUpdate body
+(model? + persona?) via a SINGLE scoped UPDATE (.eq id + user_id): a non-owned thread
+matches 0 rows → 404, so the UPDATE itself is the IDOR gate (T-17-04) — there is no
+separate ownership SELECT. exclude_unset keeps the no-clobber contract: a persona-only
+PATCH never carries "model", a model-only PATCH never carries "persona".
 
 Contract under test:
   - test_patch_sets_persona                    — PATCH {persona} → threads.update patch carries
-                                                 persona, scoped by id AND user_id (IDOR re-check).
+                                                 persona, scoped by id AND user_id (IDOR gate).
   - test_patch_persona_only_does_not_clobber_model — a persona-only body's update patch does NOT
                                                  contain "model" (exclude_unset — Pattern 4 /
-                                                 no-clobber). FORCES the switch off {"model": body.model}.
+                                                 no-clobber).
   - test_patch_model_only_still_works          — regression: PATCH {model} → patch == {"model":...},
                                                  NO "persona" key (the model-pin path stays intact).
-  - test_patch_persona_404_non_owned           — ownership re-check finds no row → 404, update
-                                                 NOT called (IDOR, T-17-04).
+  - test_patch_persona_404_non_owned           — the scoped UPDATE matches 0 rows → 404 (still
+                                                 scoped by id AND user_id, IDOR gate T-17-04).
 
 Patches mirror test_thread_model_patch.py:
   - app.dependency_overrides[get_user_id] = lambda: "user-uuid"
@@ -30,21 +29,17 @@ _TID = "thread-123"
 
 
 def _mock_db(owned: bool):
-    """Fake supabase. The ownership re-check select().eq().eq().maybe_single().execute()
-    returns a row when `owned`, else None. The update().eq().eq().execute() chain
-    records the payload and returns the updated row (carries model + persona columns)."""
+    """Fake supabase for the collapsed single-UPDATE mechanism. The
+    update().eq().eq().execute() chain records the payload and returns the updated row
+    (carries model + persona columns) when `owned`, else an empty list (0 rows → 404)."""
     db = MagicMock()
-    owner_row = {"id": _TID, "user_id": _USER} if owned else None
-    (
-        db.table.return_value.select.return_value.eq.return_value.eq.return_value
-        .maybe_single.return_value.execute.return_value
-    ) = MagicMock(data=owner_row)
+    updated_row = {
+        "id": _TID, "user_id": _USER, "title": None, "model": None, "persona": None
+    }
     (
         db.table.return_value.update.return_value.eq.return_value.eq.return_value
         .execute.return_value
-    ) = MagicMock(
-        data=[{"id": _TID, "user_id": _USER, "title": None, "model": None, "persona": None}]
-    )
+    ) = MagicMock(data=[updated_row] if owned else [])
     return db
 
 
@@ -138,13 +133,14 @@ def test_patch_model_only_still_works() -> None:
 
 def test_patch_persona_404_non_owned() -> None:
     """PERS-01 / T-17-04 (IDOR): PATCH {persona} on a thread the caller does not own →
-    ownership re-check returns no row → 404, and the update is NEVER attempted."""
+    the single scoped UPDATE (.eq id + user_id) matches 0 rows → 404. The UPDATE is the
+    ownership gate, so it IS issued (but scoped); another user's thread is never modified."""
     from fastapi.testclient import TestClient
 
     from auth import get_user_id
     from main import app
 
-    db = _mock_db(owned=False)  # ownership re-check finds no row
+    db = _mock_db(owned=False)  # scoped UPDATE matches 0 rows
 
     app.dependency_overrides[get_user_id] = lambda: _USER
     try:
@@ -158,4 +154,12 @@ def test_patch_persona_404_non_owned() -> None:
     assert resp.status_code == 404, (
         f"expected 404 for non-owned thread, got {resp.status_code}: {resp.text}"
     )
-    db.table.return_value.update.assert_not_called()
+    # The single scoped UPDATE IS the ownership gate — it must be scoped by id AND user_id.
+    update = db.table.return_value.update
+    update.assert_called_once()
+    eq_chain = update.return_value.eq
+    eq_calls = {(c.args[0], c.args[1]) for c in eq_chain.call_args_list} | {
+        (c.args[0], c.args[1]) for c in eq_chain.return_value.eq.call_args_list
+    }
+    assert ("id", _TID) in eq_calls, eq_calls
+    assert ("user_id", _USER) in eq_calls, eq_calls

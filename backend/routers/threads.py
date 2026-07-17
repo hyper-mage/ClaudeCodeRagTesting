@@ -6,8 +6,11 @@ from models.schemas import ThreadCreate, ThreadResponse, ThreadWithMessages, Mes
 router = APIRouter(prefix="/api/threads", tags=["threads"])
 
 
+# Every endpoint here is fully synchronous (no `await`), so they are plain `def`:
+# FastAPI runs `def` path operations in its threadpool, giving real concurrency for
+# the ChatPage mount fan-out (list + per-thread reads) instead of blocking the loop.
 @router.get("", response_model=list[ThreadResponse])
-async def list_threads(user_id: str = Depends(get_user_id)):
+def list_threads(user_id: str = Depends(get_user_id)):
     db = get_supabase()
     result = (
         db.table("threads")
@@ -20,7 +23,7 @@ async def list_threads(user_id: str = Depends(get_user_id)):
 
 
 @router.post("", response_model=ThreadResponse, status_code=201)
-async def create_thread(body: ThreadCreate, user_id: str = Depends(get_user_id)):
+def create_thread(body: ThreadCreate, user_id: str = Depends(get_user_id)):
     db = get_supabase()
     result = (
         db.table("threads")
@@ -31,57 +34,45 @@ async def create_thread(body: ThreadCreate, user_id: str = Depends(get_user_id))
 
 
 @router.get("/{thread_id}", response_model=ThreadWithMessages)
-async def get_thread(thread_id: str, user_id: str = Depends(get_user_id)):
+def get_thread(thread_id: str, user_id: str = Depends(get_user_id)):
     db = get_supabase()
+    # Single round-trip: embed the thread's messages via PostgREST resource embedding
+    # (`*, messages(*)`) ordered by created_at asc, replacing the prior thread-then-messages
+    # two-query fan-out. The thread is ownership-checked (.eq id + user_id); messages are
+    # already thread-scoped, so the embedded array carries exactly the same rows the old
+    # second query returned. maybe_single → None when not owned/nonexistent → 404 (IDOR gate).
     thread = (
         db.table("threads")
-        .select("*")
+        .select("*, messages(*)")
         .eq("id", thread_id)
         .eq("user_id", user_id)
+        .order("created_at", desc=False, foreign_table="messages")
         .maybe_single()
         .execute()
     )
-    if not thread.data:
+    if not thread or not thread.data:
         raise HTTPException(status_code=404, detail="Thread not found")
-
-    messages = (
-        db.table("messages")
-        .select("*")
-        .eq("thread_id", thread_id)
-        .eq("user_id", user_id)
-        .order("created_at")
-        .execute()
-    )
-    return {**thread.data, "messages": messages.data}
+    # thread.data already carries the embedded `messages` array (asc by created_at) —
+    # exactly the ThreadWithMessages shape.
+    return thread.data
 
 
 @router.patch("/{thread_id}", response_model=ThreadResponse)
-async def update_thread(
+def update_thread(
     thread_id: str, body: ThreadUpdate, user_id: str = Depends(get_user_id)
 ):
     """Partial-write the per-thread model AND/OR persona pins (MODEL-06 / PERS-01 / PERS-05).
 
-    Re-checks ownership server-side (.eq id + user_id → 404 on a non-owned
-    thread, IDOR mitigation T-13-IDOR / T-17-04) before writing. The update
-    payload is an exclude_unset model_dump, so ONLY the keys the client
-    actually sent are written: a persona-only PATCH cannot clobber the model pin
-    and a model-only PATCH cannot clobber the persona (T-17-05, no-clobber). An
-    EXPLICIT null is still a deliberate clear ({model: null} clears the pin back
-    to the default tier, D-05/D-10) because exclude_unset keeps explicitly-set
-    keys even when their value is None.
+    Ownership is enforced by a SINGLE scoped UPDATE (.eq id + user_id): a non-owned
+    thread matches 0 rows → 404, so the update itself is the IDOR gate (T-13-IDOR /
+    T-17-04) — no separate ownership SELECT. The update payload is an exclude_unset
+    model_dump, so ONLY the keys the client actually sent are written: a persona-only
+    PATCH cannot clobber the model pin and a model-only PATCH cannot clobber the persona
+    (T-17-05, no-clobber). An EXPLICIT null is still a deliberate clear ({model: null}
+    clears the pin back to the default tier, D-05/D-10) because exclude_unset keeps
+    explicitly-set keys even when their value is None.
     """
     db = get_supabase()
-    owned = (
-        db.table("threads")
-        .select("id")
-        .eq("id", thread_id)
-        .eq("user_id", user_id)
-        .maybe_single()
-        .execute()
-    )
-    if not owned.data:
-        raise HTTPException(status_code=404, detail="Thread not found")
-
     patch = body.model_dump(exclude_unset=True)
     updated = (
         db.table("threads")
@@ -90,22 +81,26 @@ async def update_thread(
         .eq("user_id", user_id)
         .execute()
     )
+    # 0 rows updated → the thread is not owned / does not exist → 404 (IDOR gate).
+    if not updated.data:
+        raise HTTPException(status_code=404, detail="Thread not found")
     # supabase-py returns the updated rows in .data; the row carries the new model/persona.
     return updated.data[0]
 
 
 @router.delete("/{thread_id}", status_code=204)
-async def delete_thread(thread_id: str, user_id: str = Depends(get_user_id)):
+def delete_thread(thread_id: str, user_id: str = Depends(get_user_id)):
     db = get_supabase()
-    thread = (
+    # Single scoped DELETE (.eq id + user_id — ADDS the user_id scope the old delete
+    # lacked, strictly safer). PostgREST returns the deleted rows in .data; 0 rows →
+    # not owned / nonexistent → 404 (IDOR gate). Success returns None (204, no body).
+    result = (
         db.table("threads")
-        .select("id")
+        .delete()
         .eq("id", thread_id)
         .eq("user_id", user_id)
-        .maybe_single()
         .execute()
     )
-    if not thread.data:
+    if not result.data:
         raise HTTPException(status_code=404, detail="Thread not found")
-
-    db.table("threads").delete().eq("id", thread_id).execute()
+    return None
