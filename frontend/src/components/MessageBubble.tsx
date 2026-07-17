@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { memo, useState } from 'react'
 import ReactMarkdown from 'react-markdown'
 import ToolCallCard from './ToolCallCard'
 import type { ToolEvent, Usage } from '../hooks/useChat'
@@ -37,7 +37,7 @@ function CostLine({ usage }: { usage: Usage }) {
   return <div className="text-xs text-gray-300 mt-1">{text}</div>
 }
 
-export default function MessageBubble({ role, content, toolsUsed, usage }: Props) {
+function MessageBubble({ role, content, toolsUsed, usage }: Props) {
   const [showTools, setShowTools] = useState(true)
   const hasTools = role === 'assistant' && toolsUsed && toolsUsed.length > 0
 
@@ -109,3 +109,11 @@ export default function MessageBubble({ role, content, toolsUsed, usage }: Props
     </div>
   )
 }
+
+// React.memo: ChatContainer maps `messages` and passes content (string) + toolsUsed/usage
+// (per-message object refs). useChat's setMessages creates a NEW object only for the bubble it
+// changes (the streaming assistant bubble each delta; a tool-updated bubble gets a new toolsUsed
+// array), leaving historical messages referentially identical. So the shallow compare re-renders
+// ONLY the changed/streaming bubble and skips historical ReactMarkdown re-parse — no call-site
+// prop-memoization needed. The live streaming bubble + tool cards still update per SSE delta.
+export default memo(MessageBubble)

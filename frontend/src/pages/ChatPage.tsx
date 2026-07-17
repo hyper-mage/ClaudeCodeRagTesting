@@ -201,7 +201,11 @@ export default function ChatPage() {
     // cold start OR the post-delete null state — silently creates an untitled thread
     // first, then sends into it. One code path covers both null states.
     let targetId = activeThreadId
+    // Capture "was this thread untitled?" BEFORE the send (fix 7): only the FIRST message of an
+    // untitled thread triggers a backend-generated title, so only then must the sidebar reload.
+    let wasUntitled: boolean
     if (targetId === null) {
+      wasUntitled = true // a freshly auto-created thread is always untitled
       try {
         // Untitled create (body {}) — the backend titles the thread from the first
         // message (D-03); no placeholder "New Chat" is ever persisted.
@@ -224,14 +228,19 @@ export default function ChatPage() {
         showToast("The assistant didn't respond. Tap the message to retry.", 'error')
         return
       }
+    } else {
+      // Active thread: it generates a title only on its FIRST message, i.e. while still untitled.
+      wasUntitled = !(threads.find(t => t.id === targetId)?.title)
     }
     // targetId is guaranteed non-null here: it was either already set, or the create
     // succeeded (a failed create returns above before reaching this point).
     // Explicit threadId defeats the React stale closure (Pitfall 1) so the optimistic
     // user bubble renders on the very first send instead of silently no-opping.
     await sendMessage(content, { threadId: targetId as string })
-    // Reload threads to pick up the backend auto-generated title (D-03).
-    loadThreads()
+    // Reload threads to pick up the backend auto-generated title (D-03) — ONLY for the first
+    // message of an untitled thread. A titled thread's title never changes on later sends, so
+    // the reload is skipped (fix 7 — no redundant GET /api/threads per send).
+    if (wasUntitled) loadThreads()
   }
 
   const activeThread = threads.find(t => t.id === activeThreadId)
