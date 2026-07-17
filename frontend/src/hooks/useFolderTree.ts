@@ -53,6 +53,13 @@ function buildTree(folders: FolderRow[]): FolderNode[] {
   return roots
 }
 
+// Module-level SWR cache of folder contents, keyed by folder id (the private root uses the
+// synthetic key 'root-private'). Navigating to a cached folder renders instantly with no
+// spinner flash, then the fetch revalidates. EVERY mutation clears the whole cache so
+// refreshTree/create/rename/delete/move always show fresh contents (freshness > a stale hit).
+const CONTENTS_CACHE_ROOT_PRIVATE = 'root-private'
+const contentsCache = new Map<string, FolderContents>()
+
 export function useFolderTree() {
   const { session } = useAuth()
   const [rawFolders, setRawFolders] = useState<FolderRow[]>([])
@@ -102,7 +109,12 @@ export function useFolderTree() {
     async (folderId: string | null) => {
       if (!session) return
       if (folderId === null || folderId === ROOT_PRIVATE_ID) {
-        setLoadingContents(true)
+        const cached = contentsCache.get(CONTENTS_CACHE_ROOT_PRIVATE)
+        if (cached) {
+          setFolderContents(cached) // instant render — no spinner flash
+        } else {
+          setLoadingContents(true)
+        }
         try {
           const docs: Document[] = await apiFetch('/api/documents').catch(() => [])
           // Root-level documents only (no folder assigned)
@@ -111,11 +123,13 @@ export function useFolderTree() {
           const privateRoots = rawFolders
             .filter(f => f.visibility === 'private' && !f.parent_id)
             .map(f => ({ ...f, children: [] }))
-          setFolderContents({
+          const fresh: FolderContents = {
             folder: null,
             subfolders: privateRoots,
             documents: rootDocs,
-          })
+          }
+          setFolderContents(fresh)
+          contentsCache.set(CONTENTS_CACHE_ROOT_PRIVATE, fresh)
         } finally {
           setLoadingContents(false)
         }
@@ -133,19 +147,29 @@ export function useFolderTree() {
         })
         return
       }
-      setLoadingContents(true)
+      const cached = contentsCache.get(folderId)
+      if (cached) {
+        setFolderContents(cached) // instant render — no spinner flash
+      } else {
+        setLoadingContents(true)
+      }
       try {
         const data = await apiFetch(`/api/folders/${folderId}/contents`).catch(() => null)
         if (data) {
-          setFolderContents({
+          const fresh: FolderContents = {
             folder: data.folder,
             subfolders: (data.subfolders || []).map((f: FolderRow) => ({
               ...f,
               children: [],
             })),
             documents: data.documents || [],
-          })
-        } else {
+          }
+          setFolderContents(fresh)
+          contentsCache.set(folderId, fresh)
+        } else if (!cached) {
+          // Revalidation returned nothing and we have no cached snapshot → today's empty state.
+          // (A cached snapshot is kept: deletions clear the cache, so this can only be a
+          // transient fetch miss — don't clobber the shown contents with empty.)
           setFolderContents({ folder: null, subfolders: [], documents: [] })
         }
       } finally {
@@ -177,6 +201,7 @@ export function useFolderTree() {
   }, [])
 
   const refreshTree = useCallback(async () => {
+    contentsCache.clear() // invalidate — post-upload/mutation contents must be fresh, not a stale hit
     await loadFolders()
     if (selectedFolderId !== null) {
       await loadContents(selectedFolderId)
@@ -198,6 +223,7 @@ export function useFolderTree() {
       } catch (e) {
         throw new Error(`Create folder failed: ${(e as Error).message}`)
       }
+      contentsCache.clear() // invalidate so the reload shows the new folder, not a stale hit
       await loadFolders()
       if (selectedFolderId !== null) await loadContents(selectedFolderId)
     },
@@ -215,6 +241,7 @@ export function useFolderTree() {
       } catch (e) {
         throw new Error(`Rename folder failed: ${(e as Error).message}`)
       }
+      contentsCache.clear() // invalidate so the reload reflects the renamed folder/path
       await loadFolders()
       if (selectedFolderId !== null) await loadContents(selectedFolderId)
     },
@@ -229,6 +256,7 @@ export function useFolderTree() {
       } catch (e) {
         throw new Error(`Delete folder failed: ${(e as Error).message}`)
       }
+      contentsCache.clear() // invalidate — the deleted subtree must not survive as a cached hit
       if (selectedFolderId === folderId) {
         setSelectedFolderId(null)
         setFolderContents(null)
@@ -256,6 +284,7 @@ export function useFolderTree() {
       } catch (e) {
         throw new Error(`Move folder failed: ${(e as Error).message}`)
       }
+      contentsCache.clear() // invalidate — both source and target folder contents changed
       await loadFolders()
       if (selectedFolderId !== null) await loadContents(selectedFolderId)
     },
@@ -275,6 +304,7 @@ export function useFolderTree() {
       } catch (e) {
         throw new Error(`Move document failed: ${(e as Error).message}`)
       }
+      contentsCache.clear() // invalidate — the doc left one folder and joined another
       if (selectedFolderId !== null) await loadContents(selectedFolderId)
     },
     [session, loadContents, selectedFolderId]
@@ -291,6 +321,7 @@ export function useFolderTree() {
       } catch (e) {
         throw new Error(`Rename document failed: ${(e as Error).message}`)
       }
+      contentsCache.clear() // invalidate so the shown folder reflects the renamed document
       if (selectedFolderId !== null) await loadContents(selectedFolderId)
     },
     [session, loadContents, selectedFolderId]

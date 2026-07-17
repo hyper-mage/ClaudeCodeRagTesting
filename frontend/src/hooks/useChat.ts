@@ -54,6 +54,11 @@ export interface Message {
 // card off this constant and retryLastUserMessage strips it, so the literal is never hardcoded twice.
 export const INTERRUPTED_CONTENT = '[Response interrupted]'
 
+// Module-level SWR cache of the last-known messages per thread. Switching to a cached thread
+// renders instantly (no fetch flash), then loadMessages revalidates and reconciles. Keyed by
+// threadId. Lives outside the hook so it persists across mounts/thread switches.
+const messageCache = new Map<string, Message[]>()
+
 export function useChat(threadId: string | null) {
   const [messages, setMessages] = useState<Message[]>([])
   const [isStreaming, setIsStreaming] = useState(false)
@@ -83,13 +88,16 @@ export function useChat(threadId: string | null) {
     }
     try {
       const data = await apiFetch(`/api/threads/${threadId}`)
-      setMessages(data.messages.map((m: Record<string, unknown>) => ({
+      const mapped: Message[] = data.messages.map((m: Record<string, unknown>) => ({
         ...m,
         toolsUsed: m.tools_used as ToolEvent[] | undefined,
         // D-02 source-of-truth: persisted per-message usage must survive a reload so the cost
         // caption + per-thread Σ total reconstruct identically after refresh (read-path fix).
         usage: m.usage as Usage | undefined,
-      })))
+      }))
+      setMessages(mapped)
+      // SWR: cache the freshly-loaded, mapped array so a later switch back renders instantly.
+      if (threadId) messageCache.set(threadId, mapped)
     } catch {
       // Preserve previous silent-on-error behavior (old code had `if (res.ok)`)
     }
@@ -114,8 +122,25 @@ export function useChat(threadId: string | null) {
     // Demo latch follows the thread-scoped reset semantics (Open Q2): the banner accompanied the
     // demo turn in the PREVIOUS thread; the new thread starts clean.
     setLastTurnWasDemo(false)
+    // SWR: render the cached messages instantly on switch (else clear so the previous thread's
+    // messages don't linger — the bug being fixed). loadMessages then revalidates + reconciles.
+    if (threadId && messageCache.has(threadId)) {
+      setMessages(messageCache.get(threadId)!)
+    } else {
+      setMessages([])
+    }
     void loadMessages()
   }, [threadId, loadMessages])
+
+  // Keep the SWR cache fresh once a turn settles (isStreaming flips false): writes the final
+  // messages so a switch-away-and-back reflects the just-completed turn. The messages.length > 0
+  // guard skips the transient empty during the fresh-thread window; the !isStreaming guard avoids
+  // caching partial streams — this effect never runs mid-delta, so it cannot disturb streaming.
+  useEffect(() => {
+    if (threadId && !isStreaming && messages.length > 0) {
+      messageCache.set(threadId, messages)
+    }
+  }, [threadId, isStreaming, messages])
 
   // Request a one-shot skip of the next [threadId] load effect (ChatPage uses this right before
   // pointing the hook at a freshly auto-created thread). See skipNextLoadRef / CR-01.
