@@ -28,7 +28,7 @@ See: .planning/PROJECT.md (updated 2026-07-14 after v1.3 completion)
 Phase: Milestone v1.3 complete
 Plan: —
 Status: Awaiting next milestone
-Last activity: 2026-07-14 — Milestone v1.3 completed and archived
+Last activity: 2026-07-17 — Completed quick task 260717-j1d: UI/backend perf optimizations (9 fixes)
 
 ## Accumulated Context
 
@@ -45,6 +45,12 @@ None yet.
 - [v1.2+]: Supabase free-tier `pg_cron` availability affects any future scheduled model-refresh upgrade (lazy TTL is the shipped baseline).
 - [ops]: Supabase key migration deferred — legacy anon/service_role keys in use; new publishable/secret keys are a future-version task.
 - [ops]: POST /api/demo/bootstrap failure (D-999.1-DEMO-A) — anon-session demo bootstrap; revisit if demo UX work returns.
+
+### Quick Tasks Completed
+
+| # | Description | Date | Commit | Directory |
+|---|-------------|------|--------|-----------|
+| 260717-j1d | Optimize UI responsiveness + backend latency (9 fixes) | 2026-07-17 | f2cc954→b148f3f (5 commits) | [260717-j1d-optimize-ui-responsiveness-and-backend-l](./quick/260717-j1d-optimize-ui-responsiveness-and-backend-l/) |
 
 ## Deferred Items
 
