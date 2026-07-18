@@ -51,6 +51,7 @@ None yet.
 | # | Description | Date | Commit | Directory |
 |---|-------------|------|--------|-----------|
 | 260717-j1d | Optimize UI responsiveness + backend latency (9 fixes) | 2026-07-17 | f2cc954→b148f3f (5 commits) | [260717-j1d-optimize-ui-responsiveness-and-backend-l](./quick/260717-j1d-optimize-ui-responsiveness-and-backend-l/) |
+| fast | Hotfix get_thread 500 — drop maybe_single on embedded select (postgrest 204 regression from 260717-j1d) | 2026-07-17 | (see commit) | — |
 
 ## Deferred Items
 

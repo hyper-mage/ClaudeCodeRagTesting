@@ -37,24 +37,29 @@ def create_thread(body: ThreadCreate, user_id: str = Depends(get_user_id)):
 def get_thread(thread_id: str, user_id: str = Depends(get_user_id)):
     db = get_supabase()
     # Single round-trip: embed the thread's messages via PostgREST resource embedding
-    # (`*, messages(*)`) ordered by created_at asc, replacing the prior thread-then-messages
-    # two-query fan-out. The thread is ownership-checked (.eq id + user_id); messages are
-    # already thread-scoped, so the embedded array carries exactly the same rows the old
-    # second query returned. maybe_single → None when not owned/nonexistent → 404 (IDOR gate).
-    thread = (
+    # (`*, messages(*)`), replacing the prior thread-then-messages two-query fan-out. The
+    # thread is ownership-checked (.eq id + user_id); messages are already thread-scoped,
+    # so the embedded array carries exactly the same rows the old second query returned.
+    #
+    # Do NOT use .maybe_single() here: combined with resource embedding it trips a
+    # postgrest-py bug that raises APIError code 204 "Missing response" instead of
+    # returning the row (regression from the 260717-j1d single-round-trip rewrite). A plain
+    # list execute is the safe form — 0 rows → not owned/nonexistent → 404 (IDOR gate).
+    result = (
         db.table("threads")
         .select("*, messages(*)")
         .eq("id", thread_id)
         .eq("user_id", user_id)
-        .order("created_at", desc=False, foreign_table="messages")
-        .maybe_single()
         .execute()
     )
-    if not thread or not thread.data:
+    if not result.data:
         raise HTTPException(status_code=404, detail="Thread not found")
-    # thread.data already carries the embedded `messages` array (asc by created_at) —
-    # exactly the ThreadWithMessages shape.
-    return thread.data
+    row = result.data[0]
+    # PostgREST embed order is not guaranteed without a foreign-table order arg (also
+    # implicated in the 204 bug above), so sort the embedded messages asc by created_at in
+    # Python to preserve the exact ThreadWithMessages contract (messages asc).
+    row["messages"] = sorted(row.get("messages") or [], key=lambda m: m["created_at"])
+    return row
 
 
 @router.patch("/{thread_id}", response_model=ThreadResponse)
