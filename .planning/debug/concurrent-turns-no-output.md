@@ -1,16 +1,27 @@
 ---
-status: diagnosed
+status: awaiting_human_verify
 trigger: "Phase 17 UAT Test 5 (SC-5): two concurrent chat turns (two threads/users, different personas) fail — very laggy setup, error+retry, after several attempts both ran tool calls but produced no output (timed out/errored). Single-turn chat (Tests 1-4) works fine. Goal: find_root_cause_only (no fix)."
 created: 2026-07-14T00:00:00Z
-updated: 2026-07-14T00:00:00Z
+updated: 2026-07-20T00:00:00Z
 ---
 
 ## Current Focus
 
-hypothesis: "Concurrent chat turns fail because (a) the configured chat model is a free-tier `:free` OpenRouter slug whose per-key concurrency/RPM caps reject the 2nd simultaneous stream (429/5xx), AND (b) the main chat streaming loop iterates a BLOCKING synchronous OpenAI client directly on the single-worker asyncio event loop (no asyncio.to_thread offload), serializing concurrent turns and starving one toward the 120s llm_timeout → empty content → '[Response interrupted]'."
-test: "Static code + config inspection (read-only, per goal find_root_cause_only)."
-expecting: "Confirm sync OpenAI client, no to_thread on the main stream, single uvicorn worker, and free-tier model in use."
-next_action: "Return ROOT CAUSE FOUND to caller. Do NOT fix."
+reasoning_checkpoint:
+  hypothesis: "The MAIN chat token stream at chat.py drives the BLOCKING sync generator stream_chat_completion via a plain `for event in ...` iterated directly on the single-worker asyncio event loop with NO asyncio.to_thread offload. While turn A blocks in the generator's next() (blocking .create() + per-chunk socket reads), turn B's coroutine cannot run at all, starving it toward llm_timeout=120s → APITimeoutError → empty content → '[Response interrupted]'."
+  confirming_evidence:
+    - "llm_service.py: `from openai import OpenAI` (SYNC client); stream_chat_completion is `def ... -> Generator` doing client.chat.completions.create(stream=True) then `for chunk in stream:` — blocking network I/O with no await."
+    - "chat.py:1134 drives it via `for event in stream_chat_completion(...)` directly on the async event loop; the subagent paths (explore_kb, analyze_document) in the SAME function already offload their blocking generators via asyncio.create_task(asyncio.to_thread(_drive)) + queue + `await asyncio.to_thread(q.get)`."
+    - "Dockerfile CMD has no --workers → 1 uvicorn worker → 1 event loop; no process-level parallelism to mask the blocking-loop defect."
+  falsification_test: "If the main stream were converted to the same to_thread+queue offload and two concurrent turns STILL serialized/timed out on the loop, the blocking-loop hypothesis would be wrong (pointing instead purely at the free-tier model concurrency cap)."
+  fix_rationale: "Root cause is the loop-blocking drive of the sync generator. Offloading the generator to a worker thread and passing chunks back over a queue (the exact pattern already proven in the subagent paths of this file) lets the event loop interleave concurrent turns — addressing the amplifier defect at its mechanism, not a symptom. Model-tier (:free concurrency cap) is explicitly OUT of code scope per fix direction."
+  blind_spots: "Cannot reproduce live 2-concurrent-turn timing here (no dev creds / free-tier model in this session). Verification is static + import/smoke + existing test suite; true concurrency relief is confirmed by code semantics (event loop no longer blocked between chunks) rather than a live 120s starvation repro."
+
+status: Fix applied to the BACKEND CODE DEFECT (amplifier). Awaiting human UAT re-run of
+Phase 17 Test 5 (two concurrent turns) to confirm end-to-end relief. The :free model-tier
+concurrency cap is out of code scope and may still surface rate_limit on the 2nd turn — that
+is an environment/config factor, not this code defect.
+next_action: "Human: re-run UAT Test 5 (two concurrent chat turns, two threads/users). Report whether both stream to completion (or, if a rate_limit bubble appears, that is the separate :free model cap, not this defect)."
 
 ## Symptoms
 
@@ -88,6 +99,42 @@ root_cause: |
   so both surface as error+Retry with no output. No persona bleed occurs because per-request
   isolation is clean (fresh client per call, local persona_voice) — which is why no wrong-voice
   leak was seen; the turns simply never produced output.
-fix: ""
-verification: ""
-files_changed: []
+fix: |
+  Converted the MAIN chat token stream (backend/routers/chat.py, the `for event in
+  stream_chat_completion(...)` at ~line 1134) from a blocking synchronous generator
+  iterated DIRECTLY on the single-worker asyncio event loop into the file's existing
+  asyncio.to_thread + queue offload: a `_drive_stream()` worker thread iterates the sync
+  generator and puts each event on a queue; the event loop consumes via
+  `await asyncio.to_thread(_stream_q.get)` so a 2nd concurrent turn's coroutine can run
+  while turn A blocks on network I/O. Exceptions raised inside the generator are forwarded
+  intact over the queue and re-raised ON the loop (`raise _stream_exc`), preserving the
+  exact type so the RateLimitError / APIStatusError / APITimeoutError SSE error taxonomy and
+  the '[Response interrupted]' seam are unchanged. This mirrors the explore_kb /
+  analyze_document sub-agent offload already present in the same function (surgical, one-file
+  change). Model-tier (:free concurrency cap) was explicitly OUT of scope and untouched.
+
+verification: |
+  - `python -m py_compile routers/chat.py` and `import routers.chat` both succeed.
+  - SSE ERROR TAXONOMY (the load-bearing constraint) — tests/test_error_surfacing.py passes:
+    it monkeypatches routers.chat.stream_chat_completion with a generator that RAISES and
+    asserts RateLimitError→'rate_limit', APIStatusError 402/401/403/404→typed codes, generic
+    Exception→generic error event. Green ⇒ the exception TYPE survives the new
+    thread→queue→re-raise handoff and the '[Response interrupted]' seam is intact.
+  - Happy path + tool loop: tests/test_chat_retry.py, test_chat_cap.py (multi-iteration tool
+    loop → cap-hit), test_usage_capture.py, test_subagent_alignment.py, test_e2e_subagent.py,
+    test_thread_usage_exposed.py all pass (content_delta streaming, tool_call accumulation +
+    dispatch, usage summing, cap-hit notice).
+  - Full non-integration suite (venv, `-p no:dash`): 314 passed. The only failure
+    (test_config::test_key_encryption_secret_default — reads the root .env KEY_ENCRYPTION_SECRET)
+    and 2 errors (test_record_manager::*_integration — need live Supabase) are PRE-EXISTING and
+    unrelated; neither touches routers/chat.py.
+  - Thread-safety reviewed: budget truncate_oldest_tool_results returns a NEW list (no in-place
+    mutation of the list the driver thread snapshots), and the tool-loop `.append` only runs
+    after the generator already built its own full_messages — so no data race on current_messages;
+    semantics identical to the prior single-threaded drive.
+  - NOT verified here (needs human): a live 2-concurrent-turn timing repro — no dev creds /
+    free-tier model in this session. Relief is confirmed by code semantics (event loop no longer
+    blocked between chunks), pending human UAT re-run of Phase 17 Test 5.
+
+files_changed:
+  - backend/routers/chat.py

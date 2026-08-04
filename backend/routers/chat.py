@@ -1131,17 +1131,56 @@ async def send_message(
                     iteration += 1
                     tool_call_happened = False
 
-                    for event in stream_chat_completion(
-                        current_messages,
-                        tools=tools,
-                        tool_guide=TOOL_SELECTION_GUIDE if tools else None,
-                        source_hint=source_scope,
-                        scope_hint=scope_hint if scope_hint else None,
-                        api_key=api_key,
-                        model=model,
-                        trace=(not is_user_key),
-                        persona_voice=persona_voice,
-                    ):
+                    # ASYNC-OFFLOAD (debug: concurrent-turns-no-output) --------------
+                    # stream_chat_completion is a BLOCKING sync generator: a blocking
+                    # client.chat.completions.create() plus a blocking socket read per
+                    # chunk. Iterating it DIRECTLY here (`for event in ...`) pinned the
+                    # single uvicorn event loop between chunks, so a 2nd concurrent turn
+                    # could not run and drifted toward llm_timeout -> APITimeoutError ->
+                    # empty content -> '[Response interrupted]'. Drive it in a worker
+                    # thread and pass chunks back over a queue -- the SAME to_thread+queue
+                    # offload the explore_kb / analyze_document sub-agent paths below
+                    # already use. Exceptions are forwarded intact and re-raised ON the
+                    # loop so the RateLimitError / APIStatusError / APITimeoutError SSE
+                    # taxonomy below stays byte-for-byte identical.
+                    import asyncio as _asyncio_stream
+                    import queue as _queue_stream
+                    _stream_q: _queue_stream.Queue = _queue_stream.Queue()
+                    _STREAM_SENTINEL = object()
+
+                    def _drive_stream():
+                        try:
+                            for _ev in stream_chat_completion(
+                                current_messages,
+                                tools=tools,
+                                tool_guide=TOOL_SELECTION_GUIDE if tools else None,
+                                source_hint=source_scope,
+                                scope_hint=scope_hint if scope_hint else None,
+                                api_key=api_key,
+                                model=model,
+                                trace=(not is_user_key),
+                                persona_voice=persona_voice,
+                            ):
+                                _stream_q.put(_ev)
+                        except Exception as _stream_ex:  # forwarded intact, re-raised on loop
+                            _stream_q.put(_stream_ex)
+                        finally:
+                            _stream_q.put(_STREAM_SENTINEL)
+
+                    _stream_task = _asyncio_stream.create_task(
+                        _asyncio_stream.to_thread(_drive_stream)
+                    )
+                    _stream_exc: Exception | None = None
+                    while True:
+                        event = await _asyncio_stream.to_thread(_stream_q.get)
+                        if event is _STREAM_SENTINEL:
+                            break
+                        if isinstance(event, Exception):
+                            # Preserve the exact exception TYPE so the SSE taxonomy
+                            # (RateLimitError / APIStatusError / APITimeoutError->generic)
+                            # classifies it correctly after `await _stream_task` below.
+                            _stream_exc = event
+                            break
                         if event["type"] == "system_content":
                             # Budget bookkeeping before LLM sees the messages.
                             budget.set_system(event["content"])
@@ -1395,6 +1434,14 @@ async def send_message(
                                         **({"subagent": True} if is_subagent else {}),
                                     }),
                                 }
+
+                    # Join the stream driver thread, then surface any forwarded
+                    # exception ON the loop so the try/except taxonomy below classifies
+                    # it (RateLimitError -> rate_limit, APIStatusError -> typed, else ->
+                    # generic error -> empty content -> '[Response interrupted]').
+                    await _stream_task
+                    if _stream_exc is not None:
+                        raise _stream_exc
 
                     if not tool_call_happened:
                         break  # voluntary stop — main exit path
