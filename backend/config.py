@@ -57,23 +57,35 @@ class Settings(BaseSettings):
     low_balance_threshold_usd: float = 1.00
 
     # Curated popular-model ranking (Phase 12 D-06/D-07/D-08) — an ORDERED list of
-    # OpenRouter model-id slugs; index 0 == most popular → popularity_rank 0. This is a
-    # versioned, CODE-REVIEWED constant that ships with the deploy (no DB/env round-trip,
-    # no admin UI, NOT a runtime call). Curated using artificialanalysis.ai rankings as a
-    # one-time human guide (D-07). Slugs were finalized against the live OpenRouter catalog
-    # at build time (2026-06-23); a slug that later goes stale self-heals to
-    # popularity_rank None (popularity_for ValueError → None, D-09) — never crashes.
+    # OpenRouter model-id slugs. This is a versioned, CODE-REVIEWED constant that ships
+    # with the deploy (no DB/env round-trip, no admin UI, NOT a runtime call).
+    #
+    # This list is now the FALLBACK, not the primary ranking source. As of quick
+    # 260910-lcm the primary source is `model_catalog_service.aa_ranking`, which reads the
+    # live Artificial Analysis intelligence index that OpenRouter ships inside each
+    # catalog entry — so the top of the ranking self-updates every 24h via
+    # `refresh_if_stale` with zero operator action. This list covers the two cases AA
+    # cannot: models with no `intelligence_index` at all, and AA-scored models that fall
+    # BELOW the `AA_RANK_LIMIT` cutoff. Ranks from this list are OFFSET below the AA ranks
+    # (`popularity_for` adds `len(aa_ranks)`) so the two sources form ONE continuous
+    # ordering rather than both starting at rank 0.
+    #
+    # Ordering therefore favors popular workhorses that score below the AA cutoff, since
+    # the AA path already covers the top tier. Slugs were finalized against the live
+    # OpenRouter catalog on 2026-09-10. The self-heal guarantee is unchanged: a slug that
+    # later goes stale yields popularity_rank None (popularity_for ValueError → None,
+    # D-09) — never a crash.
     POPULAR_MODELS: list[str] = [
-        "anthropic/claude-sonnet-4.5",
+        "anthropic/claude-opus-5",
+        "anthropic/claude-sonnet-5",
+        "openai/gpt-5.4",
+        "google/gemini-3.1-pro-preview",
+        "openai/gpt-5.2",
+        "anthropic/claude-haiku-4.5",
+        "google/gemini-3.5-flash",
+        "deepseek/deepseek-v4-pro",
         "openai/gpt-5.1",
-        "google/gemini-2.5-pro",
-        "anthropic/claude-sonnet-4",
-        "openai/gpt-4o-mini",
-        "google/gemini-2.5-flash",
-        "openai/gpt-5-mini",
-        "deepseek/deepseek-r1",
-        "deepseek/deepseek-chat",
-        "meta-llama/llama-3.3-70b-instruct",
+        "meta-llama/llama-4-maverick",
     ]
 
     @property
