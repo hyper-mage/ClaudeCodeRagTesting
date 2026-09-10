@@ -28,7 +28,7 @@ See: .planning/PROJECT.md (updated 2026-07-14 after v1.3 completion)
 Phase: Milestone v1.3 complete
 Plan: —
 Status: Awaiting next milestone
-Last activity: 2026-07-18 — Completed quick task 260718-o4c: real-DB integration smoke tests for DB-shape endpoints
+Last activity: 2026-09-10 — Completed quick task 260910-lcm: auto-update model popularity_rank from live OpenRouter AA benchmark index
 
 ## Accumulated Context
 
@@ -53,6 +53,7 @@ None yet.
 | 260717-j1d | Optimize UI responsiveness + backend latency (9 fixes) | 2026-07-17 | f2cc954→b148f3f (5 commits) | [260717-j1d-optimize-ui-responsiveness-and-backend-l](./quick/260717-j1d-optimize-ui-responsiveness-and-backend-l/) |
 | fast | Hotfix get_thread 500 — drop maybe_single on embedded select (postgrest 204 regression from 260717-j1d) | 2026-07-17 | (see commit) | — |
 | 260718-o4c | Real-DB integration smoke tests for DB-shape endpoints (thread/folder/doc) — guards postgrest-shape regressions | 2026-07-18 | d442331→828b479 (3 commits) | [260718-o4c-add-real-db-integration-smoke-tests-for-](./quick/260718-o4c-add-real-db-integration-smoke-tests-for-/) |
+| 260910-lcm | Auto-update model popularity_rank from live OpenRouter AA benchmark index instead of stale curated list | 2026-09-10 | 0b6e5bc→e1525d9 (4 commits) | [260910-lcm-auto-update-model-popularity-rank-from-l](./quick/260910-lcm-auto-update-model-popularity-rank-from-l/) |
 
 ## Deferred Items
 
