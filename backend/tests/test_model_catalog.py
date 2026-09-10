@@ -381,3 +381,188 @@ def test_negative_ttl_rejected_loudly():
 
     with pytest.raises(ValidationError):
         Settings(model_cache_ttl_seconds=-1)
+
+
+# ---------------------------------------------------------------------
+# --- AA-index popularity (quick 260910-lcm) ---
+# The live OpenRouter catalog ships benchmarks.artificial_analysis.intelligence_index
+# inside each model object (already persisted under model_cache.raw by _to_cache_row),
+# so popularity_rank can self-update every 24h with no migration and no extra fetch.
+# AA is now PRIMARY (capped at AA_RANK_LIMIT); POPULAR_MODELS is the FALLBACK, offset
+# below the AA ranks so the two form one continuous ordering (DD-4).
+# ---------------------------------------------------------------------
+def test_intelligence_index_both_shapes():
+    """The AA reader accepts BOTH input shapes: a raw catalog object (benchmarks at the
+    top level) and a `model_cache` row (benchmarks nested under `raw`)."""
+    from services.model_catalog_service import intelligence_index
+
+    raw_shape = {
+        "id": "a/b",
+        "benchmarks": {"artificial_analysis": {"intelligence_index": 52.8}},
+    }
+    assert intelligence_index(raw_shape) == 52.8
+
+    cache_row_shape = {
+        "model_id": "a/b",
+        "raw": {"benchmarks": {"artificial_analysis": {"intelligence_index": 52.8}}},
+    }
+    assert intelligence_index(cache_row_shape) == 52.8
+
+
+def test_intelligence_index_defensive():
+    """Every malformed/absent/wrong-typed benchmarks shape → None, NEVER a raise.
+
+    An unhandled exception here would 500 the whole GET /api/models (the reader runs
+    per row inside build_model_response) and blank the model picker — T-LCM-01.
+    `design_arena` is a real empty LIST upstream, so a list where a dict is expected is
+    not hypothetical. `bool` must NOT be accepted even though it subclasses int.
+    """
+    from services.model_catalog_service import intelligence_index
+
+    hostile = [
+        {},
+        {"benchmarks": None},
+        {"benchmarks": []},
+        {"benchmarks": "nope"},
+        {"benchmarks": {"design_arena": []}},
+        {"benchmarks": {"artificial_analysis": []}},
+        {"benchmarks": {"artificial_analysis": {"intelligence_index": None}}},
+        {"benchmarks": {"artificial_analysis": {"intelligence_index": "52.8"}}},
+        {"benchmarks": {"artificial_analysis": {"intelligence_index": True}}},
+    ]
+    for model in hostile:
+        assert intelligence_index(model) is None, f"expected None for {model}"
+
+
+def test_aa_ranking_orders_by_index_desc():
+    """Highest intelligence_index → rank 0, descending from there."""
+    from services.model_catalog_service import aa_ranking
+
+    def _row(model_id: str, score: float) -> dict:
+        return {
+            "id": model_id,
+            "benchmarks": {"artificial_analysis": {"intelligence_index": score}},
+        }
+
+    rows = [_row("a/low", 10.0), _row("a/high", 50.0), _row("a/mid", 30.0)]
+    assert aa_ranking(rows) == {"a/high": 0, "a/mid": 1, "a/low": 2}
+
+
+def test_aa_ranking_tiebreak_is_model_id_asc():
+    """Ties in intelligence_index break on model_id ASC (DD-3).
+
+    Real ties exist upstream (two entries at 53.4). Without a deterministic tiebreak the
+    Popular section reshuffles between page loads, so the SAME dict must come back even
+    when the input row order is reversed.
+    """
+    from services.model_catalog_service import aa_ranking
+
+    def _row(model_id: str) -> dict:
+        return {
+            "id": model_id,
+            "benchmarks": {"artificial_analysis": {"intelligence_index": 42.0}},
+        }
+
+    rows = [_row("z/model"), _row("a/model")]
+    expected = {"a/model": 0, "z/model": 1}
+    assert aa_ranking(rows) == expected
+    assert aa_ranking(list(reversed(rows))) == expected, "ordering must be input-order stable"
+
+
+def test_aa_ranking_excludes_batch_variants():
+    """`:batch` twins carry an identical score and would consume half the ranked slots."""
+    from services.model_catalog_service import aa_ranking
+
+    def _row(model_id: str) -> dict:
+        return {
+            "id": model_id,
+            "benchmarks": {"artificial_analysis": {"intelligence_index": 53.4}},
+        }
+
+    ranks = aa_ranking([_row("a/x"), _row("a/x:batch")])
+    assert "a/x" in ranks
+    assert "a/x:batch" not in ranks
+
+
+def test_aa_ranking_respects_limit():
+    """The ordering is CAPPED (DD-4) so the frontend's uncapped Popular section
+    (ModelSelector.tsx:198 filters on rank != null) stays bounded."""
+    from services.model_catalog_service import aa_ranking
+
+    rows = [
+        {
+            "id": f"v/m{i:02d}",
+            "benchmarks": {"artificial_analysis": {"intelligence_index": float(100 - i)}},
+        }
+        for i in range(20)
+    ]
+    ranks = aa_ranking(rows, limit=12)
+    assert len(ranks) == 12
+    assert sorted(ranks.values()) == list(range(12))
+
+
+def test_aa_ranking_skips_unscored_and_malformed():
+    """Unscored / None / non-dict / empty-id rows are skipped, and nothing raises."""
+    from services.model_catalog_service import aa_ranking
+
+    rows = [
+        {"id": "a/scored", "benchmarks": {"artificial_analysis": {"intelligence_index": 20.0}}},
+        {"id": "a/unscored"},
+        None,
+        "not-a-dict",
+        {"id": "", "benchmarks": {"artificial_analysis": {"intelligence_index": 99.0}}},
+        {"model_id": "a/row-shape", "raw": {"benchmarks": {"artificial_analysis": {"intelligence_index": 30.0}}}},
+    ]
+    ranks = aa_ranking(rows)  # must NOT raise
+    assert ranks == {"a/row-shape": 0, "a/scored": 1}
+
+
+def test_popularity_for_aa_wins_over_curated():
+    """A model carrying an AA rank takes it, with source 'artificialanalysis', even when
+    it is ALSO pinned in the curated list."""
+    from services.model_catalog_service import popularity_for
+
+    assert popularity_for("vendor/top", ["vendor/top"], aa_ranks={"vendor/top": 0}) == (
+        0,
+        "artificialanalysis",
+    )
+
+
+def test_popularity_for_curated_offset_below_aa():
+    """Curated ranks are OFFSET by len(aa_ranks) so AA and curated form ONE continuous
+    ordering instead of colliding at rank 0 (DD-4)."""
+    from services.model_catalog_service import popularity_for
+
+    aa_ranks = {"x/1": 0, "x/2": 1}
+    popular = ["vendor/most-popular", "vendor/second"]
+    assert popularity_for("vendor/second", popular, aa_ranks=aa_ranks) == (3, "curated")
+    assert popularity_for("vendor/not-listed", popular, aa_ranks=aa_ranks) == (None, "curated")
+
+
+def test_popularity_for_default_arg_is_unchanged():
+    """DD-1 guard: the new param is an OPTIONAL keyword. A two-positional-arg call keeps
+    byte-identical pre-change behavior (offset 0, source 'curated')."""
+    from services.model_catalog_service import popularity_for
+
+    popular = ["vendor/most-popular", "vendor/second", "vendor/third"]
+    assert popularity_for("vendor/second", popular) == (1, "curated")
+
+
+def test_build_model_response_threads_aa_ranks():
+    """build_model_response forwards aa_ranks into popularity_for (DD-2); omitting it
+    keeps today's curated-only behavior."""
+    from services.model_catalog_service import build_model_response
+
+    row = {
+        "model_id": "a/high",
+        "name": "A High",
+        "pricing": {"prompt": "0.000001", "completion": "0.000002"},
+        "raw": {"benchmarks": {"artificial_analysis": {"intelligence_index": 50.0}}},
+    }
+
+    ranked = build_model_response(row, aa_ranks={"a/high": 0})
+    assert ranked["popularity_rank"] == 0
+    assert ranked["popularity_source"] == "artificialanalysis"
+
+    unranked = build_model_response(row)
+    assert unranked["popularity_source"] == "curated"

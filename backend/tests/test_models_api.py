@@ -201,3 +201,68 @@ def test_serve_stale_on_fetch_failure(monkeypatch) -> None:
     assert resp.status_code == 200, f"expected 200 (serve stale), got {resp.status_code}: {resp.text}"
     body = resp.json()
     assert len(body) == len(stale_rows), "serve-stale did not return the existing rows (D-04 violated)"
+
+
+def test_aa_rank_served_end_to_end(monkeypatch) -> None:
+    """quick 260910-lcm — a model whose cached `raw` carries an Artificial Analysis
+    intelligence_index is served with popularity_rank from that score and
+    popularity_source == 'artificialanalysis', while rows with no benchmarks keep the
+    curated source (D-08/D-09 behavior unchanged).
+
+    Served through the within-TTL path (no fetch), exactly like test_free_only_filter.
+    The two scored rows are built LOCALLY — the shared `_cache_rows_from_fixture()`
+    helper and the JSON fixture must stay benchmarks-free (every other test depends on
+    that), so this test extends a copy instead of mutating either.
+    """
+    from fastapi.testclient import TestClient
+
+    from auth import get_user_id
+    from main import app
+
+    now = datetime.now(timezone.utc).isoformat()
+
+    def _scored_row(model_id: str, score: float) -> dict:
+        return {
+            "model_id": model_id,
+            "name": model_id,
+            "context_length": 128000,
+            "pricing": {"prompt": "0.000001", "completion": "0.000002"},
+            "is_free": False,
+            "raw": {
+                "id": model_id,
+                "benchmarks": {"artificial_analysis": {"intelligence_index": score}},
+            },
+            "fetched_at": now,
+        }
+
+    cache_rows = _cache_rows_from_fixture() + [
+        _scored_row("vendor/aa-high", 53.4),
+        _scored_row("vendor/aa-low", 11.1),
+    ]
+
+    mock_db = MagicMock()
+    mock_db.table.return_value.select.return_value.execute.return_value = MagicMock(
+        data=cache_rows
+    )
+
+    app.dependency_overrides[get_user_id] = lambda: "user-uuid"
+    try:
+        with patch("routers.models.get_supabase", return_value=mock_db):
+            resp = TestClient(app).get("/api/models")
+    finally:
+        app.dependency_overrides.clear()
+
+    assert resp.status_code == 200, f"expected 200, got {resp.status_code}: {resp.text}"
+    by_id = {m["id"]: m for m in resp.json()}
+
+    high = by_id["vendor/aa-high"]
+    assert high["popularity_rank"] == 0, f"top AA score must rank 0: {high}"
+    assert high["popularity_source"] == "artificialanalysis"
+
+    low = by_id["vendor/aa-low"]
+    assert low["popularity_rank"] == 1, f"second AA score must rank 1: {low}"
+    assert low["popularity_source"] == "artificialanalysis"
+
+    # The benchmarks-free fixture rows fall through to the curated path untouched.
+    fixture_row = by_id["openai/gpt-4o-mini"]
+    assert fixture_row["popularity_source"] == "curated"
