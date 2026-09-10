@@ -81,10 +81,10 @@ Measured against `https://openrouter.ai/api/v1/models` (public, no auth) on 2026
 - **`:batch` duplicates are pervasive and would poison the ranking.** Every top model has an identical-score `:batch` twin, so an unfiltered top-20 is really only 10 distinct models. Exclude ids ending `:batch` from the AA ordering.
 - Ties in `intelligence_index` are real (e.g. two entries at 53.4). A deterministic tiebreak is mandatory or ranks shuffle between page loads.
 - Live top-12 non-`:batch` at planning time (a sanity reference, NOT something to hardcode): `anthropic/claude-fable-5.1` (53.4), `openai/gpt-6-astra` (52.8), `anthropic/claude-opus-5` (50.7), `anthropic/claude-fable-5` (49.7), `openai/gpt-5.6-sol` (47.1), `z-ai/glm-5.3` (44.9), `x-ai/grok-4.6` (44.4), `moonshotai/kimi-k3` (43.8), `openai/gpt-5.6-terra` (42.3), `anthropic/claude-opus-4.8` (42.0), `z-ai/glm-5.3-flash` (41.9), `google/gemini-3.8-flash` (41.2).
-- **There is NO `anthropic/claude-sonnet-5`.** The newest Sonnet is `anthropic/claude-sonnet-4.6`. Never write a sonnet-5 slug.
-- Slugs re-verified present on 2026-09-10: `anthropic/claude-opus-5`, `anthropic/claude-sonnet-4.6`, `anthropic/claude-haiku-4.5`, `openai/gpt-5.4`, `openai/gpt-5.2`, `openai/gpt-5.1`, `google/gemini-3.1-pro-preview`, `google/gemini-3.5-flash`, `deepseek/deepseek-v4-pro`, `x-ai/grok-4.6`, `meta-llama/llama-4-maverick`.
-- Re-verify any slug with:
-  `python -c "import json,urllib.request; ids={m['id'] for m in json.load(urllib.request.urlopen('https://openrouter.ai/api/v1/models'))['data']}; print('anthropic/claude-opus-5' in ids)"`
+- **`anthropic/claude-sonnet-5` IS live** — created 2026-06-30, AA 38.4. It is the newest Sonnet; `claude-sonnet-4.6` (2026-02-17, AA 30.5) is a generation behind it. Sonnet-5 sits at AA position **18**, i.e. BELOW the top-12 cutoff, so it gets NO AA rank and depends on the curated list for its Popular slot. Confirmed against the full unsliced set of 15 non-`:batch` `anthropic/` entries on 2026-09-10.
+- Slugs re-verified present on 2026-09-10 (full-catalog membership test, not a truncated listing): `anthropic/claude-opus-5`, `anthropic/claude-sonnet-5`, `anthropic/claude-sonnet-4.6`, `anthropic/claude-haiku-4.5`, `openai/gpt-5.4`, `openai/gpt-5.2`, `openai/gpt-5.1`, `google/gemini-3.1-pro-preview`, `google/gemini-3.5-flash`, `deepseek/deepseek-v4-pro`, `x-ai/grok-4.6`, `meta-llama/llama-4-maverick`.
+- Re-verify any slug with a MEMBERSHIP test — never by eyeballing a sliced listing. A `[:25]` slice of the `anthropic/` prefix truncates immediately after `claude-sonnet-4.6:batch` and hides `claude-sonnet-5`; that exact mistake produced a false "this slug does not exist" claim during planning. Do not slice:
+  `python -c "import json,urllib.request; ids={m['id'] for m in json.load(urllib.request.urlopen('https://openrouter.ai/api/v1/models'))['data']}; print('anthropic/claude-sonnet-5' in ids)"`
 
 Caller audit (grepped `backend/` and `backend/tests/`): the ONLY caller of `build_model_response` outside its own module is `routers/models.py::list_models`. The ONLY caller of `popularity_for` is `build_model_response` plus `test_model_catalog.py::test_popularity_tagging`. `scripts/seed_model_cache.py` imports only `_to_cache_row` and `fetch_catalog` — untouched by this change.
 </verified_facts>
@@ -109,7 +109,7 @@ Read this one carefully — it is the non-obvious consequence that would otherwi
 
 Concretely:
 - Only the top `AA_RANK_LIMIT` non-`:batch` AA models get an AA rank (`0..11`, source `"artificialanalysis"`).
-- Models below that cutoff fall through to the curated list exactly like an unscored model. This is intentional and useful: at planning time `claude-sonnet-4.6` (30.5), `gemini-3.5-flash` (33.0), `haiku-4.5` (17.6) and `llama-4-maverick` (9.3) all score below the cutoff, so the curated list is what keeps those popular workhorses in the Popular section.
+- Models below that cutoff fall through to the curated list exactly like an unscored model. This is intentional and useful: at planning time `claude-sonnet-5` (38.4 — AA position 18), `gemini-3.5-flash` (33.0), `haiku-4.5` (17.6) and `llama-4-maverick` (9.3) all score below the cutoff, so the curated list is what keeps those popular workhorses in the Popular section.
 - Curated ranks are **offset by the number of AA-ranked models** so the two sources form ONE continuous ordering instead of colliding at rank 0. With 12 AA models, curated indexes become `12, 13, 14, ...`. Without an offset the AA #1 and the curated #1 would both be rank 0 and the frontend's ascending sort would interleave them unpredictably.
 - The offset is `len(aa_ranks)`, so when `aa_ranks` is `None`/empty the offset is `0` and behavior is byte-identical to today (this is what keeps `test_popularity_tagging` green).
 - Resulting Popular section: at most 12 AA + at most 10 curated, minus overlap ≈ 19 rows. Bounded and deterministic.
@@ -185,7 +185,7 @@ Concretely:
   Use this ordered list (every slug re-verified present on 2026-09-10; ordering favors popular workhorses that score BELOW the AA cutoff, since the AA path already covers the top tier):
 
       "anthropic/claude-opus-5",
-      "anthropic/claude-sonnet-4.6",
+      "anthropic/claude-sonnet-5",
       "openai/gpt-5.4",
       "google/gemini-3.1-pro-preview",
       "openai/gpt-5.2",
@@ -195,7 +195,11 @@ Concretely:
       "openai/gpt-5.1",
       "meta-llama/llama-4-maverick",
 
-  Before writing them, re-verify with the one-liner in verified_facts. If any slug has disappeared since planning, drop it rather than inventing a replacement, and note the drop in the SUMMARY. **Never write `anthropic/claude-sonnet-5` — it does not exist.** Prefer non-`:batch` variants.
+  Before writing them, re-verify with the membership one-liner in verified_facts — do NOT eyeball a sliced listing. If any slug has disappeared since planning, drop it rather than inventing a replacement, and note the drop in the SUMMARY. Prefer non-`:batch` variants.
+
+  Two deliberate content choices in that list, not accidents — preserve them:
+  - **`anthropic/claude-sonnet-5` replaces `claude-sonnet-4.6`; 4.6 is NOT also pinned.** Sonnet-5 is newer (2026-06-30 vs 2026-02-17) and scores higher (AA 38.4 vs 30.5), and at AA position 18 it falls below the `AA_RANK_LIMIT` cutoff — so without a curated entry the current flagship Sonnet would have no Popular slot at all. Pinning both would burn two of ten fallback slots on the same model line.
+  - **`anthropic/claude-opus-5` stays pinned even though it IS in the AA top-12** (rank 2, AA 50.7), where the AA path already wins and the curated entry is inert. It is deliberate insurance: if OpenRouter ever stops emitting an AA score for opus-5, it keeps its Popular slot instead of silently vanishing from the section.
 
   Then run the full backend suite to confirm nothing else regressed (`test_config.py`, `test_key_model_resolution.py`, and `test_deprecated_model_fallback.py` are the likely blast radius for a config-constant change).
 
@@ -230,7 +234,7 @@ Concretely:
 1. `backend/venv/Scripts/python.exe -m pytest backend/tests -p no:dash -q` — full suite green.
 2. `grep -n "AA_RANK_LIMIT\|def aa_ranking\|def intelligence_index" backend/services/model_catalog_service.py` — all three present.
 3. `grep -n "aa_ranking(rows)" backend/routers/models.py` — computed once, in the router, not per row.
-4. `grep -v '^#' backend/config.py | grep -c "claude-sonnet-5"` — must be `0` (the non-existent slug never shipped).
+4. `grep -v '^#' backend/config.py | grep -c "claude-sonnet-5"` — must be `1` (the current flagship Sonnet IS pinned; it is below the AA cutoff so the curated list is its only route into the Popular section). Comment lines are stripped first so prose in the header block cannot satisfy the count.
 5. No migration file added: `git status --short supabase/migrations/` is empty.
 6. No frontend file touched: `git status --short frontend/` is empty.
 7. `git diff --stat` touches only the five files in `files_modified`.
