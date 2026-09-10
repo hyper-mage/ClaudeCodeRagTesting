@@ -35,6 +35,19 @@ logger = logging.getLogger(__name__)
 
 CATALOG_URL = "https://openrouter.ai/api/v1/models"
 
+# How many models the live Artificial-Analysis ordering is allowed to rank.
+#
+# The frontend's Popular section (`ModelSelector.tsx:198`) is built as
+# `rows.filter(m => m.popularity_rank != null)` with NO cap, and `ModelHint` renders a
+# "Popular" chip on every non-null rank. Roughly a third of the live catalog carries an
+# AA score, so ranking all of them would balloon Popular into a near-duplicate of "All
+# models" and strip the section of meaning. The bound is therefore enforced HERE,
+# server-side, which keeps the frontend contract (`rank != null` => Popular) unchanged.
+#
+# This is the single knob: raising or removing it widens the Popular section
+# proportionally, with no frontend edit required.
+AA_RANK_LIMIT: int = 12
+
 
 # =============================================================================
 # I/O: fetch the public catalog (mirrors budget_service.fetch_model_context_length)
@@ -77,6 +90,40 @@ def price_per_mtok(per_token: object) -> float | None:
     return round(value * 1_000_000, 4)
 
 
+def intelligence_index(model: dict) -> float | None:
+    """Guarded read of `benchmarks.artificial_analysis.intelligence_index`.
+
+    Accepts BOTH input shapes the rest of this module already handles: a raw OpenRouter
+    catalog object (benchmarks at the top level) and a `model_cache` row (the full
+    upstream object nested under `raw` by `_to_cache_row`) — so no migration and no extra
+    HTTP fetch are needed; the score is already sitting in the cache today.
+
+    Returns None for every malformed/absent/wrong-typed shape and NEVER raises. The live
+    upstream blob is `{"design_arena": [], "artificial_analysis": {"intelligence_index":
+    52.8, ...}}`, where `design_arena` really is an empty LIST, so a list where a dict is
+    expected is not hypothetical. `bool` is rejected explicitly because it subclasses int.
+
+    Defensiveness is load-bearing, not decorative: this runs per row inside
+    `build_model_response`, so a single raise would 500 the whole GET /api/models and
+    blank the model picker (same posture as `price_per_mtok` / `tag_is_free`, T-12-V5-01).
+    """
+    if not isinstance(model, dict):
+        return None
+    benchmarks = model.get("benchmarks")
+    if not isinstance(benchmarks, dict):
+        raw = model.get("raw")
+        benchmarks = raw.get("benchmarks") if isinstance(raw, dict) else None
+    if not isinstance(benchmarks, dict):
+        return None
+    analysis = benchmarks.get("artificial_analysis")
+    if not isinstance(analysis, dict):
+        return None
+    value = analysis.get("intelligence_index")
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return None
+    return float(value)
+
+
 def tag_is_free(model: dict) -> bool:
     """Free/paid tag per the verified rule.
 
@@ -92,27 +139,85 @@ def tag_is_free(model: dict) -> bool:
     return pricing.get("prompt") == "0" and pricing.get("completion") == "0"
 
 
-def popularity_for(model_id: str, popular: list[str]) -> tuple[int | None, str]:
-    """Curated popularity: rank = position in the ordered POPULAR_MODELS list.
+def aa_ranking(rows: list[dict], limit: int = AA_RANK_LIMIT) -> dict[str, int]:
+    """Order the catalog by live Artificial-Analysis intelligence index → {model_id: rank}.
 
-    Returns (index, "curated") when present; (None, "curated") when absent — a model
-    that is not in the curated list degrades gracefully to a null rank (D-08/D-09). The
-    source is always "curated" in Phase 12; a future AA-integration phase overwrites the
-    rank and flips source to "artificialanalysis" with no reshape (D-08).
+    Pure and side-effect-free. Rank is a CROSS-CATALOG position, so this is computed once
+    per request from the full row set by the caller and then handed down per row — a
+    per-model function cannot know it (see `build_model_response`).
+
+    Rules:
+      - Non-dict entries, empty ids and unscored rows are skipped; NEVER raises on a
+        malformed row set.
+      - Ids ending `:batch` are EXCLUDED. Every top model ships an identical-score
+        `:batch` twin upstream, so an unfiltered top-N is really only N/2 distinct models
+        and half the ranked slots would be duplicates.
+      - Sort is `intelligence_index` DESC, then `model_id` ASC. Real ties exist upstream
+        (two live entries at 53.4); without the deterministic tiebreak the Popular
+        section would reshuffle between page loads.
+      - Truncated to `limit` (default AA_RANK_LIMIT) to keep the frontend's uncapped
+        Popular section bounded.
     """
+    scored: list[tuple[float, str]] = []
+    for row in rows or []:
+        if not isinstance(row, dict):
+            continue
+        model_id = str(row.get("id") or row.get("model_id") or "")
+        if not model_id or model_id.endswith(":batch"):
+            continue
+        score = intelligence_index(row)
+        if score is None:
+            continue
+        scored.append((score, model_id))
+
+    scored.sort(key=lambda pair: (-pair[0], pair[1]))
+    return {model_id: rank for rank, (_score, model_id) in enumerate(scored[:limit])}
+
+
+def popularity_for(
+    model_id: str,
+    popular: list[str],
+    aa_ranks: dict[str, int] | None = None,
+) -> tuple[int | None, str]:
+    """Popularity rank: live AA index first, curated POPULAR_MODELS list as the fallback.
+
+    Resolution order:
+      1. Present in `aa_ranks` → (that rank, "artificialanalysis"). The live index wins
+         even over a curated pin, because it self-updates every 24h through the existing
+         `refresh_if_stale` path.
+      2. Otherwise fall back to the curated index, OFFSET by `len(aa_ranks)` →
+         (offset + index, "curated"). The offset exists so the two sources form ONE
+         continuous ordering instead of colliding at rank 0 — without it the AA #1 and
+         the curated #1 would both be rank 0 and the frontend's ascending sort would
+         interleave them unpredictably.
+      3. In neither → (None, "curated"). A curated slug that later goes stale upstream
+         degrades to a null rank rather than crashing (D-08/D-09, unchanged).
+
+    The source is no longer always "curated": the AA path is live as of quick 260910-lcm.
+    `aa_ranks` is an OPTIONAL keyword — when None/empty the offset is 0 and behavior is
+    byte-identical to the pre-AA curated-only path, so existing call sites are unaffected.
+    """
+    if isinstance(aa_ranks, dict) and model_id in aa_ranks:
+        return aa_ranks[model_id], "artificialanalysis"
+    offset = len(aa_ranks or {})
     try:
-        return popular.index(model_id), "curated"
+        return offset + popular.index(model_id), "curated"
     except ValueError:
         return None, "curated"
 
 
-def build_model_response(model: dict) -> dict:
+def build_model_response(model: dict, aa_ranks: dict[str, int] | None = None) -> dict:
     """Compose a render-ready catalog entry from a raw OpenRouter model row.
 
     Accepts either a raw OpenRouter model object (keyed `id`/`pricing`/`context_length`)
     or a cached `model_cache` row (keyed `model_id`/`pricing`/`context_length`); resolves
     the id from whichever is present. Computes is_free + per-Mtok hints + null-safe
-    context_length + curated popularity, and RETAINS the raw pricing strings (D-10).
+    context_length + popularity, and RETAINS the raw pricing strings (D-10).
+
+    Popularity is now AA-PRIMARY with the curated list as the fallback. `aa_ranks` is
+    precomputed by the CALLER (once per request, via `aa_ranking`) and threaded in,
+    because rank is a cross-catalog position this per-row function cannot derive on its
+    own. Omitting it is legal and yields the curated-only behavior unchanged.
 
     Never raises on a malformed/partial row — missing fields surface as None/False.
     """
@@ -126,7 +231,7 @@ def build_model_response(model: dict) -> dict:
     ctx = model.get("context_length")
     context_length = ctx if isinstance(ctx, int) else None
 
-    rank, source = popularity_for(model_id, settings.POPULAR_MODELS)
+    rank, source = popularity_for(model_id, settings.POPULAR_MODELS, aa_ranks=aa_ranks)
 
     return {
         "id": model_id,

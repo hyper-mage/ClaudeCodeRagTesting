@@ -9,8 +9,13 @@ reimplement free/paid tagging, per-Mtok math, popularity, or the refresh logic:
 
   refresh_if_stale(db)      — serve-or-refresh the model_cache rows; never empty (D-05);
                               serve-stale-on-failure (D-04). Read-triggered, 24h TTL (D-03).
+  aa_ranking(cached rows)   — live Artificial-Analysis ordering over the WHOLE row set,
+                              computed ONCE per request. Rank is a cross-catalog position,
+                              so it cannot be derived per row; the resulting
+                              {model_id: rank} map is threaded into each row build.
   build_model_response(row) — tag is_free + per-Mtok hints + null-safe context_length +
-                              curated popularity, retaining raw pricing (D-10 / D-11).
+                              popularity (AA-primary, curated fallback), retaining raw
+                              pricing (D-10 / D-11).
 
 Security:
 - Auth-gated via Depends(get_user_id) (codebase norm, A4). The catalog is non-secret and
@@ -26,7 +31,7 @@ from fastapi import APIRouter, Depends
 from auth import get_user_id
 from database import get_supabase
 from models.schemas import ModelResponse
-from services.model_catalog_service import build_model_response, refresh_if_stale
+from services.model_catalog_service import aa_ranking, build_model_response, refresh_if_stale
 
 router = APIRouter(prefix="/api/models", tags=["models"])
 
@@ -41,13 +46,18 @@ def list_models(
     Composes the plan-01 helpers over the model_cache rows:
       1. refresh_if_stale(db) — serve-or-refresh; never empty (D-05); serve stale on a
          fetch failure (D-04). An empty cache populates synchronously on this first read.
-      2. build_model_response(row) per row — render-ready fields, raw pricing retained.
-      3. If free_only, drop the non-free rows SERVER-SIDE (D-02) — the client never
+      2. aa_ranking over the cached rows — the live AA ordering, computed ONCE.
+         Rank is a position across the whole catalog, so it must be resolved here rather
+         than inside the per-row build; the map is then passed down to every row.
+      3. build_model_response(row, aa_ranks=...) per row — render-ready fields, raw
+         pricing retained, popularity AA-primary with the curated list as fallback.
+      4. If free_only, drop the non-free rows SERVER-SIDE (D-02) — the client never
          recomputes is_free.
     """
     db = get_supabase()
     rows = refresh_if_stale(db)
-    models = [build_model_response(row) for row in rows]
+    aa_ranks = aa_ranking(rows)
+    models = [build_model_response(row, aa_ranks=aa_ranks) for row in rows]
     if free_only:
         models = [m for m in models if m["is_free"]]
     return models
